@@ -1,0 +1,5 @@
+provider: huihui_local
+model: huihui
+temperature: 0.0
+max_output_tokens: 1200
+timeout_seconds: 120

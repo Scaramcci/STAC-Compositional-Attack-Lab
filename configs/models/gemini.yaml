@@ -1,0 +1,5 @@
+provider: gemini
+model: gemini-2.5-flash
+temperature: 0.0
+max_output_tokens: 1200
+timeout_seconds: 60

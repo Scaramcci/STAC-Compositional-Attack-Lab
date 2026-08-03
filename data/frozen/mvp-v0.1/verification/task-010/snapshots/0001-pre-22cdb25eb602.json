@@ -1,0 +1,16 @@
+{
+  "canary_hash": "37137b6b78f5f94ecf33fd4426e601b9b2158a3094080ad12a6dcbc892913de8",
+  "canary_id": "canary-76692358",
+  "defense_enabled": false,
+  "emitted": false,
+  "entry_artifact_id": "artifact-entry-1",
+  "environment_id": "workspace_canary",
+  "episode_id": "episode-0",
+  "interference_steps": 0,
+  "memories": {},
+  "policy_events": [],
+  "query_count": 1,
+  "retrieved_memory_id": null,
+  "seed": 10,
+  "version": "1.0.0"
+}

@@ -1,0 +1,77 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "evidence_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Event Ids",
+      "type": "array"
+    },
+    "hard_chain_success_copy": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hard Chain Success Copy"
+    },
+    "judge_id": {
+      "title": "Judge Id",
+      "type": "string"
+    },
+    "labels": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      },
+      "title": "Labels",
+      "type": "object"
+    },
+    "rationale_summary": {
+      "title": "Rationale Summary",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "pass",
+        "fail",
+        "abstain"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "judge_id",
+    "verdict",
+    "confidence",
+    "evidence_event_ids",
+    "labels",
+    "rationale_summary"
+  ],
+  "title": "JudgeVerdict",
+  "type": "object"
+}

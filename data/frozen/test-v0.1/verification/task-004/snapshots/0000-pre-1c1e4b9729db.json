@@ -1,0 +1,16 @@
+{
+  "canary_hash": "3d449ca984f09bae750651137079ec81acda15d7e0dffde330fcac189405ab05",
+  "canary_id": "canary-31681838",
+  "defense_enabled": false,
+  "emitted": false,
+  "entry_artifact_id": null,
+  "environment_id": "workspace_canary",
+  "episode_id": "episode-0",
+  "interference_steps": 0,
+  "memories": {},
+  "policy_events": [],
+  "query_count": 0,
+  "retrieved_memory_id": null,
+  "seed": 4,
+  "version": "1.0.0"
+}

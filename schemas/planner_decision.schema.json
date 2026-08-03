@@ -1,0 +1,104 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "execute_node",
+        "retry_node",
+        "reroute",
+        "stop_success",
+        "stop_failure"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "budget_after_action": {
+      "minimum": 0,
+      "title": "Budget After Action",
+      "type": "integer"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "decision_id": {
+      "title": "Decision Id",
+      "type": "string"
+    },
+    "fallback_node_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fallback Node Id"
+    },
+    "public_evidence_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Public Evidence Event Ids",
+      "type": "array"
+    },
+    "rationale_summary": {
+      "title": "Rationale Summary",
+      "type": "string"
+    },
+    "satisfied_preconditions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Satisfied Preconditions",
+      "type": "array"
+    },
+    "selected_node_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Node Id"
+    },
+    "selected_primitive_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Primitive Id"
+    },
+    "unsatisfied_preconditions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unsatisfied Preconditions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "decision_id",
+    "action",
+    "selected_node_id",
+    "selected_primitive_id",
+    "satisfied_preconditions",
+    "unsatisfied_preconditions",
+    "public_evidence_event_ids",
+    "budget_after_action",
+    "rationale_summary",
+    "confidence"
+  ],
+  "title": "PlannerDecision",
+  "type": "object"
+}

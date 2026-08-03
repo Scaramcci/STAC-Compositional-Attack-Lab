@@ -1,0 +1,5 @@
+provider: fake
+model: fake-deterministic-v1
+temperature: 0.0
+max_output_tokens: 1200
+timeout_seconds: 60

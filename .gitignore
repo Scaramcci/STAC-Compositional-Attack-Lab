@@ -1,0 +1,18 @@
+.env
+__pycache__/
+*.pyc
+* 2.json
+* 2.jsonl
+.venv/
+src/*.egg-info/
+integrations/.conda-agentdojo/
+integrations/agentdojo/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+data/generated/*
+!data/generated/.gitkeep
+experiments/runs/*
+!experiments/runs/.gitkeep
+reports/*
+!reports/.gitkeep
