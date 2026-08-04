@@ -9,8 +9,12 @@ from stac_attack_lab.hashing import file_hash, stable_hash
 
 def freeze_dataset(dataset: Path, version: str, project_root: Path) -> Path:
     target = project_root / "data/frozen" / version
+    source_samples = dataset / "samples.jsonl"
     if target.exists():
-        shutil.rmtree(target)
+        target_samples = target / "samples.jsonl"
+        if target_samples.is_file() and file_hash(source_samples) == file_hash(target_samples):
+            return target
+        raise FileExistsError(f"frozen_dataset_version_exists:{version}")
     shutil.copytree(dataset, target)
     samples = target / "samples.jsonl"
     manifest = {

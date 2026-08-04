@@ -24,3 +24,7 @@ Runtime role configs are independent. Current temporary config `stac_sample_buil
 - `judges.benign_utility_judge`: condition-blind utility labels.
 
 Judge outputs never override deterministic verifier verdicts.
+
+## Prompt identity and transcript linkage
+
+The full `runtime.victim_system` file hash is written to every condition manifest and tested for equality across clean, attack, ablation, defense, offline, and evaluation configurations. Each external call records prompt id, semantic version, byte hash, input schema, and output schema. Victim transcript audit rejects visible `private_oracle`, attack-graph, condition, verifier-target, or expected-predicate metadata.

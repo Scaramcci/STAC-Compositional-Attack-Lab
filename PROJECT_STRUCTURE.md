@@ -80,3 +80,11 @@ sequenceDiagram
   R->>H: events and snapshot refs
   H->>P: coarse hard stage status
 ```
+
+## Durable execution and local serving
+
+`recording/progress.py` owns attack idempotency keys, atomic checkpoints, append-only transitions, and the root human ledger. `recording/conversations.py` owns typed observable events, secret filtering, model error categories, stable call ids, and transcript audit. The online runner checkpoints outside each per-attack directory so a crash cannot erase an already completed condition.
+
+`models/discovery.py` validates a Huihui Hugging Face directory without loading it. `scripts/launch_huihui_vllm.sh` is the explicit single-4090 serving boundary; the runner communicates only with its configured OpenAI-compatible base URL.
+
+A run root now also contains `run_manifest.json`, `progress.json`, `attack_progress.jsonl`, `conversations.jsonl`, `transcript_audit.json`, and `results.jsonl`. Per-attack subdirectories continue to contain manifest/status/events/verdicts/artifacts/snapshots/report files.

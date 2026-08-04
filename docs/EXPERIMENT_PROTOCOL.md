@@ -31,3 +31,13 @@ The local smoke reports engineering feasibility and variance estimates. Wilson C
 ## Reproducibility
 
 Freeze datasets before online runs. Reports must be rebuilt from `results.jsonl`, `events.jsonl`, and `verdicts.jsonl`, not from stdout.
+
+## Checkpoint and interruption protocol
+
+The unit of durability is one `task/sample × condition × seed` attack case. Before a case it transitions to `running`; afterward it transitions to `completed`, `failed_retryable`, `failed_terminal`, or `paused_quota`. Each transition is fsynced, followed by an atomic checkpoint and human-ledger update. Resume skips `completed` idempotency keys and starts at the first nonterminal key. Attempts are append-only and never overwritten.
+
+## Conversation audit protocol
+
+A request event precedes every external model call, using a stable call id. Its response or categorized error follows immediately. Events contain role/provider/model/prompt/schema identifiers, complete observable messages, filtered raw response, structured parse, validation result, latency/token metadata when available, and links to events/artifacts/snapshots/hard verdicts. Hidden chain-of-thought is neither requested nor recorded.
+
+Formal acceptance requires a passing transcript audit and deterministic hard verdict. Semantic labels can only supplement those results.

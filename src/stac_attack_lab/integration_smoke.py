@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import ast
-import json
 import os
 from pathlib import Path
 from typing import cast
 
+from stac_attack_lab.config import GPT_MODEL_ID, configured_openai_models
 from stac_attack_lab.contracts import PromptWriterOutput
 from stac_attack_lab.env_loader import load_project_env
 from stac_attack_lab.models.base import ModelCallError, ModelClient
@@ -15,28 +14,8 @@ from stac_attack_lab.models.openai_compatible import OpenAICompatibleClient
 
 
 def first_openai_model() -> str:
-    mixed_case_key = "OPENAI_MODEL" + "_list"
-    raw = (
-        os.environ.get("OPENAI_MODEL_LIST")
-        or os.environ.get(mixed_case_key)
-        or os.environ.get("OPENAI_MODEL")
-        or ""
-    )
-    if not raw:
-        return "gpt-4o-mini"
-    try:
-        parsed = json.loads(raw)
-        if isinstance(parsed, list) and parsed:
-            return str(parsed[0])
-    except json.JSONDecodeError:
-        pass
-    try:
-        parsed_literal = ast.literal_eval(raw)
-        if isinstance(parsed_literal, list) and parsed_literal:
-            return str(parsed_literal[0])
-    except (SyntaxError, ValueError):
-        pass
-    return raw.split(",")[0].strip()
+    configured = configured_openai_models()
+    return configured[0] if configured else GPT_MODEL_ID
 
 
 def smoke_models(project_root: Path) -> dict[str, object]:
@@ -48,20 +27,15 @@ def smoke_models(project_root: Path) -> dict[str, object]:
     gemini = GeminiClient()
     clients: list[tuple[str, ModelClient, str]] = [("gemini", gemini, gemini.model_id)]
     if os.environ.get("STAC_SMOKE_OPENAI_COMPATIBLE") == "1":
-        clients.append(
-            (
-                "openai_compatible",
-                OpenAICompatibleClient(first_openai_model()),
-                first_openai_model(),
-            )
-        )
+        model = first_openai_model()
+        clients.append(("openai_compatible", OpenAICompatibleClient(model), model))
     else:
         providers["openai_compatible"] = {
             "ok": False,
             "skipped": "set STAC_SMOKE_OPENAI_COMPATIBLE=1",
         }
     if os.environ.get("STAC_SMOKE_HUIHUI") == "1":
-        model = os.environ.get("HUIHUI_MODEL") or "huihui"
+        model = os.environ.get("HUIHUI_MODEL") or "huihui-qwen3-14b-abliterated-v2"
         clients.append(("huihui_local", HuihuiLocalClient(model), model))
     else:
         providers["huihui_local"] = {"ok": False, "skipped": "set STAC_SMOKE_HUIHUI=1"}

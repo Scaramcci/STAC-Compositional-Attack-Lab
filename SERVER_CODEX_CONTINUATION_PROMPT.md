@@ -28,6 +28,13 @@ plus linting, type checking, schema generation, and other tests that are proven
 not to make model or public-network calls. Any integration test requiring a real
 model must remain explicitly marked and skipped with a precise reason.
 
+Current server state: model discovery resolves
+`/home/kunyuan/models/huihui-qwen3-14b-abliterated-v2`. An ignored
+`.venv-vllm` contains vLLM 0.26.0, PyTorch 2.11.0+cu130, and BitsAndBytes 0.50.0;
+CUDA detection succeeds on the RTX 4090. The launcher defaults to that virtual
+environment and runtime BitsAndBytes quantization. The Huihui weights/server and
+the full experiment have intentionally not been started.
+
 ## Required model assignments
 
 Implement and validate two distinct experiment profiles. Model assignment must
@@ -54,7 +61,7 @@ transcript references, deterministic evidence, and verifier results.
   to the offline phase: GPT-5.5 through the OpenAI-compatible API.
 - Change only Victim to the local
   `huihui-qwen3-14b-abliterated-v2` model.
-- Search for the local model under `../../models` rather than assuming one exact
+- Search for the local model under `../../../models` rather than assuming one exact
   directory name. Validate a candidate using its model config/tokenizer and
   weight files. Support an explicit `HUIHUI_MODEL_PATH` override.
 - Build the local serving/evaluation integration required by the repository,
@@ -195,4 +202,3 @@ At completion, report only:
 - real-model commands intentionally not run;
 - remaining integration prerequisites for OpenAI/Gemini and the local 4090;
 - any deviation from `PLAN.md`, with the corresponding ADR.
-

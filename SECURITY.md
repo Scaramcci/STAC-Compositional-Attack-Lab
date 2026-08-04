@@ -27,3 +27,11 @@ The full local fake model is deterministic and does not represent broad model be
 ## Incident Response
 
 If a real secret or unsafe payload is accidentally written into this project, stop running experiments, remove the artifact, rotate the exposed credential if applicable, document the incident in `docs/DECISIONS.md`, and regenerate affected datasets.
+
+## Transcript and checkpoint controls
+
+All observable messages are filtered against configured secret values before serialization or hashing. Every conversation event records that the filter ran. Transcript audit flags sequence gaps, role/model mismatches, missing request events, absent redaction proof, and Victim-visible experiment metadata. `EXPERIMENT_PROGRESS.md` contains status only, never full messages.
+
+A real-profile configuration error fails before execution and reports variable names or a generic model-configuration category. Provider errors are categorized without response headers, endpoint query strings, key fragments, or secret fingerprints.
+
+Frozen dataset versions cannot be overwritten with different content. The local-model discovery command reads model metadata and filenames only; it does not load weights or start a network service.

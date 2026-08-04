@@ -4,6 +4,7 @@
       "enum": [
         "planner",
         "attacker",
+        "prompt_writer",
         "victim",
         "verifier",
         "judge",
@@ -21,6 +22,7 @@
         "action_tool",
         "planner",
         "attacker",
+        "prompt_writer",
         "victim",
         "verifier",
         "judge"

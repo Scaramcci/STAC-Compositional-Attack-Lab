@@ -79,3 +79,27 @@ Problem: SHADE_Arena exists under `papers/projects/AgentLAB/code/official/SHADE_
 Decision: Add a read-only adapter smoke that checks expected SHADE_Arena files and reports discovered task/tool modules. Do not edit SHADE_Arena or vendor it into this project.
 
 Impact: Integration readiness is visible, but formal SHADE_Arena execution remains an explicit integration step.
+
+## ADR-009: Fail-closed named model profiles
+
+Problem: Role model names were independently configurable and the intended GPT/Gemini and GPT/Huihui experiments could silently drift.
+
+Decision: Add validated `stac_offline` and `formal_evaluation` profiles. Every non-Victim role is pinned to `gpt-5.5`; only Victim differs. `OPENAI_MODEL_list` takes precedence over its uppercase compatibility alias, and startup rejects a list without GPT-5.5.
+
+Impact: Older GPT-4.1 configs no longer load as formal profiles. The all-Gemini mapping remains clearly labeled `gemini_development` and is not a formal substitute.
+
+## ADR-010: Per-attack checkpoint and typed observable transcripts
+
+Problem: Resume was a no-op and hash-only LLM traces could not reconstruct interrupted experiments.
+
+Decision: Store atomic `progress.json`, append-only `attack_progress.jsonl`, and typed, redacted `conversations.jsonl`. Use a deterministic run/config/dataset/attack/condition/seed idempotency key and checkpoint every case. Audit sequence, roles, prompt/model assignment, redaction, and call linkage.
+
+Impact: Quota interruptions become `paused_quota` and resume skips completed keys. Research artifacts are larger because observable messages and raw responses are retained after explicit secret filtering.
+
+## ADR-011: Immutable frozen versions and discovered local weights
+
+Problem: Dataset freeze replaced existing versions, and the Huihui path was an assumed server detail.
+
+Decision: Reject content changes under an existing frozen version while treating identical freezes as idempotent. Discover Huihui under `../../../models` or `HUIHUI_MODEL_PATH` by checking config, tokenizer, and weights before vLLM launch. Keep vLLM in an ignored `.venv-vllm` environment and default the 24 GB launcher to BitsAndBytes runtime quantization, with explicit binary, quantization, and CPU-offload overrides.
+
+Impact: Dataset corrections require a new version. Local evaluation has a deterministic preflight and does not load weights during discovery tests. The 28 GB BF16 checkpoint is not assumed to fit unquantized on the RTX 4090.

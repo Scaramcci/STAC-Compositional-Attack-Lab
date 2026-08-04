@@ -22,7 +22,7 @@ schemas:
 smoke-offline:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli offline build --config configs/experiments/mvp_offline.yaml
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli dataset audit --dataset data/generated/latest
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli dataset freeze --dataset data/generated/latest --version mvp-v0.1
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli dataset freeze --dataset data/generated/latest --version smoke-v0.1
 
 smoke-online:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli online run --config configs/experiments/mvp_online.yaml --dataset-version mvp-v0.1

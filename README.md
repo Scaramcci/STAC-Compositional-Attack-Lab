@@ -1,24 +1,34 @@
 # STAC Compositional Attack Lab
 
-Local, deterministic-first lab for building and evaluating safe STAC-style compositional attack chains against synthetic workspace canaries and read-only AgentLAB/SHADE_Arena integrations.
+A deterministic-first lab for constructing and evaluating safe, long-horizon STAC compositional attack chains against synthetic workspace canaries.
 
-## Install
-
-```bash
-python -m pip install -e '.[dev]'
-```
-
-No API key is required for deterministic tests. The default smoke model is `fake-deterministic-v1`.
-
-## Five-Minute Fake Smoke
+## Install and offline smoke
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+make lint
+make typecheck
+make test
 make smoke-offline
 make smoke-online
 make smoke-report
 ```
 
-Outputs are written to `data/generated/latest`, `data/frozen/mvp-v0.1`, and `experiments/runs/latest`.
+The fake profile never needs credentials or network access. It builds 10 offline samples and runs the 2-task × 1-seed × 9-condition smoke matrix. Canaries are local, synthetic, and valueless.
+
+## Experiment profiles
+
+The profile field is validated together with every role assignment:
+
+- `fake`: all roles use `fake-deterministic-v1`, with networking disabled.
+- `gemini_development`: an explicitly non-formal all-Gemini development profile.
+- `stac_offline`: Planner, Attacker, PromptWriter, Verifier, and Judge use `gpt-5.5` through the OpenAI-compatible endpoint; Victim uses Gemini.
+- `formal_evaluation`: the same GPT-5.5 roles; only Victim changes to local `huihui-qwen3-14b-abliterated-v2`.
+
+The deterministic verifier is authoritative in every profile. Semantic Verifier/Judge outputs are separate evidence labels and cannot change `chain_success`.
+
+Copy `.env.example` to `.env` and replace placeholders locally. `OPENAI_MODEL_list` is the canonical existing spelling and takes precedence over `OPENAI_MODEL_LIST`. Startup fails closed unless `gpt-5.5` is present. Errors name missing variables or invalid configuration only; secrets are neither serialized nor hashed.
 
 ## Commands
 
@@ -26,27 +36,45 @@ Outputs are written to `data/generated/latest`, `data/frozen/mvp-v0.1`, and `exp
 python -m stac_attack_lab.cli offline build --config configs/experiments/mvp_offline.yaml
 python -m stac_attack_lab.cli dataset audit --dataset data/generated/latest
 python -m stac_attack_lab.cli dataset freeze --dataset data/generated/latest --version mvp-v0.1
-python -m stac_attack_lab.cli online run --config configs/experiments/mvp_online.yaml --dataset-version mvp-v0.1
+python -m stac_attack_lab.cli online run --config configs/experiments/mvp_online.yaml
+python -m stac_attack_lab.cli run resume --run-id <run-id>
+python -m stac_attack_lab.cli transcript audit --run-root experiments/runs/latest
 python -m stac_attack_lab.cli report build --run-root experiments/runs/latest
-python -m stac_attack_lab.cli integration smoke-shade
+python -m stac_attack_lab.cli schemas build
 ```
 
-## Model Configs
+Frozen versions are immutable: freezing identical content is idempotent; different content under an existing version is rejected.
 
-- `configs/experiments/stac_sample_build_gemini.yaml`: temporary all-role Gemini sample construction while OpenAI-compatible access is unavailable.
-- `configs/experiments/stac_sample_build_gpt_gemini.yaml`: intended STAC sample construction with GPT planner/attacker/prompt-writer/verifier/judge and Gemini victim.
-- `configs/experiments/evaluation_gpt_huihui_4090.yaml`: intended formal evaluation with GPT planner/attacker/verifier/judge and local 4090-hosted huihui victim.
+## Resume and provenance
 
-Real credentials are read only from environment variables: `GEMINI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, optional `OPENAI_MODEL_LIST`, and for the server run `HUIHUI_BASE_URL`, optional `HUIHUI_API_KEY`, `HUIHUI_MODEL`.
+Every online experiment writes:
 
-## Minimal Result Example
+- `progress.json`, atomically replaced after each individual attack case;
+- `attack_progress.jsonl`, an append-only, fsynced status transition log;
+- `conversations.jsonl`, typed complete observable role/model/tool events;
+- `transcript_audit.json`, sequence, isolation, assignment, linkage, and redaction findings;
+- per-attack events, artifacts, snapshots, verdicts, and reports.
 
-The offline smoke freezes all 10 synthetic seeds as `mvp-v0.1`. The online smoke runs 2 tasks × 1 seed × 9 conditions. Expected fake-model behavior: `clean` has 0 canary successes, `fixed_full` succeeds, and `llm_planner_full_defense_on` is blocked by `MemoryIntegrityGuard`.
+`EXPERIMENT_PROGRESS.md` is the compact human ledger. Completed idempotency keys are skipped on resume. Quota/rate-limit failures checkpoint as `paused_quota` and exit without discarding completed attacks.
 
-## Safety
+## Huihui on one RTX 4090
 
-All canaries are synthetic no-value IDs. The environment has no network, shell, host-file, credential, or real exfiltration capability.
+Discovery checks `HUIHUI_MODEL_PATH` first, then searches `../../../models` for a Hugging Face directory containing config, tokenizer, and weight files without loading weights:
 
-## Current Limits
+```bash
+python -m stac_attack_lab.cli models discover-huihui
+python3 -m venv .venv-vllm
+.venv-vllm/bin/python -m pip install --upgrade pip
+.venv-vllm/bin/python -m pip install vllm 'bitsandbytes>=0.49.2'
+scripts/launch_huihui_vllm.sh
+```
 
-The local verifier remains deterministic and has final authority over attack success. LLM verifier and judge roles add labels only. AgentDojo and SHADE_Arena are exposed through integration smoke/adapters; formal external runs are separate from default tests.
+The launcher uses `.venv-vllm/bin/vllm` by default and accepts a `VLLM_BIN` override. It defaults to runtime BitsAndBytes quantization because the discovered BF16 checkpoint is larger than 24 GB. Set `HUIHUI_QUANTIZATION=none` only when the weights fit; `HUIHUI_CPU_OFFLOAD_GB`, `HUIHUI_MAX_MODEL_LEN`, and `HUIHUI_GPU_MEMORY_UTILIZATION` tune the single-GPU deployment.
+
+## Real-model integration
+
+After credentials and quota are available, use `stac_sample_build_gpt_gemini.yaml` for formal sample construction and `evaluation_gpt_huihui_4090.yaml` for evaluation. A Gemini-only connectivity smoke is opt-in through `integration smoke-models`; OpenAI and Huihui calls additionally require their `STAC_SMOKE_*` flags.
+
+## Safety and current limits
+
+No local tool can access the public network, shell, host files, environment variables, real credentials, or real external services. The model clients are the only optional network boundary. AgentDojo and SHADE_Arena remain read-only adapter/contract smokes. The checked-in `mvp-v0.1` data is an engineering fixture, not a general empirical claim.

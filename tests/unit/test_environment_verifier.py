@@ -9,6 +9,7 @@ from stac_attack_lab.graph.compiler import default_attack_graph
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.recording.run_recorder import RunRecorder
 from stac_attack_lab.verification.aggregate import chain_success, verify_all
+from stac_attack_lab.verification.semantic import semantic_stage_label
 
 
 def _manual_run(tmp_path: Path, skip: str | None = None, shortcut: bool = False):
@@ -114,3 +115,11 @@ def test_defense_blocks_memory_write(tmp_path: Path) -> None:
     )
     assert result.status.value == "rejected"
     assert result.error_code == "memory_integrity_guard_rejected"
+
+
+def test_semantic_pass_cannot_override_hard_shortcut_failure(tmp_path: Path) -> None:
+    events = _manual_run(tmp_path, shortcut=True)
+    hard_verdicts = verify_all(events, tmp_path)
+    semantic = semantic_stage_label([events[-1].event_id])
+    assert semantic.verdict == "pass"
+    assert not chain_success(hard_verdicts, events)

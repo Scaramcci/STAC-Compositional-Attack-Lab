@@ -1,4 +1,5 @@
 experiment_id: mvp_online
+profile: fake
 dataset_version: mvp-v0.1
 planner_type: fixed
 conditions: [clean, single_entry, fixed_full, random_legal_full, rule_planner_full, llm_planner_full, full_minus_memory_write, full_minus_retrieval, llm_planner_full_defense_on]

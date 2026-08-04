@@ -16,3 +16,7 @@ experiments/runs/*
 !experiments/runs/.gitkeep
 reports/*
 !reports/.gitkeep
+
+data/frozen/smoke-*/
+
+.venv-vllm/

@@ -17,12 +17,9 @@ class OpenAICompatibleClient:
     def __init__(self, model_id: str, max_output_tokens: int = 1200) -> None:
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
-        self.base_url = os.environ.get("OPENAI_BASE_URL") or os.environ.get(
-            "OPENAI_COMPATIBLE_BASE_URL"
-        )
-        self._api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get(
-            "OPENAI_COMPATIBLE_API_KEY"
-        )
+        self.base_url = os.environ.get("OPENAI_BASE_URL")
+        self._api_key = os.environ.get("OPENAI_API_KEY")
+        self.last_raw_response: str | None = None
 
     @property
     def endpoint_host(self) -> str:
@@ -36,7 +33,7 @@ class OpenAICompatibleClient:
         timeout: int,
     ) -> BaseModel:
         if not self.base_url or not self._api_key:
-            raise ModelCallError("missing_openai_compatible_env")
+            raise ModelCallError("missing_openai_env")
         url = self.base_url.rstrip("/") + "/chat/completions"
         schema = response_schema.model_json_schema()
         prompt = "Return JSON only. The JSON must validate this schema:\n" + json.dumps(
@@ -47,16 +44,17 @@ class OpenAICompatibleClient:
             "messages": [{"role": "system", "content": prompt}, *messages],
             "temperature": 0,
             "max_tokens": self.max_output_tokens,
+            "seed": seed,
         }
         try:
             data = _post_json(url, payload, self._api_key, timeout)
             choices = cast(list[dict[str, Any]], data["choices"])
             content = cast(str, choices[0]["message"]["content"])
+            self.last_raw_response = content
             return response_schema.model_validate(json.loads(_extract_json(content)))
         except urllib.error.HTTPError as exc:
-            raise ModelCallError(
-                f"openai_compatible_smoke_failed:HTTPError:{exc.code}:{exc.reason}"
-            ) from exc
+            category = "quota" if exc.code == 429 else f"provider_http_{exc.code}"
+            raise ModelCallError(category) from exc
         except (
             KeyError,
             json.JSONDecodeError,
@@ -64,7 +62,7 @@ class OpenAICompatibleClient:
             TimeoutError,
             http.client.RemoteDisconnected,
         ) as exc:
-            raise ModelCallError(f"openai_compatible_smoke_failed:{type(exc).__name__}") from exc
+            raise ModelCallError(type(exc).__name__.lower()) from exc
 
 
 def _post_json(

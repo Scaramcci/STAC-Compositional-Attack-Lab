@@ -13,6 +13,7 @@ class StrictModel(BaseModel):
 class ActorRole(StrEnum):
     planner = "planner"
     attacker = "attacker"
+    prompt_writer = "prompt_writer"
     victim = "victim"
     verifier = "verifier"
     judge = "judge"
@@ -27,6 +28,7 @@ class Component(StrEnum):
     action_tool = "action_tool"
     planner = "planner"
     attacker = "attacker"
+    prompt_writer = "prompt_writer"
     victim = "victim"
     verifier = "verifier"
     judge = "judge"

@@ -1,4 +1,5 @@
 experiment_id: stac_sample_build_gemini
+profile: gemini_development
 dataset_version: generated
 planner_type: adaptive_llm
 conditions: [llm_planner_full]

@@ -1,4 +1,5 @@
 experiment_id: evaluation_gpt_huihui_4090
+profile: formal_evaluation
 dataset_version: mvp-v0.1
 planner_type: adaptive_llm
 conditions: [clean, fixed_full, llm_planner_full, full_minus_memory_write, full_minus_retrieval, llm_planner_full_defense_on]
@@ -13,37 +14,37 @@ network_enabled: true
 models:
   planner:
     provider: openai_compatible
-    model: gpt-4.1
+    model: gpt-5.5
     temperature: 0.0
     max_output_tokens: 1200
     timeout_seconds: 60
   attacker:
     provider: openai_compatible
-    model: gpt-4.1
+    model: gpt-5.5
     temperature: 0.2
     max_output_tokens: 1200
     timeout_seconds: 60
   victim:
     provider: huihui_local
-    model: huihui
+    model: huihui-qwen3-14b-abliterated-v2
     temperature: 0.0
     max_output_tokens: 1200
     timeout_seconds: 120
   prompt_writer:
     provider: openai_compatible
-    model: gpt-4.1
+    model: gpt-5.5
     temperature: 0.0
     max_output_tokens: 1200
     timeout_seconds: 60
   verifier:
     provider: openai_compatible
-    model: gpt-4.1
+    model: gpt-5.5
     temperature: 0.0
     max_output_tokens: 1200
     timeout_seconds: 60
   judge:
     provider: openai_compatible
-    model: gpt-4.1
+    model: gpt-5.5
     temperature: 0.0
     max_output_tokens: 1200
     timeout_seconds: 60

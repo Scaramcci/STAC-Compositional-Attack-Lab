@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from stac_attack_lab.config import load_experiment_config
@@ -12,14 +13,17 @@ from stac_attack_lab.reporting.report import build_report
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_offline_online_report_smoke() -> None:
-    build = build_offline_dataset(ROOT, task_limit=2, seed=1)
+def test_offline_online_report_smoke(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    shutil.copytree(ROOT / "data/seeds", project / "data/seeds")
+    shutil.copytree(ROOT / "prompts", project / "prompts")
+    build = build_offline_dataset(project, task_limit=2, seed=1)
     assert audit_dataset(build) == []
-    frozen = freeze_dataset(build, "test-v0.1", ROOT)
+    frozen = freeze_dataset(build, "test-v0.1", project)
     assert (frozen / "samples.jsonl").exists()
     config = load_experiment_config(ROOT / "configs/experiments/mvp_online.yaml")
     config = config.model_copy(update={"dataset_version": "test-v0.1"})
-    run_root = run_online(ROOT, config)
+    run_root = run_online(project, config)
     report = build_report(run_root)
     assert report["run_count"] == 18
     fixed = report["conditions"]["fixed_full"]  # type: ignore[index]
