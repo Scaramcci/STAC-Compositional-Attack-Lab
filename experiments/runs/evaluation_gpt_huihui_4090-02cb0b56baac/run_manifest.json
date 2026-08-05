@@ -1,0 +1,70 @@
+{
+  "config": {
+    "benign_interference_steps": 3,
+    "conditions": [
+      "llm_planner_full"
+    ],
+    "dataset_version": "stac-verified-30-v0.1",
+    "defense_enabled": false,
+    "experiment_id": "evaluation_gpt_huihui_4090",
+    "max_candidate_attempts": null,
+    "max_tokens": 4096,
+    "max_tool_calls": 8,
+    "max_turns": 12,
+    "models": {
+      "attacker": {
+        "max_output_tokens": 1200,
+        "model": "gpt-5.5",
+        "provider": "openai_compatible",
+        "temperature": 0.2,
+        "timeout_seconds": 60
+      },
+      "judge": {
+        "max_output_tokens": 1200,
+        "model": "gpt-5.5",
+        "provider": "openai_compatible",
+        "temperature": 0.0,
+        "timeout_seconds": 60
+      },
+      "planner": {
+        "max_output_tokens": 1200,
+        "model": "gpt-5.5",
+        "provider": "openai_compatible",
+        "temperature": 0.0,
+        "timeout_seconds": 60
+      },
+      "prompt_writer": {
+        "max_output_tokens": 1200,
+        "model": "gpt-5.5",
+        "provider": "openai_compatible",
+        "temperature": 0.0,
+        "timeout_seconds": 60
+      },
+      "verifier": {
+        "max_output_tokens": 1200,
+        "model": "gpt-5.5",
+        "provider": "openai_compatible",
+        "temperature": 0.0,
+        "timeout_seconds": 60
+      },
+      "victim": {
+        "max_output_tokens": 1200,
+        "model": "huihui-qwen3-14b-abliterated-v2",
+        "provider": "huihui_local",
+        "temperature": 0.0,
+        "timeout_seconds": 120
+      }
+    },
+    "network_enabled": true,
+    "planner_type": "adaptive_llm",
+    "profile": "formal_evaluation",
+    "seeds": [
+      1
+    ],
+    "successful_sample_target": null,
+    "task_limit": 30
+  },
+  "config_hash": "02cb0b56baac6218621648c74da5e0c087c235a323e11b5866fe75b6057478d1",
+  "dataset_version": "stac-verified-30-v0.1",
+  "run_id": "evaluation_gpt_huihui_4090-02cb0b56baac"
+}

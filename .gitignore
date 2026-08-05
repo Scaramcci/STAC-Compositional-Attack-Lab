@@ -14,6 +14,19 @@ data/generated/*
 !data/generated/.gitkeep
 experiments/runs/*
 !experiments/runs/.gitkeep
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/
+experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/run_manifest.json
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/progress.json
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/attack_progress.jsonl
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/conversations.jsonl
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/results.jsonl
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/transcript_audit.json
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/
+experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/*
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/report.json
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/events.jsonl
+!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/verdicts.jsonl
 reports/*
 !reports/.gitkeep
 
