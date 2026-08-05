@@ -1,90 +1,152 @@
 # Project Structure
 
-## Top-Level Directories
+本文档说明模块职责、依赖方向、离线到在线的数据流、角色隔离和运行产物。研究状态与尚未实现的范围见 [`docs/RESEARCH_STATUS.md`](docs/RESEARCH_STATUS.md)。
 
-- `src/stac_attack_lab/`: all executable code. It owns contracts, graph validation, local environment tools, model clients, planners, execution loops, verifiers, dataset handling, adapters, and reporting.
-- `prompts/`: versioned role prompts. These are experiment assets, not inline strings. Each prompt has front matter, input/output schema names, permissions, trusted/untrusted boundaries, budget, and examples.
-- `configs/`: strict experiment/model/environment inputs. The project uses a small YAML subset parser to avoid extra runtime dependencies.
-- `schemas/`: generated JSON Schema files from Pydantic contracts.
-- `data/seeds/`: synthetic task and primitive seed data.
-- `data/generated/`: offline build products, including verification traces and generated samples.
-- `data/frozen/`: frozen audited datasets by version.
-- `experiments/runs/`: online STAC run directories.
-- `reports/`: reserved for copied or exported reports.
-- `tests/`: unit, e2e, and integration-contract tests.
+## 顶层结构
 
-## Module Responsibilities And Dependencies
-
-The dependency direction is:
-
-`contracts/config -> graph/primitives/environment/model -> planning/execution/verification -> datasets/reporting -> CLI`.
-
-`contracts.py` defines the authoritative Pydantic models. `registry.py` defines the four primitive specs. `graph/validator.py` checks typed graph structure, budgets, reachability, and safety constraints. `environments/workspace_canary.py` implements the local four-component sandbox. `environments/agentdojo_adapter.py` and `environments/shade_arena_adapter.py` discover external suites without mutating them. `models/factory.py` resolves role model configs into fake, Gemini, OpenAI-compatible, or local huihui clients. `recording/` writes append-only JSONL events and atomic snapshots. `verification/` reads only events and snapshots. `execution/` coordinates offline generation and online STAC. `datasets/` audits and freezes samples. `reporting/` rebuilds metrics from run results.
-
-Lower modules do not import CLI or reporting.
-
-## Offline To Online Data Flow
-
-Offline starts with `data/seeds/tasks.jsonl` or translated AgentLAB/SHADE_Arena task pairs. Seed tasks are a reusable candidate-scenario pool. A collection run assigns each candidate a unique id and seed, generates its graph and stage prompts, and runs those exact prompts through the Gemini Victim in `WorkspaceCanaryEnv`. It writes events, snapshots, artifacts, and verdicts under the generated run directory. Only complete deterministic hard-pass candidates become `OfflineSample` rows; rejected candidates and reason codes remain separate.
-
-The intended STAC sample construction config is `stac_sample_build_gpt_gemini.yaml`: GPT roles produce and check graph/prompt artifacts, Gemini executes them, and collection continues until 30 successful samples or the 120-candidate safety cap. While OpenAI-compatible access is unavailable, `stac_sample_build_gemini.yaml` preserves the same collection contract with Gemini roles. Formal evaluation loads the frozen `stac-verified-30-v0.1` dataset, verifies every selection/graph/prompt hash, and binds one Huihui attack episode to each accepted sample.
-
-`dataset audit` additionally checks collection completeness and offline selection evidence. `dataset freeze` refuses incomplete hard-success collections, preserves their collection manifest, and adds immutable content hashes. Formal online runs reject old fixture rows without selection evidence.
-
-## Role Isolation
-
-Planner sees public graph fields, legal frontier, budget, sanitized event ids, and coarse hard-verifier status. It cannot see private oracle state, expected predicate values, hidden artifacts, Victim private prompt, or Judge labels.
-
-Attacker sees only the selected planner decision and frozen public stage variables. It may instantiate one message for one primitive and cannot replan.
-
-Victim uses `prompts/runtime/victim_system.md`. Its byte hash is recorded in every run manifest and remains identical across clean, attack, ablation, and defense conditions.
-
-PromptWriter and Verifier are separate roles in config even when the current deterministic sample builder uses verified local templates. Judge prompts provide semantic labels only. `chain_success` is computed exclusively by `verification.aggregate` from deterministic hard verdicts.
-
-## Runtime Artifacts
-
-Each online run directory contains `manifest.json`, `status.json`, `events.jsonl`, `planner_decisions.jsonl`, `verdicts.jsonl`, `artifacts/`, `snapshots/`, and `report.json`. `experiments/runs/latest/results.jsonl` aggregates run-level `RunResult` records. `report build` reads those records and writes `report.json` and `report.md`.
-
-## Adding A Primitive
-
-Add a `PrimitiveSpec` in `registry.py`, expose it under `primitives/`, add deterministic predicates, add graph compiler/validator coverage, implement environment behavior if a new capability is needed, and add a verifier that reads only events and snapshots.
-
-## Adding An Environment
-
-Implement the `Environment` protocol in `environments/base.py`: `reset`, `snapshot`, `restore`, `step`, `public_spec`, and `private_oracle`. Keep `private_oracle` out of prompts and planner inputs. Add integration smoke tests that skip explicitly when external dependencies are absent. External AgentLAB/SHADE_Arena adapters must be read-only until a dedicated integration runner is enabled.
-
-## Adding A Verifier
-
-Create a pure function/class under `verification/`. It must accept recorded events and snapshot refs, return `VerifierVerdict`, cite evidence event ids/snapshot refs, and never mutate environment state.
-
-## Adding A Prompt Or Condition
-
-Add a prompt markdown file with front matter and legal/illegal examples, update docs if a new role boundary exists, and extend prompt tests. For conditions, update the config matrix and `_filtered_graph` or planner selection while preserving matched pair fields.
-
-## Sequence
-
-```mermaid
-sequenceDiagram
-  participant D as Frozen Dataset
-  participant P as Planner
-  participant A as Attacker
-  participant V as Victim
-  participant E as WorkspaceCanaryEnv
-  participant R as Recorder
-  participant H as Hard Verifier
-  D->>P: public graph, frontier, budget
-  P->>A: PlannerDecision
-  A->>V: one stage message
-  V->>E: schema-valid tool call
-  E->>R: result, artifacts, snapshots
-  R->>H: events and snapshot refs
-  H->>P: coarse hard stage status
+```text
+stac-compositional-attack-lab/
+├── configs/                 实验、模型和环境配置
+├── data/
+│   ├── seeds/               合成任务与原语种子
+│   ├── generated/           尚未冻结的离线构建产物
+│   └── frozen/              审计后不可变的数据集和构建对话
+├── docs/                    研究协议、prompt、决策与当前状态
+├── experiments/runs/        evaluation 对话、事件、判定和进度
+├── prompts/                 各角色的版本化 prompt 资产
+├── schemas/                 Pydantic 生成的 JSON Schema
+├── scripts/                 运行入口和 Huihui/vLLM 启动脚本
+├── src/stac_attack_lab/      核心实现
+└── tests/                   单元、端到端和集成 contract tests
 ```
 
-## Durable execution and local serving
+## 核心模块职责
 
-`recording/progress.py` owns attack idempotency keys, atomic checkpoints, append-only transitions, and the root human ledger. `recording/conversations.py` owns typed observable events, secret filtering, model error categories, stable call ids, and transcript audit. The online runner checkpoints outside each per-attack directory so a crash cannot erase an already completed condition.
+| 模块 | 职责 |
+|---|---|
+| `contracts.py` | 定义任务、攻击图、模型输出、事件、artifact、verdict 和运行结果契约 |
+| `registry.py`, `primitives/` | 注册并实现当前四个攻击原语 |
+| `graph/` | 编译和验证攻击节点、边、前置条件、预算及终止目标 |
+| `environments/workspace_canary.py` | 提供无公网、无 shell、合成 canary 的四组件环境 |
+| `models/` | Fake、Gemini、OpenAI-compatible 和本地 Huihui 客户端 |
+| `planning/` | fixed、random、rule-based 和 LLM adaptive planner |
+| `execution/offline.py` | 生成候选样本、执行 Victim、确定性验证并保留通过样本 |
+| `execution/online_stac.py` | 按攻击图执行 Planner、Attacker、Victim 和 verifier 状态机 |
+| `recording/` | 写入事件、对话、artifact、快照、checkpoint 和 audit |
+| `verification/` | 根据事件、lineage 和状态计算 hard verdict，附加语义标签 |
+| `datasets/` | 审计并冻结离线样本，在线阶段校验绑定关系和 hash |
+| `reporting/` | 从持久化记录重建聚合报告 |
+| `environments/*_adapter.py` | 对 AgentDojo、SHADE_Arena 做只读发现与 contract smoke |
 
-`models/discovery.py` validates a Huihui Hugging Face directory without loading it. `scripts/launch_huihui_vllm.sh` is the explicit single-4090 serving boundary; the runner communicates only with its configured OpenAI-compatible base URL.
+依赖方向为：
 
-A run root now also contains `run_manifest.json`, `progress.json`, `attack_progress.jsonl`, `conversations.jsonl`, `transcript_audit.json`, and `results.jsonl`. Per-attack subdirectories continue to contain manifest/status/events/verdicts/artifacts/snapshots/report files.
+```text
+contracts/config
+  -> graph/primitives/environment/model
+  -> planning/execution/verification/recording
+  -> datasets/reporting
+  -> CLI
+```
+
+底层模块不依赖 CLI 或报告模块，确定性 verifier 不调用或修改环境。
+
+## 当前攻击链与组件传播
+
+当前 registry 包含四个原语：
+
+1. `tool_response_injection`：不可信 retrieval tool 内容进入 Victim。
+2. `memory_write`：Victim 将相关 artifact 写入 workspace memory。
+3. `memory_retrieval`：memory retriever 在后续阶段把持久化内容返回 Victim。
+4. `canary_tool_trigger`：Victim 生成 action tool 参数，本地环境检查其 lineage。
+
+当前默认图是固定线性图：
+
+```mermaid
+flowchart LR
+    RT["Retrieval tool"] -->|untrusted artifact| V1["Victim"]
+    V1 -->|memory write| MS["Memory store"]
+    MS --> MR["Memory retriever"]
+    MR -->|retrieved artifact| V2["Victim"]
+    V2 -->|tool arguments| AS["Local action sink"]
+    AS --> HV["Deterministic verifier"]
+```
+
+这是一类组合攻击基线，不代表已经实现多入口、多拓扑或多危害攻击集合。
+
+## 离线到在线的数据流
+
+```text
+data/seeds/tasks.jsonl
+  -> Planner/attack graph candidate
+  -> PromptWriter/Attacker stage messages
+  -> Gemini Victim executes in WorkspaceCanaryEnv
+  -> events + artifacts + snapshots
+  -> deterministic hard verification
+  -> accepted samples + failures + conversations
+  -> dataset audit and immutable freeze
+  -> Huihui evaluation loads exact frozen sample
+  -> online Planner/Attacker/Victim execution
+  -> conversations + events + verdicts + progress
+```
+
+离线阶段的正式配置是 `configs/experiments/stac_sample_build_gpt_gemini.yaml`。候选执行完整攻击链并通过 hard verification 后才进入冻结数据集。evaluation 使用 `configs/experiments/evaluation_gpt_huihui_4090.yaml`，保持 GPT 角色不变，只把 Victim 替换为本地 Huihui。
+
+## 角色隔离
+
+- Planner 只看到公开攻击图、合法 frontier、预算和粗粒度阶段状态，不看到 private oracle。
+- Attacker 只接收 Planner 选中的一个节点及该阶段冻结模板，不能自行改图或合并多个阶段。
+- PromptWriter 负责离线阶段最终 Victim-visible message，与 Attacker 使用独立 prompt 和 schema。
+- Victim 使用固定 `prompts/runtime/victim_system.md`，不同 condition 下 hash 必须一致。
+- Verifier/Judge 只能产生语义辅助标签，不能覆盖确定性 hard verdict。
+- Recorder 记录可观察消息、结构化输出和证据引用，不请求隐藏 chain-of-thought。
+
+## 对话和执行证据
+
+### 离线样本构建
+
+```text
+data/frozen/stac-verified-30-v0.1/
+├── conversations.jsonl       全部角色的模型请求和响应
+├── samples.jsonl             30 个冻结样本及 prompt/graph hash
+├── failures.jsonl            未接受候选及原因
+├── transcript_audit.json     对话完整性审计
+└── verification/<candidate-id>/
+    ├── events.jsonl          环境工具事件
+    ├── verdicts.jsonl        确定性阶段判定
+    ├── artifacts/            入口、memory、retrieval artifact
+    └── snapshots/            工具执行前后状态
+```
+
+### 正式 evaluation
+
+```text
+experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/
+├── conversations.jsonl       Planner 到 Attacker、Attacker 到 Victim、工具和 verifier 对话
+├── run_manifest.json         模型、数据集、prompt hash 和配置来源
+├── progress.json             当前汇总进度
+├── attack_progress.jsonl     每个攻击的 append-only 状态变化
+├── transcript_audit.json     对话完整性与隔离审计
+├── results.jsonl             每个 episode 的机器可读汇总
+└── <attack-id>/
+    ├── events.jsonl
+    ├── verdicts.jsonl
+    └── report.json
+```
+
+对话不是结果摘要。研究攻击如何传播时，应优先读取 `conversations.jsonl`，再通过 `related_event_ids`、`artifact_refs`、`snapshot_refs` 和 `hard_verdict_refs` 连接到执行证据。
+
+## 可恢复执行
+
+`recording/progress.py` 为每个攻击建立幂等 key，原子更新 `progress.json`，并将状态追加到 `attack_progress.jsonl`。配额或临时错误不会删除已完成攻击，恢复命令跳过已经完成的 key。
+
+`recording/conversations.py` 为模型和工具交互分配稳定 call/event id，过滤环境秘密，并运行 transcript audit。当前已知的 attempt 级事件标识和运行指标问题记录在 `docs/RESEARCH_STATUS.md`，扩展实验前必须修正。
+
+## 扩展方法
+
+新增攻击原语时，需要同时增加 `PrimitiveSpec`、环境行为、图验证规则、确定性 predicate、schema 和测试。新增传播类型还应定义 artifact transformation、taint/lineage 继承和信任边界变化。
+
+新增环境时，实现 `environments/base.py` 的 `Environment` 协议：`reset`、`snapshot`、`restore`、`step`、`public_spec` 和 `private_oracle`。private oracle 不得进入任何模型 prompt。
+
+新增 verifier 时，在 `verification/` 中实现纯函数或纯类，只读取已记录事件和快照，返回带 evidence refs 的 `VerifierVerdict`，不得修改环境。
+
+新增防御时，应将其实现为明确的传播节点策略，并记录输入 lineage、决策、拦截位置、输出 artifact 和 benign utility，避免把 verifier 的事后判定误当成运行时防御。
