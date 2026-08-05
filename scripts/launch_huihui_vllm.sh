@@ -3,7 +3,14 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VLLM_BIN="${VLLM_BIN:-${PROJECT_ROOT}/.venv-vllm/bin/vllm}"
-MODEL_PATH="${HUIHUI_MODEL_PATH:-$(PYTHONPATH="${PROJECT_ROOT}/src" python3 -m stac_attack_lab.cli models discover-huihui)}"
+VLLM_BIN_DIR="$(dirname "${VLLM_BIN}")"
+export PATH="${VLLM_BIN_DIR}:${PATH}"
+export VLLM_USE_FLASHINFER_SAMPLER="${VLLM_USE_FLASHINFER_SAMPLER:-0}"
+DISCOVERY_PYTHON="${HUIHUI_DISCOVERY_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"
+if [[ ! -x "${DISCOVERY_PYTHON}" && "${DISCOVERY_PYTHON}" == "${PROJECT_ROOT}/.venv/bin/python" ]]; then
+  DISCOVERY_PYTHON="python3"
+fi
+MODEL_PATH="${HUIHUI_MODEL_PATH:-$(PYTHONPATH="${PROJECT_ROOT}/src" "${DISCOVERY_PYTHON}" -m stac_attack_lab.cli models discover-huihui)}"
 SERVED_MODEL="${HUIHUI_MODEL:-huihui-qwen3-14b-abliterated-v2}"
 HOST="${HUIHUI_HOST:-127.0.0.1}"
 PORT="${HUIHUI_PORT:-8000}"

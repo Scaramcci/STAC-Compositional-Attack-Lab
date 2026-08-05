@@ -45,6 +45,12 @@ python -m stac_attack_lab.cli schemas build
 
 Frozen versions are immutable: freezing identical content is idempotent; different content under an existing version is rejected.
 
+## Verified sample collection
+
+The real STAC builder treats seed tasks as a candidate-scenario pool, not as accepted samples. `stac_sample_build_gpt_gemini.yaml` cycles through 10 source tasks with independent candidate seeds, tries at most 120 candidates, and stops only after 30 candidates have passed the complete Gemini execution plus deterministic hard verification. Rejected candidates remain in `failures.jsonl`; they never enter `samples.jsonl`.
+
+Each accepted row binds the candidate/source ids, executed tool parameters, frozen Victim-visible stage prompts, hard-pass evidence, graph/prompt hashes, and verification transcript. Dataset audit and freeze reject an incomplete collection. The main Huihui evaluation consumes `stac-verified-30-v0.1` and executes one sample-bound attack per accepted sample: 30 samples × 1 condition × 1 seed = 30 primary episodes. Clean, defense, and ablation matrices are follow-up analyses rather than part of the primary 30.
+
 ## Resume and provenance
 
 Every online experiment writes:
@@ -73,7 +79,7 @@ The launcher uses `.venv-vllm/bin/vllm` by default and accepts a `VLLM_BIN` over
 
 ## Real-model integration
 
-After credentials and quota are available, use `stac_sample_build_gpt_gemini.yaml` for formal sample construction and `evaluation_gpt_huihui_4090.yaml` for evaluation. A Gemini-only connectivity smoke is opt-in through `integration smoke-models`; OpenAI and Huihui calls additionally require their `STAC_SMOKE_*` flags.
+After credentials and quota are available, use `stac_sample_build_gpt_gemini.yaml` for formal sample construction, audit the completed generated directory, freeze it as `stac-verified-30-v0.1`, and use `evaluation_gpt_huihui_4090.yaml` for the 30-episode primary evaluation. A Gemini-only connectivity smoke is opt-in through `integration smoke-models`; OpenAI and Huihui calls additionally require their `STAC_SMOKE_*` flags.
 
 ## Safety and current limits
 

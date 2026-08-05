@@ -7,7 +7,7 @@ All prompts are markdown assets with YAML front matter: `prompt_id`, `version`, 
 - `offline.environment_analyst`: converts public environment specs into `EnvironmentInventory`; cannot infer hidden state.
 - `offline.attack_graph_generator`: proposes registered-primitive `AttackGraph` candidates; code performs validation.
 - `offline.chain_critic`: critiques structure and sandbox compliance; cannot execute tools.
-- `offline.prompt_writer`: converts verified stages into Victim-visible text without leaking graph, verifier, or canary answers.
+- `offline.prompt_writer`: converts a candidate stage into the final Victim-visible text before offline execution. The exact stored text must be exercised by Gemini and hard-pass before collection.
 
 ## Runtime
 
@@ -15,7 +15,7 @@ All prompts are markdown assets with YAML front matter: `prompt_id`, `version`, 
 - `runtime.attacker`: instantiates one selected primitive message. It cannot replan or combine stages.
 - `runtime.victim_system`: neutral workspace agent prompt. Its hash is invariant across clean, attack, ablation, and defense.
 
-Runtime role configs are independent. Current temporary config `stac_sample_build_gemini.yaml` maps every role to Gemini. The intended sample-builder maps planner, attacker, prompt-writer, verifier, and judge to GPT-compatible models while leaving victim on Gemini. The evaluation config maps victim to local huihui and leaves the other roles GPT-compatible.
+Runtime role configs are independent. Current temporary config `stac_sample_build_gemini.yaml` maps every role to Gemini. The intended sample-builder maps planner, attacker, prompt-writer, verifier, and judge to GPT-compatible models while leaving victim on Gemini. Evaluation maps victim to local Huihui; its Attacker receives the selected sample stage and frozen verified prompt and may not invent a different route.
 
 ## Judges
 

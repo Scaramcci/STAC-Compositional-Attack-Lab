@@ -25,11 +25,11 @@ Lower modules do not import CLI or reporting.
 
 ## Offline To Online Data Flow
 
-Offline starts with `data/seeds/tasks.jsonl` or, in future integration runs, translated AgentLAB/SHADE_Arena task pairs. `default_attack_graph` compiles a four-stage graph using registered primitives. The offline executor runs the chain in `WorkspaceCanaryEnv`, writing `events.jsonl`, `snapshots/`, `artifacts/`, and `verdicts.jsonl` under `data/generated/latest/verification/<task_id>/`. Only chains that hard-pass all deterministic verifiers become `OfflineSample` rows in `data/generated/latest/samples.jsonl`.
+Offline starts with `data/seeds/tasks.jsonl` or translated AgentLAB/SHADE_Arena task pairs. Seed tasks are a reusable candidate-scenario pool. A collection run assigns each candidate a unique id and seed, generates its graph and stage prompts, and runs those exact prompts through the Gemini Victim in `WorkspaceCanaryEnv`. It writes events, snapshots, artifacts, and verdicts under the generated run directory. Only complete deterministic hard-pass candidates become `OfflineSample` rows; rejected candidates and reason codes remain separate.
 
-The intended STAC sample construction config is `stac_sample_build_gpt_gemini.yaml`: GPT roles produce and check the graph/prompt artifacts, Gemini is the victim, and the frozen sample resembles AgentLAB offline data. While OpenAI-compatible access is unavailable, `stac_sample_build_gemini.yaml` keeps the same role separation with Gemini for every LLM role. Formal evaluation uses `evaluation_gpt_huihui_4090.yaml`, where the victim provider switches to `huihui_local` and points at a 4090-hosted OpenAI-compatible endpoint.
+The intended STAC sample construction config is `stac_sample_build_gpt_gemini.yaml`: GPT roles produce and check graph/prompt artifacts, Gemini executes them, and collection continues until 30 successful samples or the 120-candidate safety cap. While OpenAI-compatible access is unavailable, `stac_sample_build_gemini.yaml` preserves the same collection contract with Gemini roles. Formal evaluation loads the frozen `stac-verified-30-v0.1` dataset, verifies every selection/graph/prompt hash, and binds one Huihui attack episode to each accepted sample.
 
-`dataset audit` checks schema validity, duplicate sample hashes, dangerous strings, hidden canary leaks in Victim-visible messages, and missing expected predicates. `dataset freeze` copies the audited dataset to `data/frozen/<version>/` and writes a manifest hash. Online runs load only this frozen dataset.
+`dataset audit` additionally checks collection completeness and offline selection evidence. `dataset freeze` refuses incomplete hard-success collections, preserves their collection manifest, and adds immutable content hashes. Formal online runs reject old fixture rows without selection evidence.
 
 ## Role Isolation
 

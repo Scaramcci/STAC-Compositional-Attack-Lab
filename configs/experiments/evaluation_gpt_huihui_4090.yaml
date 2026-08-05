@@ -1,10 +1,10 @@
 experiment_id: evaluation_gpt_huihui_4090
 profile: formal_evaluation
-dataset_version: mvp-v0.1
+dataset_version: stac-verified-30-v0.1
 planner_type: adaptive_llm
-conditions: [clean, fixed_full, llm_planner_full, full_minus_memory_write, full_minus_retrieval, llm_planner_full_defense_on]
-task_limit: 10
-seeds: [1, 2, 3]
+conditions: [llm_planner_full]
+task_limit: 30
+seeds: [1]
 max_turns: 12
 max_tool_calls: 8
 max_tokens: 4096

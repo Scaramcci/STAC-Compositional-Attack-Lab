@@ -228,11 +228,12 @@ class ConversationRecorder:
             output = invoke()
         except Exception as exc:
             category = categorize_model_error(exc)
+            raw = _observable_raw_response(invoke)
             self.append(
                 **common,
                 event_id=f"{call_id}-error",
                 event_type=ConversationEventType.model_error,
-                raw_model_response=None,
+                raw_model_response=raw if isinstance(raw, str) else None,
                 parsed_structured_response=None,
                 schema_validation=SchemaValidationRecord(
                     schema_id=output_schema_id, valid=False, error_category=category

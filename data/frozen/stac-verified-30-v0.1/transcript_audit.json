@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "run_id": "stac_sample_build_gpt_gemini-c2646d11abda",
+  "passed": true,
+  "event_count": 1044,
+  "findings": []
+}

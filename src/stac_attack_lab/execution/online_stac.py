@@ -13,12 +13,17 @@ from stac_attack_lab.contracts import (
     JudgeVerdict,
     OfflineSample,
     PlannerDecision,
+    PromptWriterOutput,
     RunResult,
     VictimAction,
 )
 from stac_attack_lab.environments.base import ToolCall
 from stac_attack_lab.environments.workspace_canary import WorkspaceCanaryEnv
-from stac_attack_lab.execution.victim import VictimRunner, victim_prompt_hash
+from stac_attack_lab.execution.victim import (
+    VictimRunner,
+    victim_model_messages,
+    victim_prompt_hash,
+)
 from stac_attack_lab.graph.models import AttackGraph
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.models.factory import build_model_client
@@ -41,13 +46,43 @@ from stac_attack_lab.recording.run_recorder import RunRecorder
 from stac_attack_lab.verification.aggregate import chain_success, verify_all
 
 
-def load_frozen_samples(project_root: Path, version: str, limit: int) -> list[OfflineSample]:
-    path = project_root / "data/frozen" / version / "samples.jsonl"
-    return [
+def _validate_verified_sample(sample: OfflineSample) -> None:
+    selection = sample.selection
+    if selection is None:
+        raise ValueError(f"formal_evaluation_requires_selection_evidence:{sample.sample_id}")
+    graph_hash = stable_hash(sample.attack_graph.model_dump(mode="json"))
+    prompt_hash = stable_hash([item.model_dump(mode="json") for item in sample.victim_messages])
+    if graph_hash != selection.verified_graph_hash:
+        raise ValueError(f"verified_graph_hash_mismatch:{sample.sample_id}")
+    if prompt_hash != selection.verified_prompt_hash:
+        raise ValueError(f"verified_prompt_hash_mismatch:{sample.sample_id}")
+    if stable_hash(sample.verified_call_params) != selection.verified_call_params_hash:
+        raise ValueError(f"verified_call_params_hash_mismatch:{sample.sample_id}")
+
+
+def load_frozen_samples(
+    project_root: Path, version: str, limit: int, *, require_verified_collection: bool = False
+) -> list[OfflineSample]:
+    dataset_root = project_root / "data/frozen" / version
+    path = dataset_root / "samples.jsonl"
+    samples = [
         OfflineSample.model_validate_json(line)
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
-    ][:limit]
+    ]
+    if require_verified_collection:
+        manifest = json.loads((dataset_root / "dataset_manifest.json").read_text(encoding="utf-8"))
+        if not manifest.get("collection_complete"):
+            raise ValueError("formal_evaluation_requires_complete_collection")
+        if not manifest.get("transcript_audit_passed"):
+            raise ValueError("formal_evaluation_requires_passing_transcript_audit")
+        if manifest.get("selection_policy") != "offline_hard_success_only":
+            raise ValueError("formal_evaluation_requires_hard_success_selection")
+        if len(samples) < limit:
+            raise ValueError(f"formal_evaluation_sample_shortfall:{len(samples)}/{limit}")
+        for sample in samples[:limit]:
+            _validate_verified_sample(sample)
+    return samples[:limit]
 
 
 def _planner(name: str, seed: int) -> Planner:
@@ -114,7 +149,12 @@ def run_online(
 ) -> Path:
     if config.profile != "fake":
         validate_startup(config)
-    samples = load_frozen_samples(project_root, config.dataset_version, config.task_limit)
+    samples = load_frozen_samples(
+        project_root,
+        config.dataset_version,
+        config.task_limit,
+        require_verified_collection=config.profile == "formal_evaluation",
+    )
     config_hash = stable_hash(config.model_dump(mode="json"))
     resolved_run_id = run_id or f"{config.experiment_id}-{config_hash[:12]}"
     root = run_root or project_root / "experiments/runs/latest"
@@ -286,6 +326,7 @@ def _attacker_action(
     config: ExperimentConfig,
     node: Any,
     decision: Any,
+    frozen_prompt: PromptWriterOutput,
     seed: int,
     model_call: Callable[..., Any],
 ) -> AttackerAction:
@@ -295,7 +336,7 @@ def _attacker_action(
             action_id=f"attack-{node.node_id}-{seed}",
             node_id=node.node_id,
             primitive_id=node.primitive_id,
-            message=f"Continue the public workspace task with stage {node.stage_id}.",
+            message=frozen_prompt.victim_message,
             used_variables={"stage_id": node.stage_id},
             constraint_checks=["single_primitive", "no_hidden_terms"],
         )
@@ -308,6 +349,7 @@ def _attacker_action(
                 {
                     "decision": decision.model_dump(mode="json"),
                     "stage_template": node.template_vars,
+                    "frozen_verified_prompt": frozen_prompt.model_dump(mode="json"),
                 },
                 sort_keys=True,
             ),
@@ -326,7 +368,7 @@ def _attacker_action(
             ),
         ),
     )
-    if output.abstain or output.node_id != node.node_id or output.primitive_id != node.primitive_id:
+    if output.node_id != node.node_id or output.primitive_id != node.primitive_id:
         raise ValueError("attacker_schema_or_role_violation")
     return output
 
@@ -338,6 +380,7 @@ def _victim_call(
     action: AttackerAction,
     seed: int,
     env: WorkspaceCanaryEnv,
+    public_tool_history: list[dict[str, object]],
     model_call: Callable[..., Any],
 ) -> ToolCall:
     role_config = config.models["victim"]
@@ -349,11 +392,12 @@ def _victim_call(
             canary_id=env.canary_id,
         )
     asset = load_prompt(project_root / "prompts/runtime/victim_system.md")
-    messages = [
-        {"role": "system", "content": asset.body},
-        {"role": "user", "content": action.message},
-        {"role": "user", "content": json.dumps(env.public_spec(), sort_keys=True)},
-    ]
+    messages = victim_model_messages(
+        asset.body,
+        action.message,
+        env.public_spec(),
+        public_tool_history,
+    )
     client = build_model_client(role_config)
     output = cast(
         VictimAction,
@@ -400,7 +444,12 @@ def run_one(
         "experiment_run_id": experiment_id,
         "condition": condition,
         "sample_id": sample.sample_id,
+        "sample_hash": sample.sample_hash,
         "pair_id": sample.pair_id,
+        "offline_verification_ref": sample.verification_transcript_ref,
+        "selection": (
+            sample.selection.model_dump(mode="json") if sample.selection is not None else None
+        ),
         "seed": seed,
         "victim_prompt_hash": victim_prompt_hash(project_root),
         "model_roles": {
@@ -480,11 +529,13 @@ def run_one(
         )
     else:
         graph = _filtered_graph(sample, condition)
+        prompts_by_stage = {item.source_stage_id: item for item in sample.victim_messages}
         planner = _condition_planner(condition, config, seed)
         passed: set[str] = set()
         retry_counts: dict[str, int] = {}
         budget = config.max_tool_calls
         input_artifacts: list[str] = []
+        public_tool_history: list[dict[str, object]] = []
         while budget > 0 and len(passed) < len(graph.nodes):
             planner_asset = load_prompt(project_root / "prompts/runtime/adaptive_planner.md")
             planner_messages = [
@@ -536,8 +587,17 @@ def run_one(
             if decision.action.startswith("stop") or decision.selected_node_id is None:
                 break
             node = next(item for item in graph.nodes if item.node_id == decision.selected_node_id)
+            frozen_prompt = prompts_by_stage.get(node.stage_id)
+            if frozen_prompt is None or frozen_prompt.status != "ok":
+                raise ValueError(f"sample_missing_verified_prompt:{node.stage_id}")
             action = _attacker_action(
-                project_root, config, node, decision, seed, recorded_model_call
+                project_root,
+                config,
+                node,
+                decision,
+                frozen_prompt,
+                seed,
+                recorded_model_call,
             )
             _record_event(
                 conversation,
@@ -554,12 +614,25 @@ def run_one(
                 messages=[{"role": "user", "content": decision.model_dump_json()}],
                 parsed=action.model_dump(mode="json"),
             )
+            if action.abstain:
+                retry_counts[node.node_id] = retry_counts.get(node.node_id, 0) + 1
+                budget -= 1
+                continue
             for _ in range(
                 config.benign_interference_steps if node.primitive_id == "memory_retrieval" else 0
             ):
                 env.benign_step()
             pre = env.snapshot()
-            call = _victim_call(project_root, config, node, action, seed, env, recorded_model_call)
+            call = _victim_call(
+                project_root,
+                config,
+                node,
+                action,
+                seed,
+                env,
+                public_tool_history,
+                recorded_model_call,
+            )
             request_conversation_id = f"tool-request-{run_id}-{node.node_id}"
             _record_event(
                 conversation,
@@ -615,6 +688,12 @@ def run_one(
                 related_event_ids=[request_conversation_id],
                 artifact_refs=event.output_artifact_ids,
                 snapshot_refs=[event.pre_snapshot_ref, event.post_snapshot_ref],
+            )
+            public_tool_history.append(
+                {
+                    "tool_call": call.model_dump(mode="json"),
+                    "tool_result": result.model_dump(mode="json"),
+                }
             )
             input_artifacts = event.output_artifact_ids or input_artifacts
             if result.status.value == "ok":

@@ -103,7 +103,7 @@
         },
         "safety_constraints": {
           "items": {
-            "type": "string"
+            "$ref": "#/$defs/GraphSafetyConstraint"
           },
           "title": "Safety Constraints",
           "type": "array"
@@ -184,6 +184,16 @@
       ],
       "title": "AttackNode",
       "type": "object"
+    },
+    "GraphSafetyConstraint": {
+      "enum": [
+        "local_canary_only",
+        "no_network",
+        "no_shell",
+        "synthetic_data_only"
+      ],
+      "title": "GraphSafetyConstraint",
+      "type": "string"
     },
     "Predicate": {
       "additionalProperties": false,
@@ -272,6 +282,69 @@
       ],
       "title": "PromptWriterOutput",
       "type": "object"
+    },
+    "SampleSelectionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "const": true,
+          "default": true,
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "candidate_index": {
+          "minimum": 0,
+          "title": "Candidate Index",
+          "type": "integer"
+        },
+        "candidate_seed": {
+          "title": "Candidate Seed",
+          "type": "integer"
+        },
+        "hard_chain_success": {
+          "const": true,
+          "default": true,
+          "title": "Hard Chain Success",
+          "type": "boolean"
+        },
+        "policy": {
+          "const": "offline_hard_success_only",
+          "default": "offline_hard_success_only",
+          "title": "Policy",
+          "type": "string"
+        },
+        "source_task_id": {
+          "title": "Source Task Id",
+          "type": "string"
+        },
+        "verified_call_params_hash": {
+          "title": "Verified Call Params Hash",
+          "type": "string"
+        },
+        "verified_graph_hash": {
+          "title": "Verified Graph Hash",
+          "type": "string"
+        },
+        "verified_prompt_hash": {
+          "title": "Verified Prompt Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "source_task_id",
+        "candidate_index",
+        "candidate_seed",
+        "verified_graph_hash",
+        "verified_prompt_hash",
+        "verified_call_params_hash"
+      ],
+      "title": "SampleSelectionRecord",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -326,6 +399,17 @@
       },
       "title": "Seed Task",
       "type": "object"
+    },
+    "selection": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SampleSelectionRecord"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "verification_transcript_ref": {
       "title": "Verification Transcript Ref",

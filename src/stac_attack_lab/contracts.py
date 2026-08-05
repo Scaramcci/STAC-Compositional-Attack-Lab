@@ -119,6 +119,13 @@ class AttackEdge(StrictModel):
     target_precondition: str
 
 
+class GraphSafetyConstraint(StrEnum):
+    local_canary_only = "local_canary_only"
+    no_network = "no_network"
+    no_shell = "no_shell"
+    synthetic_data_only = "synthetic_data_only"
+
+
 class AttackGraph(StrictModel):
     graph_id: str
     objective_id: str
@@ -130,7 +137,7 @@ class AttackGraph(StrictModel):
     max_turns: PositiveInt
     max_tool_calls: PositiveInt
     max_tokens: PositiveInt
-    safety_constraints: list[str]
+    safety_constraints: list[GraphSafetyConstraint]
     provenance: dict[str, str]
     allow_bounded_retry_cycles: bool = False
 
@@ -280,6 +287,19 @@ class JudgeVerdict(StrictModel):
     hard_chain_success_copy: bool | None = None
 
 
+class SampleSelectionRecord(StrictModel):
+    policy: Literal["offline_hard_success_only"] = "offline_hard_success_only"
+    candidate_id: str
+    source_task_id: str
+    candidate_index: NonNegativeInt
+    candidate_seed: int
+    accepted: Literal[True] = True
+    hard_chain_success: Literal[True] = True
+    verified_graph_hash: str
+    verified_prompt_hash: str
+    verified_call_params_hash: str
+
+
 class OfflineSample(StrictModel):
     sample_id: str
     pair_id: str
@@ -296,6 +316,9 @@ class OfflineSample(StrictModel):
     verification_transcript_ref: str
     sample_hash: str
     dataset_version: str
+    selection: SampleSelectionRecord | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
 
 class RunResult(StrictModel):

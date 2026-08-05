@@ -22,6 +22,7 @@ class AttackProgressStatus(StrEnum):
     failed_retryable = "failed_retryable"
     failed_terminal = "failed_terminal"
     paused_quota = "paused_quota"
+    skipped = "skipped"
 
 
 class AttackCaseProgress(StrictModel):
@@ -177,8 +178,64 @@ class ProgressManager:
         )
 
     def incomplete(self) -> list[AttackCaseProgress]:
-        terminal = {AttackProgressStatus.completed, AttackProgressStatus.failed_terminal}
+        terminal = {
+            AttackProgressStatus.completed,
+            AttackProgressStatus.failed_terminal,
+            AttackProgressStatus.skipped,
+        }
         return [attack for attack in self.load().attacks if attack.status not in terminal]
+
+    def skip_remaining(self, *, reason: str) -> ExperimentProgress:
+        progress = self.load()
+        now = datetime.now(UTC)
+        attacks: list[AttackCaseProgress] = []
+        terminal = {
+            AttackProgressStatus.completed,
+            AttackProgressStatus.failed_terminal,
+            AttackProgressStatus.skipped,
+        }
+        for current in progress.attacks:
+            if current.status in terminal:
+                attacks.append(current)
+                continue
+            updated = current.model_copy(
+                update={
+                    "status": AttackProgressStatus.skipped,
+                    "last_error_category": reason,
+                    "updated_at": now,
+                }
+            )
+            attacks.append(updated)
+            transition = ProgressTransition(
+                run_id=progress.run_id,
+                attack_id=current.attack_id,
+                idempotency_key=current.idempotency_key,
+                previous_status=current.status,
+                status=AttackProgressStatus.skipped,
+                attempt=current.attempts,
+                timestamp=now,
+                error_category=reason,
+            )
+            append_jsonl(self.transitions_path, transition.model_dump(mode="json"))
+        progress = progress.model_copy(
+            update={
+                "attacks": attacks,
+                "updated_at": now,
+                "completed": sum(item.status == AttackProgressStatus.completed for item in attacks),
+                "failed": sum(
+                    item.status
+                    in {
+                        AttackProgressStatus.failed_retryable,
+                        AttackProgressStatus.failed_terminal,
+                    }
+                    for item in attacks
+                ),
+                "pending": 0,
+                "pause_reason": None,
+            }
+        )
+        self._persist(progress)
+        return progress
 
     def transition(
         self,
@@ -217,10 +274,14 @@ class ProgressManager:
             in {AttackProgressStatus.failed_retryable, AttackProgressStatus.failed_terminal}
             for item in attacks
         )
-        pending = (
-            len(attacks)
-            - completed
-            - sum(item.status == AttackProgressStatus.failed_terminal for item in attacks)
+        pending = sum(
+            item.status
+            not in {
+                AttackProgressStatus.completed,
+                AttackProgressStatus.failed_terminal,
+                AttackProgressStatus.skipped,
+            }
+            for item in attacks
         )
         progress = progress.model_copy(
             update={

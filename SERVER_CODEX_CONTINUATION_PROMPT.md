@@ -54,6 +54,11 @@ be explicit per role; do not silently substitute one role's client for another.
 This phase must produce a frozen, AgentLAB-offline-like sample dataset containing
 the attack graph, role outputs, prompt/model hashes, provenance, complete
 transcript references, deterministic evidence, and verifier results.
+Treat seed tasks as candidate scenarios rather than accepted rows. Attempt up to
+200 uniquely seeded candidates and collect exactly 50 only after the final stored
+Victim-visible prompts have been executed by Gemini and the complete deterministic
+chain hard-passes. Preserve rejected candidates separately; never freeze an
+incomplete collection.
 
 ### Formal evaluation
 
@@ -61,6 +66,10 @@ transcript references, deterministic evidence, and verifier results.
   to the offline phase: GPT-5.5 through the OpenAI-compatible API.
 - Change only Victim to the local
   `huihui-qwen3-14b-abliterated-v2` model.
+- Load the frozen `stac-verified-30-v0.1` successful-sample dataset and run one
+  primary attack episode per row. Each episode must remain bound to that row's
+  verified graph and frozen stage prompts. Run clean/ablation/defense matrices
+  separately from the 30-episode primary result.
 - Search for the local model under `../../../models` rather than assuming one exact
   directory name. Validate a candidate using its model config/tokenizer and
   weight files. Support an explicit `HUIHUI_MODEL_PATH` override.

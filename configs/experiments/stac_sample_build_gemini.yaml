@@ -4,6 +4,8 @@ dataset_version: generated
 planner_type: adaptive_llm
 conditions: [llm_planner_full]
 task_limit: 10
+successful_sample_target: 30
+max_candidate_attempts: 120
 seeds: [1]
 max_turns: 12
 max_tool_calls: 8

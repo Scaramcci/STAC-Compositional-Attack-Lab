@@ -76,7 +76,8 @@
         "completed",
         "failed_retryable",
         "failed_terminal",
-        "paused_quota"
+        "paused_quota",
+        "skipped"
       ],
       "title": "AttackProgressStatus",
       "type": "string"

@@ -12,6 +12,7 @@ from pydantic import Field, PositiveInt, field_validator, model_validator
 from stac_attack_lab.contracts import StrictModel
 
 GPT_MODEL_ID = "gpt-5.5"
+HUIHUI_DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
 REQUIRED_ROLES = {"planner", "attacker", "victim", "prompt_writer", "verifier", "judge"}
 OPENAI_ROLES = REQUIRED_ROLES - {"victim"}
 
@@ -35,6 +36,8 @@ class ExperimentConfig(StrictModel):
     planner_type: str = "fixed"
     conditions: list[str] = Field(default_factory=lambda: ["clean", "fixed_full"])
     task_limit: PositiveInt = 2
+    successful_sample_target: PositiveInt | None = None
+    max_candidate_attempts: PositiveInt | None = None
     seeds: list[int] = Field(default_factory=lambda: [1])
     max_turns: PositiveInt = 12
     max_tool_calls: PositiveInt = 8
@@ -53,6 +56,14 @@ class ExperimentConfig(StrictModel):
 
     @model_validator(mode="after")
     def validate_role_profile(self) -> ExperimentConfig:
+        if (self.successful_sample_target is None) != (self.max_candidate_attempts is None):
+            raise ValueError("sample_collection_fields_must_be_set_together")
+        if (
+            self.successful_sample_target is not None
+            and self.max_candidate_attempts is not None
+            and self.max_candidate_attempts < self.successful_sample_target
+        ):
+            raise ValueError("max_candidate_attempts_below_successful_sample_target")
         missing = REQUIRED_ROLES - set(self.models)
         if missing:
             raise ValueError("missing_model_roles:" + ",".join(sorted(missing)))
@@ -75,6 +86,10 @@ class ExperimentConfig(StrictModel):
                 raise ValueError(f"{self.profile}_victim_must_use_{expected_provider}")
             if not self.network_enabled:
                 raise ValueError(f"{self.profile}_requires_network_enabled")
+            if self.profile == "stac_offline" and self.successful_sample_target is None:
+                raise ValueError("stac_offline_requires_sample_collection_target")
+            if self.profile == "formal_evaluation" and self.successful_sample_target is not None:
+                raise ValueError("formal_evaluation_consumes_frozen_samples")
         return self
 
 
@@ -161,8 +176,6 @@ def validate_startup(
             missing.append("OPENAI_MODEL_list")
     if "gemini" in providers and not env.get("GEMINI_API_KEY"):
         missing.append("GEMINI_API_KEY")
-    if "huihui_local" in providers and not env.get("HUIHUI_BASE_URL"):
-        missing.append("HUIHUI_BASE_URL")
     if missing:
         raise StartupValidationError("missing_environment_variables:" + ",".join(sorted(missing)))
     if "openai_compatible" in providers and GPT_MODEL_ID not in configured_openai_models(env):

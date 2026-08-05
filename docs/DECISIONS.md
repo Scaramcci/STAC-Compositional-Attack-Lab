@@ -103,3 +103,11 @@ Problem: Dataset freeze replaced existing versions, and the Huihui path was an a
 Decision: Reject content changes under an existing frozen version while treating identical freezes as idempotent. Discover Huihui under `../../../models` or `HUIHUI_MODEL_PATH` by checking config, tokenizer, and weights before vLLM launch. Keep vLLM in an ignored `.venv-vllm` environment and default the 24 GB launcher to BitsAndBytes runtime quantization, with explicit binary, quantization, and CPU-offload overrides.
 
 Impact: Dataset corrections require a new version. Local evaluation has a deterministic preflight and does not load weights during discovery tests. The 28 GB BF16 checkpoint is not assumed to fit unquantized on the RTX 4090.
+
+## ADR-012: Success-targeted offline collection and sample-bound evaluation
+
+Problem: `task_limit` incorrectly served as both candidate count and accepted sample count. A rejection stopped real construction, stored PromptWriter messages were generated after the successful Victim execution, and the main evaluation multiplied 10 fixture rows across conditions/seeds instead of consuming a verified attack dataset one sample at a time.
+
+Decision: Follow AgentLAB STAC's generate → execute/verify → prompt artifact → evaluate boundary, strengthened by executing the final frozen prompt during offline validation. Treat 10 seed tasks as a rotating scenario pool, try at most 120 uniquely seeded candidates, and accept only deterministic hard-pass candidates until 30 are collected. Preserve all rejection records. Freeze only complete collections with per-sample selection, graph, and prompt hashes. The primary Huihui config consumes the resulting 30 rows once each; controls and ablations are separate.
+
+Impact: Existing `mvp-v0.1` remains an engineering fixture and cannot be used by the formal profile. The formal dataset version is `stac-verified-30-v0.1`. Actual candidate/API cost depends on acceptance rate rather than being fixed at 30 attempts, while the main evaluation is exactly 30 attack episodes.

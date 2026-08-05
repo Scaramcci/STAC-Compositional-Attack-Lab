@@ -14,9 +14,16 @@ from stac_attack_lab.models.base import ModelCallError
 
 
 class OpenAICompatibleClient:
-    def __init__(self, model_id: str, max_output_tokens: int = 1200) -> None:
+    def __init__(
+        self,
+        model_id: str,
+        max_output_tokens: int = 1200,
+        *,
+        use_response_format: bool = False,
+    ) -> None:
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
+        self.use_response_format = use_response_format
         self.base_url = os.environ.get("OPENAI_BASE_URL")
         self._api_key = os.environ.get("OPENAI_API_KEY")
         self.last_raw_response: str | None = None
@@ -46,6 +53,15 @@ class OpenAICompatibleClient:
             "max_tokens": self.max_output_tokens,
             "seed": seed,
         }
+        if self.use_response_format:
+            payload["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_schema.__name__,
+                    "schema": schema,
+                    "strict": True,
+                },
+            }
         try:
             data = _post_json(url, payload, self._api_key, timeout)
             choices = cast(list[dict[str, Any]], data["choices"])
@@ -74,6 +90,9 @@ def _post_json(
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            # Some OpenAI-compatible gateways reject urllib's default
+            # Python-urllib user agent before the request reaches the model.
+            "User-Agent": "OpenAI/Python 1.0.0",
         },
         method="POST",
     )

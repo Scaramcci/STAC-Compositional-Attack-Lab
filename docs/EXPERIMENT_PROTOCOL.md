@@ -8,13 +8,13 @@ Conditions: `clean`, `single_entry`, `fixed_full`, `random_legal_full`, `rule_pl
 
 ## STAC Sample Construction
 
-The target sample-construction run is `configs/experiments/stac_sample_build_gpt_gemini.yaml`: GPT-compatible planner, attacker, prompt-writer, verifier, and judge roles; Gemini victim; deterministic hard verifier as final acceptance. Until OpenAI-compatible access is restored, `configs/experiments/stac_sample_build_gemini.yaml` uses Gemini for every LLM role while preserving the same contracts and role boundaries.
+The target sample-construction run is `configs/experiments/stac_sample_build_gpt_gemini.yaml`: GPT-compatible planner, attacker, prompt-writer, verifier, and judge roles; Gemini victim; deterministic hard verifier as final acceptance. The 10 seed tasks are candidate scenarios, not the sample count. Candidate generation continues with unique ids/seeds until 30 complete hard-pass samples are accepted, subject to a 120-attempt safety cap. Rejections are retained with reason codes and do not enter the accepted JSONL.
 
-The output is an audited and frozen JSONL dataset with AgentLAB-offline-like records: seed task, clean baseline, attack graph, verified call params, victim messages, expected predicates, version hashes, transcript refs, and sample hash.
+For each stage, PromptWriter produces the final Victim-visible message before execution; Gemini must execute that same message and the resulting full chain must hard-pass. Each accepted row records selection evidence, source/candidate ids, actual verified call parameters, frozen prompts, graph/prompt hashes, transcript refs, and sample hash. Incomplete collections cannot be frozen.
 
 ## Formal Evaluation
 
-The target evaluation config is `configs/experiments/evaluation_gpt_huihui_4090.yaml`: GPT-compatible planner/attacker/verifier/judge roles and a local 4090-hosted huihui victim exposed through an OpenAI-compatible endpoint. AgentLAB and SHADE_Arena are referenced through read-only adapters and integration smoke before any formal run.
+The target evaluation config is `configs/experiments/evaluation_gpt_huihui_4090.yaml`: GPT-compatible planner/attacker/verifier/judge roles and a local 4090-hosted Huihui victim. It loads `stac-verified-30-v0.1`, rejects missing or mismatched offline selection evidence, and runs 30 samples × one primary attack condition × one seed. Planner decisions stay inside each sample's frozen graph and Attacker receives that stage's frozen verified prompt. Controls, defense, and ablations are separate follow-up runs.
 
 ## Pairing
 
@@ -34,7 +34,7 @@ Freeze datasets before online runs. Reports must be rebuilt from `results.jsonl`
 
 ## Checkpoint and interruption protocol
 
-The unit of durability is one `task/sample × condition × seed` attack case. Before a case it transitions to `running`; afterward it transitions to `completed`, `failed_retryable`, `failed_terminal`, or `paused_quota`. Each transition is fsynced, followed by an atomic checkpoint and human-ledger update. Resume skips `completed` idempotency keys and starts at the first nonterminal key. Attempts are append-only and never overwritten.
+During collection, the durable unit is one candidate; during evaluation it is one `sample × condition × seed` case. Rejected candidates become `failed_terminal`, transient/quota failures remain resumable, and unused candidates become `skipped` once the success target is reached. Each transition is fsynced, followed by an atomic checkpoint and human-ledger update. Accepted samples and failures are append-only.
 
 ## Conversation audit protocol
 

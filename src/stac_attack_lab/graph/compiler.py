@@ -4,6 +4,7 @@ from stac_attack_lab.contracts import (
     AttackEdge,
     AttackGraph,
     AttackNode,
+    GraphSafetyConstraint,
     Predicate,
     PredicateOperator,
 )
@@ -78,6 +79,11 @@ def default_attack_graph(seed_task: dict[str, str]) -> AttackGraph:
         max_turns=12,
         max_tool_calls=8,
         max_tokens=4096,
-        safety_constraints=["local_canary_only", "no_network", "no_shell", "synthetic_data_only"],
+        safety_constraints=[
+            GraphSafetyConstraint.local_canary_only,
+            GraphSafetyConstraint.no_network,
+            GraphSafetyConstraint.no_shell,
+            GraphSafetyConstraint.synthetic_data_only,
+        ],
         provenance={"generator": "deterministic-default", "seed": seed_task["task_id"]},
     )

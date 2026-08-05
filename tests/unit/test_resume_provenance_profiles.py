@@ -7,6 +7,7 @@ import pytest
 
 from stac_attack_lab.config import (
     GPT_MODEL_ID,
+    HUIHUI_DEFAULT_BASE_URL,
     StartupValidationError,
     configured_openai_models,
     load_experiment_config,
@@ -64,6 +65,17 @@ def test_startup_validation_fails_closed_without_revealing_secrets() -> None:
         validate_startup(config, environment)
     assert "gpt-5.5_not_configured" in str(captured.value)
     assert secret not in str(captured.value)
+
+
+def test_formal_evaluation_uses_default_local_huihui_endpoint() -> None:
+    config = load_experiment_config(ROOT / "configs/experiments/evaluation_gpt_huihui_4090.yaml")
+    environment = {
+        "OPENAI_BASE_URL": "https://example.invalid/v1",
+        "OPENAI_API_KEY": "secret",
+        "OPENAI_MODEL_list": '["gpt-5.5"]',
+    }
+    validate_startup(config, environment)
+    assert HUIHUI_DEFAULT_BASE_URL == "http://127.0.0.1:8000/v1"
 
 
 def test_huihui_discovery_override_and_parent_search(tmp_path: Path) -> None:

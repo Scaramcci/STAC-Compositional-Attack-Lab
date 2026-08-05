@@ -496,16 +496,18 @@ python -m stac_attack_lab.cli dataset freeze --dataset data/generated/<build_id>
 
 1. 加载 seed task、环境公开契约、工具 schema 和原语注册表。
 2. `EnvironmentAnalyst` 生成/缓存 inventory。
-3. `OfflineGraphGenerator` 每个 seed 生成 `K=3` 个候选图。
+3. `OfflineGraphGenerator` 从 seed task 场景池生成带唯一 candidate id/seed 的候选图；候选次数与成功样本目标分离。
 4. `GraphValidator` 静态拒绝非法图；`ChainCritic` 只做语义建议。
 5. `OfflineChainExecutor` 从相同初始快照逐节点执行，任何修改都生成新 candidate revision，不能覆盖原始候选。
 6. 每一步记录 tool request/response、前后快照、artifact 和 verifier verdict。
-7. 只有所有 required predicate hard-pass 的图才能进入 `PromptWriter`。
-8. PromptWriter 生成 Victim 可见 message；在 fresh snapshot 中重放一次，验证反向 prompt 没改变行为。
+7. PromptWriter 为每个合法 stage 生成最终 Victim 可见 message；Gemini 在 fresh candidate 环境中实际执行该 message。
+8. 只有整条最终 prompt/tool 通路的所有 required predicate hard-pass，候选才进入 accepted samples。
 9. `DatasetAuditor` 检查 schema、哈希、数据泄漏、危险字符串、缺失 evidence、clean pair、预算和重复 sample。
 10. 冻结后写 `dataset_manifest.json` 和只读 sample 文件；内容改变必须产生新版本和新 hash。
 
 离线阶段必须同时产出失败样本及 reason code，避免数据只保留成功链造成选择偏差。失败样本不进入在线主实验，但用于报告 generator executable rate。
+
+正式采集目标为 30 个成功样本，最多启动 120 个候选；10 个 seed task 是可循环复用的场景池。达到 30 后停止并将未用候选标记为 `skipped`。未达到目标的数据集不得冻结。
 
 ## 11. 在线 STAC 管线
 
@@ -591,9 +593,9 @@ experiments/runs/<run_id>/
 
 ## 14. 实验矩阵
 
-### 14.1 必跑 full local
+### 14.1 必跑 primary local
 
-使用 10 个 seed task、3 个随机 seed、1 个 Victim 模型。每个 condition 使用 matched initial state 和预算。
+离线先从 10 个 seed task 场景池收集 30 个 hard-verified 样本。主评估对每个冻结样本使用一次 `llm_planner_full` 攻击和一个固定 seed；每个 episode 必须引用该样本的 graph/prompt hash。
 
 | 条件 | 目的 |
 |---|---|
@@ -607,7 +609,7 @@ experiments/runs/<run_id>/
 | `full_minus_retrieval` | 检验跨 episode 传播必要性 |
 | `llm_planner_full_defense_on` | 防御效果与效用代价 |
 
-目标规模：`10 tasks × 3 seeds × 9 conditions = 270 runs/model`。开发 smoke 使用 `2 tasks × 1 seed`，但不能替代正式 full local。
+主结果规模：`30 verified samples × 1 attack condition × 1 seed = 30 runs/model`。上表其他条件作为单独的控制、消融和防御扩展，不混入主 30 条结果。开发 smoke 使用 `2 tasks × 1 seed`，但不能替代正式采集与评估。
 
 扩展实验再加入其他单原语、所有 `full-minus-one`、第二 Victim 模型和 AgentDojo/SHADE_Arena 环境；不得在 full local 还未稳定时扩张。
 
@@ -628,7 +630,7 @@ experiments/runs/<run_id>/
 - 二元配对结果使用 McNemar exact test；效应量报告配对成功率差。
 - 比例和均值使用按 task 分层的 paired bootstrap 95% CI，固定 bootstrap seed。
 - 同时报告分子/分母、失败 reason code 和 invalid pair 数，不只报告百分比。
-- full local 样本量小，只用于工程可行性和方差估计；不得写成普遍性结论。
+- 30 条 primary local 样本量仍小，只用于工程可行性和方差估计；不得写成普遍性结论。
 
 ## 15. 配置与模型接口
 
@@ -756,7 +758,7 @@ make smoke-report
 - [ ] 实现 inventory、generator、critic、graph validator 和 offline executor。
 - [ ] 实现 verified-chain prompt writer 与 fresh replay。
 - [ ] 实现 dataset auditor、manifest、freeze/version/hash。
-- [ ] 生成 2-task smoke dataset，再扩到 10-task `mvp-v0.1`。
+- [ ] 生成 2-task smoke dataset，再从 10-task 场景池收集 30 条 hard-verified 正式样本。
 
 ### Phase D：在线 STAC
 
@@ -784,7 +786,7 @@ make smoke-report
 只有同时满足以下条件才可宣告 full local 完成：
 
 - 所有 Gate 通过，测试不是通过 skip 掩盖本地核心失败。
-- 10 个 seed 的冻结离线数据集可审计、可哈希、可 fresh replay。
+- 30 个成功样本的冻结离线数据集可审计、可哈希、可 fresh replay；失败候选另行保留。
 - fake-model 可从零完成离线生成、在线 STAC、消融、防御和报告闭环。
 - 至少一条四组件 long-horizon 链有连续 artifact lineage 和四阶段硬证据。
 - clean/full/ablation/defense 使用有效 matched pairs，报告能定位传播转折点。
