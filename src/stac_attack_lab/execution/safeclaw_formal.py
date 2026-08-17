@@ -318,11 +318,20 @@ def run_safeclaw_formal(
                         encoding="utf-8"
                     )
                 )
+                materialized_task_payload = json.loads(
+                    materialized.path.read_text(encoding="utf-8")
+                )
                 recorder.record_artifact(
                     case_id,
                     FormalStage.materialized,
                     "binding_manifest",
                     binding_payload,
+                )
+                materialized_task_record = recorder.record_artifact(
+                    case_id,
+                    FormalStage.materialized,
+                    "materialized_task",
+                    materialized_task_payload,
                 )
                 request = EpisodeRequest(
                     case_id=case_id,
@@ -353,9 +362,14 @@ def run_safeclaw_formal(
                 )
             official = parse_safeclaw_official(episode, sanitized)
             mechanism = _empty_mechanism()
-            artifact_paths: dict[str, str] = {}
+            graph_payload: dict[str, Any] | None = None
+            extraction_payload: dict[str, Any] | None = None
+            artifact_paths: dict[str, str] = {
+                "materialized_task": materialized_task_record.relative_path
+            }
             if episode.status == SafeClawExecutionStatus.completed and sanitized is not None:
                 graph, trajectory_audit = normalize_safeclaw_episode(episode, descriptor, sanitized)
+                graph_payload = graph.model_dump(mode="json")
                 graph_record = recorder.record_artifact(
                     case_id, FormalStage.normalized, "interaction_graph", graph
                 )
@@ -366,6 +380,7 @@ def run_safeclaw_formal(
                     trajectory_audit,
                 )
                 extraction = extract_primitive_occurrences(graph, registry)
+                extraction_payload = extraction.model_dump(mode="json")
                 occurrence_record = recorder.record_artifact(
                     case_id,
                     FormalStage.normalized,
@@ -390,7 +405,84 @@ def run_safeclaw_formal(
             official_record = recorder.record_artifact(
                 case_id, FormalStage.verified, "official_verdict", official
             )
-            artifact_paths["official_verdict"] = official_record.relative_path
+            mechanism_record = recorder.record_artifact(
+                case_id,
+                FormalStage.verified,
+                "mechanism_evaluation",
+                mechanism,
+            )
+            runner_case_root = episode_runner.output_root / case_id
+            attempt_logs = [
+                {
+                    "relative_path": str(path.relative_to(run_root)),
+                    "content": path.read_text(encoding="utf-8"),
+                }
+                for path in sorted(runner_case_root.glob("attempt-*.log"))
+            ]
+            complete_interaction_record = {
+                "schema_version": "2.0",
+                "record_type": "safeclaw_formal_complete_interaction",
+                "run_id": resolved_run_id,
+                "case_id": case_id,
+                "pair_id": pair_id,
+                "condition": condition,
+                "seed": seed,
+                "planner_stage": {
+                    "implementation": plan.planner_type,
+                    "model_id": None,
+                    "prompt_asset": None,
+                    "messages": [],
+                    "input": planner_input.model_dump(mode="json"),
+                    "output": plan.model_dump(mode="json"),
+                },
+                "attacker_stage": {
+                    "implemented": False,
+                    "model_id": None,
+                    "prompt_asset": None,
+                    "messages": [],
+                    "reason": (
+                        "The formal v1 pipeline deterministically materializes the selected "
+                        "primitive chain into a SafeClaw task; it does not call an LLM attacker."
+                    ),
+                },
+                "attack_realization": {
+                    "selected_sample": selected_public.model_dump(mode="json"),
+                    "execution_view": execution_view.model_dump(mode="json"),
+                    "binding_manifest": binding_payload,
+                    "materialized_task": materialized_task_payload,
+                },
+                "victim_stage": {
+                    "platform": "openclaw",
+                    "model_id": episode.target_model_id,
+                    "provider_contract": "openai_compatible",
+                    "base_url_env": config.target_base_url_env,
+                    "api_key_env": config.target_api_key_env,
+                    "episode": episode.model_dump(mode="json"),
+                    "sessions": (sanitized or {}).get("sessions", []),
+                    "session_transcript_raw": (sanitized or {}).get("session_transcript_raw", ""),
+                    "sanitized_result": sanitized,
+                    "attempt_logs": attempt_logs,
+                },
+                "primitive_evaluation": {
+                    "interaction_graph": graph_payload,
+                    "primitive_extraction": extraction_payload,
+                    "mechanism_evaluation": mechanism.model_dump(mode="json"),
+                },
+                "official_evaluation": official.model_dump(mode="json"),
+            }
+            complete_record = recorder.record_artifact(
+                case_id,
+                FormalStage.verified,
+                "complete_interaction_record",
+                complete_interaction_record,
+            )
+            artifact_paths.update(
+                {
+                    "official_verdict": official_record.relative_path,
+                    "mechanism_evaluation": mechanism_record.relative_path,
+                    "complete_interaction_record": complete_record.relative_path,
+                }
+            )
             result = aggregate_formal_result(
                 run_id=resolved_run_id,
                 case_id=case_id,

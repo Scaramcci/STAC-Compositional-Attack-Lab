@@ -48,6 +48,11 @@ def _atomic_json(path: Path, value: object) -> None:
     temporary.replace(path)
 
 
+def _upstream_provider_root(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    return normalized[:-3] if normalized.endswith("/v1") else normalized
+
+
 def _classify_failure(log: str, timed_out: bool) -> tuple[SafeClawExecutionStatus, bool, str]:
     lowered = log.lower()
     if timed_out:
@@ -128,7 +133,7 @@ class SafeClawRunner:
                 model_config,
                 {
                     "model": request.target_model_id,
-                    "api_base_url": request.target_base_url,
+                    "api_base_url": _upstream_provider_root(request.target_base_url),
                     "api_key": api_key,
                 },
             )

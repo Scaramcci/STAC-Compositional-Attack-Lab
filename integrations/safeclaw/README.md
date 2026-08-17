@@ -25,3 +25,39 @@ materialized. Bindable JSON pointers are allow-listed in that block. Pointers
 containing evaluation, success/safe condition, oracle, canary, auth, credential,
 token, password, or secret fields are rejected. Official unchanged tasks remain
 the `safeclaw_conformance` track and cannot be materialized.
+
+Each formal case stores `materialized_task.json` and
+`complete_interaction_record.json` under `cases/<case-id>/`. The complete record
+links the deterministic planner input/output, selected primitive chain and
+binding, exact materialized victim task, sanitized SafeClaw sessions and raw
+transcript, attempt logs, normalized interaction graph, primitive extraction,
+mechanism verdicts, and official verdict. API credentials are redacted and
+hidden chain-of-thought is never requested or recorded.
+
+## Long-running execution with tmux
+
+The tmux-oriented runner performs preflight, starts or resumes the formal run,
+audits the recorded artifacts, and rebuilds the report. Output is unbuffered and
+also written to `experiments/safeclaw_runs/<run-id>/tmux-run.log`. Reusing the
+same run id resumes completed cases instead of duplicating them.
+
+```bash
+tmux new-session -d -s safeclaw-formal \
+  "cd /path/to/stac-compositional-attack-lab && bash scripts/run_safeclaw_formal_tmux.sh safeclaw-formal-v1-main"
+tmux attach -t safeclaw-formal
+```
+
+Detach with `Ctrl-b d`. If the process exits, inspect the persistent log and
+rerun the same `tmux new-session` command to resume. The launcher intentionally
+does not override `execution_enabled=false` or a blocked task set.
+
+The current formal path consumes model API only inside the OpenClaw victim
+episode. Deterministic planners, task materialization, primitive extraction,
+mechanism verification, and the official SafeClaw checks do not call an LLM.
+Each current task has two sessions, so the nine-case matrix issues at least 18
+OpenClaw gateway requests before malformed-call or whole-episode retries. A
+gateway request can trigger multiple provider completions during tool-use loops.
+Current `tokens`, `cost`, and `api_calls` result fields are not provider billing
+telemetry: tokens/cost remain zero and api_calls currently counts episode
+attempts. Use provider-side usage logs for billing until usage extraction is
+implemented.

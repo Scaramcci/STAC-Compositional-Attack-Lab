@@ -23,7 +23,9 @@ def _runner(command: list[str], cwd: Path | None) -> subprocess.CompletedProcess
 
 
 def test_preflight_fails_closed_on_missing_checkout_without_secret_values() -> None:
-    config = load_safeclaw_preflight_config(ROOT / "configs/environments/safeclaw_openclaw_v1.yaml")
+    config = load_safeclaw_preflight_config(
+        ROOT / "configs/environments/safeclaw_openclaw_v1.yaml"
+    ).model_copy(update={"upstream_dir": "tests/fixtures/safeclaw/missing-upstream"})
     secret = "sk-never-render-this-secret-123456"
     report = run_safeclaw_preflight(
         ROOT,
