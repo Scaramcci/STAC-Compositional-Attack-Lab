@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from math import sqrt
+from math import comb, sqrt
 
 
 def wilson_ci(successes: int, total: int) -> tuple[float, float]:
@@ -15,4 +15,12 @@ def wilson_ci(successes: int, total: int) -> tuple[float, float]:
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    return 1.0 if b + c == 0 else min(1.0, 2 * min(b, c) / (b + c))
+    if b < 0 or c < 0:
+        raise ValueError("mcnemar_discordant_counts_must_be_nonnegative")
+    discordant = b + c
+    if discordant == 0:
+        return 1.0
+    lower_tail: float = sum(int(comb(discordant, k)) for k in range(min(b, c) + 1)) / (
+        2**discordant
+    )
+    return min(1.0, 2 * lower_tail)

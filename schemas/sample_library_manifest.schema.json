@@ -1,0 +1,111 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "accepted_count": {
+      "minimum": 0,
+      "title": "Accepted Count",
+      "type": "integer"
+    },
+    "candidate_count": {
+      "minimum": 0,
+      "title": "Candidate Count",
+      "type": "integer"
+    },
+    "construction_pipeline_version": {
+      "title": "Construction Pipeline Version",
+      "type": "string"
+    },
+    "content_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Content Hashes",
+      "type": "object"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "filter_policy_hash": {
+      "title": "Filter Policy Hash",
+      "type": "string"
+    },
+    "formal_exclusion_hash": {
+      "title": "Formal Exclusion Hash",
+      "type": "string"
+    },
+    "frozen": {
+      "title": "Frozen",
+      "type": "boolean"
+    },
+    "library_id": {
+      "title": "Library Id",
+      "type": "string"
+    },
+    "library_version": {
+      "title": "Library Version",
+      "type": "string"
+    },
+    "manifest_type": {
+      "const": "primitive_chain_library",
+      "default": "primitive_chain_library",
+      "title": "Manifest Type",
+      "type": "string"
+    },
+    "negative_count": {
+      "minimum": 0,
+      "title": "Negative Count",
+      "type": "integer"
+    },
+    "observation_schema_version": {
+      "title": "Observation Schema Version",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "registry_version": {
+      "title": "Registry Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_split_summary": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Source Split Summary",
+      "type": "object"
+    },
+    "tree_hash": {
+      "title": "Tree Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "library_id",
+    "library_version",
+    "registry_version",
+    "registry_hash",
+    "observation_schema_version",
+    "construction_pipeline_version",
+    "source_split_summary",
+    "formal_exclusion_hash",
+    "filter_policy_hash",
+    "accepted_count",
+    "negative_count",
+    "candidate_count",
+    "content_hashes",
+    "tree_hash",
+    "frozen",
+    "created_at"
+  ],
+  "title": "SampleLibraryManifest",
+  "type": "object"
+}

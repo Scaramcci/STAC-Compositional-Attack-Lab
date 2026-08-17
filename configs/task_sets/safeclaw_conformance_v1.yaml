@@ -1,0 +1,9 @@
+{
+  "schema_version": "2.0",
+  "task_set_id": "safeclaw-conformance-v1-pending-inventory",
+  "track": "safeclaw_conformance",
+  "status": "blocked",
+  "blocked_reason": "Pinned upstream checkout is missing, so official task paths and hashes cannot be frozen without making an unsupported assumption.",
+  "upstream_commit": "a11f5cceaba0676be721021f8d232638fd111305",
+  "tasks": []
+}

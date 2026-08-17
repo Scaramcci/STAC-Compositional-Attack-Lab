@@ -1,0 +1,178 @@
+{
+  "$defs": {
+    "CorePrimitiveFamily": {
+      "enum": [
+        "TRANSFER",
+        "TRANSFORM",
+        "MUTATE",
+        "CONTROL"
+      ],
+      "title": "CorePrimitiveFamily",
+      "type": "string"
+    },
+    "EvidenceGrade": {
+      "enum": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ],
+      "title": "EvidenceGrade",
+      "type": "string"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "evidence_grades": {
+      "items": {
+        "$ref": "#/$defs/EvidenceGrade"
+      },
+      "title": "Evidence Grades",
+      "type": "array"
+    },
+    "evidence_ref_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ref Ids",
+      "type": "array"
+    },
+    "family": {
+      "$ref": "#/$defs/CorePrimitiveFamily"
+    },
+    "graph_id": {
+      "title": "Graph Id",
+      "type": "string"
+    },
+    "hard_fact": {
+      "title": "Hard Fact",
+      "type": "boolean"
+    },
+    "input_artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Input Artifact Ids",
+      "type": "array"
+    },
+    "occurrence_id": {
+      "title": "Occurrence Id",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/PrimitiveOutcome"
+    },
+    "output_artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Output Artifact Ids",
+      "type": "array"
+    },
+    "post_state_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Post State Refs",
+      "type": "array"
+    },
+    "pre_state_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Pre State Refs",
+      "type": "array"
+    },
+    "primitive_ref": {
+      "title": "Primitive Ref",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "semantic_labels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Semantic Labels",
+      "type": "object"
+    },
+    "source_component_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Component Roles",
+      "type": "array"
+    },
+    "source_event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Event Ids",
+      "type": "array"
+    },
+    "subtype": {
+      "title": "Subtype",
+      "type": "string"
+    },
+    "target_component_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Component Roles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "occurrence_id",
+    "graph_id",
+    "primitive_ref",
+    "family",
+    "subtype",
+    "outcome",
+    "source_component_roles",
+    "target_component_roles",
+    "input_artifact_ids",
+    "output_artifact_ids",
+    "pre_state_refs",
+    "post_state_refs",
+    "source_event_ids",
+    "evidence_grades",
+    "evidence_ref_ids",
+    "confidence",
+    "hard_fact",
+    "reason_codes"
+  ],
+  "title": "PrimitiveOccurrence",
+  "type": "object"
+}

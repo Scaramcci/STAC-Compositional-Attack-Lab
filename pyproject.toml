@@ -7,7 +7,7 @@ name = "stac-compositional-attack-lab"
 version = "0.1.0"
 description = "Deterministic lab for safe STAC-style compositional agent attack experiments."
 requires-python = ">=3.11"
-dependencies = ["pydantic>=2.0"]
+dependencies = ["pydantic>=2.0", "PyYAML>=6.0", "jsonschema>=4.21"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.8"]
