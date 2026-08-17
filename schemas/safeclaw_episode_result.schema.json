@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "SafeClawExecutionStatus": {
+      "enum": [
+        "completed",
+        "rejected",
+        "blocked",
+        "timeout",
+        "environment_error",
+        "api_error",
+        "invalid_binding"
+      ],
+      "title": "SafeClawExecutionStatus",
+      "type": "string"
+    },
+    "SanitizedSessionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "public_stage_status": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Public Stage Status",
+          "type": "object"
+        },
+        "sequence_no": {
+          "minimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "transcript_ref": {
+          "title": "Transcript Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "sequence_no",
+        "status",
+        "transcript_ref",
+        "public_stage_status"
+      ],
+      "title": "SanitizedSessionResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attempt_count": {
+      "exclusiveMinimum": 0,
+      "title": "Attempt Count",
+      "type": "integer"
+    },
+    "binding_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Binding Id"
+    },
+    "canonical_trajectory_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Canonical Trajectory Ref"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "ended_at": {
+      "title": "Ended At",
+      "type": "string"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "error_category": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Category"
+    },
+    "official_checks_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Official Checks Ref"
+    },
+    "provenance": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Provenance",
+      "type": "object"
+    },
+    "runner_version": {
+      "title": "Runner Version",
+      "type": "string"
+    },
+    "sanitized_result_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Sanitized Result Hash"
+    },
+    "sanitized_result_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Sanitized Result Ref"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "secret_scan_passed": {
+      "title": "Secret Scan Passed",
+      "type": "boolean"
+    },
+    "sessions": {
+      "items": {
+        "$ref": "#/$defs/SanitizedSessionResult"
+      },
+      "title": "Sessions",
+      "type": "array"
+    },
+    "started_at": {
+      "title": "Started At",
+      "type": "string"
+    },
+    "state_evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "State Evidence Refs",
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/$defs/SafeClawExecutionStatus"
+    },
+    "taint_evidence_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Taint Evidence Refs",
+      "type": "array"
+    },
+    "target_model_id": {
+      "title": "Target Model Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "episode_id",
+    "case_id",
+    "task_id",
+    "binding_id",
+    "status",
+    "upstream_commit",
+    "runner_version",
+    "target_model_id",
+    "started_at",
+    "ended_at",
+    "duration_ms",
+    "attempt_count",
+    "sessions",
+    "sanitized_result_ref",
+    "sanitized_result_hash",
+    "canonical_trajectory_ref",
+    "official_checks_ref",
+    "state_evidence_refs",
+    "taint_evidence_refs",
+    "secret_scan_passed",
+    "provenance"
+  ],
+  "title": "SafeClawEpisodeResult",
+  "type": "object"
+}

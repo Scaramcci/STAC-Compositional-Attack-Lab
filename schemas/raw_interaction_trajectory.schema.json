@@ -1,0 +1,172 @@
+{
+  "$defs": {
+    "SourceReference": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref_id": {
+          "title": "Ref Id",
+          "type": "string"
+        },
+        "relative_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relative Path"
+        }
+      },
+      "required": [
+        "ref_id",
+        "kind",
+        "content_hash"
+      ],
+      "title": "SourceReference",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checkpoint_refs": {
+      "items": {
+        "$ref": "#/$defs/SourceReference"
+      },
+      "title": "Checkpoint Refs",
+      "type": "array"
+    },
+    "collection_seed": {
+      "title": "Collection Seed",
+      "type": "integer"
+    },
+    "collection_status": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked",
+        "error"
+      ],
+      "title": "Collection Status",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "event_refs": {
+      "items": {
+        "$ref": "#/$defs/SourceReference"
+      },
+      "title": "Event Refs",
+      "type": "array"
+    },
+    "failure_category": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Failure Category"
+    },
+    "model_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Model Hashes",
+      "type": "object"
+    },
+    "provenance": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Provenance",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Session Ids",
+      "type": "array"
+    },
+    "source_adapter_id": {
+      "title": "Source Adapter Id",
+      "type": "string"
+    },
+    "source_adapter_version": {
+      "title": "Source Adapter Version",
+      "type": "string"
+    },
+    "source_environment_family": {
+      "title": "Source Environment Family",
+      "type": "string"
+    },
+    "source_environment_version": {
+      "title": "Source Environment Version",
+      "type": "string"
+    },
+    "source_split": {
+      "enum": [
+        "train",
+        "dev",
+        "test",
+        "synthetic"
+      ],
+      "title": "Source Split",
+      "type": "string"
+    },
+    "source_task_id": {
+      "title": "Source Task Id",
+      "type": "string"
+    },
+    "trajectory_id": {
+      "title": "Trajectory Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "trajectory_id",
+    "source_adapter_id",
+    "source_adapter_version",
+    "source_environment_family",
+    "source_environment_version",
+    "source_task_id",
+    "source_split",
+    "episode_id",
+    "session_ids",
+    "event_refs",
+    "checkpoint_refs",
+    "model_hashes",
+    "config_hash",
+    "collection_seed",
+    "collection_status",
+    "provenance"
+  ],
+  "title": "RawInteractionTrajectory",
+  "type": "object"
+}

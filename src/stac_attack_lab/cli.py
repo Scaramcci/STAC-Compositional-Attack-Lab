@@ -7,16 +7,32 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from stac_attack_lab.config import StartupValidationError, load_experiment_config
-from stac_attack_lab.contracts import SCHEMA_MODELS
 from stac_attack_lab.datasets.auditor import audit_dataset
+from stac_attack_lab.datasets.library import (
+    audit_primitive_library,
+    freeze_primitive_library,
+)
 from stac_attack_lab.datasets.manifest import freeze_dataset
 from stac_attack_lab.env_loader import load_project_env
 from stac_attack_lab.environments.agentdojo_adapter import smoke_available
+from stac_attack_lab.environments.safeclaw.preflight import (
+    load_safeclaw_preflight_config,
+    run_safeclaw_preflight,
+)
+from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
 from stac_attack_lab.environments.shade_arena_adapter import (
     smoke_available as shade_smoke_available,
 )
 from stac_attack_lab.execution.offline import build_offline_dataset
 from stac_attack_lab.execution.online_stac import resume_online, run_online
+from stac_attack_lab.execution.safeclaw_formal import (
+    load_safeclaw_formal_config,
+    run_safeclaw_formal,
+)
+from stac_attack_lab.execution.sample_generation import (
+    build_sample_library,
+    load_sample_generation_config,
+)
 from stac_attack_lab.integration_smoke import smoke_models
 from stac_attack_lab.models.discovery import ModelDiscoveryError, discover_huihui_model
 from stac_attack_lab.recording.conversations import (
@@ -24,8 +40,11 @@ from stac_attack_lab.recording.conversations import (
     TranscriptAuditReport,
     audit_transcript,
 )
+from stac_attack_lab.recording.formal_run_recorder import FormalRunRecorder
 from stac_attack_lab.recording.progress import ExperimentProgress
+from stac_attack_lab.reporting.formal_report import build_formal_report
 from stac_attack_lab.reporting.report import build_report
+from stac_attack_lab.schema_registry import SCHEMA_MODELS, validate_schema_registry
 
 
 def project_root() -> Path:
@@ -33,6 +52,7 @@ def project_root() -> Path:
 
 
 def build_schemas(root: Path) -> None:
+    validate_schema_registry()
     schema_dir = root / "schemas"
     schema_dir.mkdir(exist_ok=True)
     models: dict[str, type[BaseModel]] = {
@@ -68,6 +88,32 @@ def _main(argv: list[str] | None = None) -> int:
     freeze = dataset_sub.add_parser("freeze")
     freeze.add_argument("--dataset", required=True)
     freeze.add_argument("--version", required=True)
+
+    sample = sub.add_parser("sample")
+    sample_sub = sample.add_subparsers(dest="sample_cmd", required=True)
+    sample_build = sample_sub.add_parser("build")
+    sample_build.add_argument("--config", required=True)
+    sample_audit = sample_sub.add_parser("audit")
+    sample_audit.add_argument("--library", required=True)
+    sample_freeze = sample_sub.add_parser("freeze")
+    sample_freeze.add_argument("--library", required=True)
+    sample_freeze.add_argument("--version", required=True)
+
+    safeclaw = sub.add_parser("safeclaw")
+    safeclaw_sub = safeclaw.add_subparsers(dest="safeclaw_cmd", required=True)
+    safeclaw_inventory = safeclaw_sub.add_parser("inventory")
+    safeclaw_inventory.add_argument("--upstream", required=True)
+    safeclaw_inventory.add_argument("--task", action="append", required=True)
+    safeclaw_preflight = safeclaw_sub.add_parser("preflight")
+    safeclaw_preflight.add_argument("--config", required=True)
+    safeclaw_run = safeclaw_sub.add_parser("run")
+    safeclaw_run.add_argument("--config", required=True)
+    safeclaw_run.add_argument("--run-id", default=None)
+    safeclaw_run.add_argument("--resume", action="store_true")
+    safeclaw_audit_run = safeclaw_sub.add_parser("audit-run")
+    safeclaw_audit_run.add_argument("--run-root", required=True)
+    safeclaw_report = safeclaw_sub.add_parser("formal-report")
+    safeclaw_report.add_argument("--run-root", required=True)
 
     online = sub.add_parser("online")
     online_sub = online.add_subparsers(dest="online_cmd", required=True)
@@ -125,6 +171,62 @@ def _main(argv: list[str] | None = None) -> int:
         target = freeze_dataset(root / args.dataset, args.version, root)
         print(target)
         return 0
+    if args.cmd == "sample" and args.sample_cmd == "build":
+        sample_config = load_sample_generation_config(root / args.config)
+        print(build_sample_library(root, sample_config))
+        return 0
+    if args.cmd == "sample" and args.sample_cmd == "audit":
+        errors = audit_primitive_library(root / args.library)
+        if errors:
+            for error in errors:
+                print(error)
+            return 1
+        print("audit passed")
+        return 0
+    if args.cmd == "sample" and args.sample_cmd == "freeze":
+        print(freeze_primitive_library(root / args.library, args.version, root))
+        return 0
+
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "inventory":
+        descriptors = inventory_safeclaw_tasks(root / args.upstream, args.task)
+        print(
+            json.dumps(
+                [item.model_dump(mode="json") for item in descriptors],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "preflight":
+        preflight_config = load_safeclaw_preflight_config(root / args.config)
+        preflight_report = run_safeclaw_preflight(root, preflight_config)
+        print(preflight_report.model_dump_json(indent=2))
+        return 0 if preflight_report.passed else 1
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "run":
+        try:
+            formal_config = load_safeclaw_formal_config(root / args.config)
+            print(
+                run_safeclaw_formal(
+                    root,
+                    formal_config,
+                    run_id=args.run_id,
+                    resume=args.resume,
+                )
+            )
+            return 0
+        except (ValueError, FileExistsError) as exc:
+            print(str(exc))
+            return 2
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "audit-run":
+        audit_report = FormalRunRecorder(root / args.run_root).audit()
+        print(audit_report.model_dump_json(indent=2))
+        return 0 if audit_report.passed else 1
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "formal-report":
+        target_root = root / args.run_root
+        build_formal_report(target_root)
+        print(target_root / "formal_report.json")
+        return 0
+
     if args.cmd == "online":
         config = load_experiment_config(root / args.config)
         if args.dataset_version:

@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "MacroCoreEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_type": {
+          "enum": [
+            "data",
+            "state",
+            "control",
+            "authorization"
+          ],
+          "title": "Edge Type",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "source_pattern_node_id": {
+          "title": "Source Pattern Node Id",
+          "type": "string"
+        },
+        "target_pattern_node_id": {
+          "title": "Target Pattern Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_pattern_node_id",
+        "target_pattern_node_id",
+        "edge_type"
+      ],
+      "title": "MacroCoreEdge",
+      "type": "object"
+    },
+    "MacroCoreNode": {
+      "additionalProperties": false,
+      "properties": {
+        "pattern_node_id": {
+          "title": "Pattern Node Id",
+          "type": "string"
+        },
+        "primitive_ref": {
+          "title": "Primitive Ref",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "pattern_node_id",
+        "primitive_ref"
+      ],
+      "title": "MacroCoreNode",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "aliases": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Aliases",
+      "type": "array"
+    },
+    "binding_slots": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Binding Slots",
+      "type": "array"
+    },
+    "core_edges": {
+      "items": {
+        "$ref": "#/$defs/MacroCoreEdge"
+      },
+      "title": "Core Edges",
+      "type": "array"
+    },
+    "core_nodes": {
+      "items": {
+        "$ref": "#/$defs/MacroCoreNode"
+      },
+      "title": "Core Nodes",
+      "type": "array"
+    },
+    "entry_predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entry Predicates",
+      "type": "array"
+    },
+    "exit_predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exit Predicates",
+      "type": "array"
+    },
+    "macro_id": {
+      "title": "Macro Id",
+      "type": "string"
+    },
+    "public_summary": {
+      "title": "Public Summary",
+      "type": "string"
+    },
+    "required_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Capabilities",
+      "type": "array"
+    },
+    "safety_scope": {
+      "const": "authorized_benchmark_sandbox",
+      "default": "authorized_benchmark_sandbox",
+      "title": "Safety Scope",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "macro_id",
+    "version",
+    "public_summary",
+    "entry_predicates",
+    "exit_predicates",
+    "required_capabilities",
+    "binding_slots",
+    "core_nodes",
+    "core_edges",
+    "aliases"
+  ],
+  "title": "AttackMacroSpec",
+  "type": "object"
+}

@@ -1,0 +1,62 @@
+diff --git a/scripts/judge.py b/scripts/judge.py
+index 466b14e..9e19a55 100755
+--- a/scripts/judge.py
++++ b/scripts/judge.py
+@@ -458,7 +458,7 @@ def _apply_model_config(config_path: str):
+             f"json.dump(c,open('{cfg_path}','w'),indent=2)"
+             f"\""
+         )
+-        print(f"  Provider override (Seclaw): ...{api_key[-6:]} -> {api_base_url or 'default'}")
++        print(f"  Provider override (Seclaw): credential redacted -> {api_base_url or 'default'}")
+         return {"model": model_id, "api_base_url": api_base_url}
+ 
+     # Write provider config to openclaw.json (models.providers.openai)
+@@ -498,7 +498,7 @@ def _apply_model_config(config_path: str):
+             # Copy modified config back (requires root for NemoClaw)
+             dexec(f"cp /tmp/_openclaw_config.json {OPENCLAW_HOME}/openclaw.json")
+             dexec(f"chmod 444 {OPENCLAW_HOME}/openclaw.json")
+-        print(f"  Provider override: ...{api_key[-6:]} -> {api_base_url}")
++        print(f"  Provider override: credential redacted -> {api_base_url}")
+ 
+     # Also update auth-profiles key (gateway may prefer this over provider apiKey)
+     if api_key:
+@@ -537,7 +537,27 @@ def _apply_model_config(config_path: str):
+     print(f"  Gateway restarted — config: {validate.strip()}")
+ 
+     # Return applied config so it can be saved in the report
+-    return {"model": model_id, "api_base_url": api_base_url or "", "api_key_suffix": api_key[-6:] if api_key else ""}
++    return {"model": model_id, "api_base_url": api_base_url or ""}
++
++
++def _safe_auth_profile_structure(raw: str):
++    """Retain provider/profile metadata without persisting credentials."""
++    try:
++        parsed = json.loads(raw) if raw else {}
++    except json.JSONDecodeError:
++        return {"available": bool(raw), "parse_error": True}
++
++    profiles = []
++    for name, profile in parsed.get("profiles", {}).items():
++        if not isinstance(profile, dict):
++            continue
++        profiles.append({
++            "profile_name": name,
++            "provider": profile.get("provider"),
++            "credential_type": profile.get("type"),
++            "credential": "***REDACTED***",
++        })
++    return {"available": bool(raw), "profiles": profiles}
+ 
+ 
+ def remove_container():
+@@ -1489,7 +1509,9 @@ class Evaluator:
+                 "skills_deployed": self.pre_state.get("skills_deployed", []),
+                 "plugins_deployed": self.pre_state.get("plugins_deployed", []),
+             },
+-            "auth_profiles": self.post_state.get("auth_profiles_content", ""),
++            "auth_profiles": _safe_auth_profile_structure(
++                self.post_state.get("auth_profiles_content", "")
++            ),
+         }
+ 
+     def _check_skill_loaded(self) -> dict:

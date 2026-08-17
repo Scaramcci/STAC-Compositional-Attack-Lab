@@ -1,0 +1,681 @@
+{
+  "$defs": {
+    "BindingSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_public_sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Public Sources",
+          "type": "array"
+        },
+        "required_capability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Capability"
+        },
+        "required_component_role": {
+          "title": "Required Component Role",
+          "type": "string"
+        },
+        "sensitive": {
+          "const": false,
+          "default": false,
+          "title": "Sensitive",
+          "type": "boolean"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "value_type": {
+          "title": "Value Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot_id",
+        "value_type",
+        "required_component_role",
+        "allowed_public_sources"
+      ],
+      "title": "BindingSlot",
+      "type": "object"
+    },
+    "ChainEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Binding"
+        },
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "guard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guard"
+        },
+        "join_k": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Join K"
+        },
+        "join_semantics": {
+          "$ref": "#/$defs/JoinSemantics",
+          "default": "ALL"
+        },
+        "required_for_full_chain": {
+          "default": true,
+          "title": "Required For Full Chain",
+          "type": "boolean"
+        },
+        "source_fact": {
+          "title": "Source Fact",
+          "type": "string"
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "source_occurrence_outcome": {
+          "$ref": "#/$defs/PrimitiveOutcome",
+          "default": "passed"
+        },
+        "state_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State Binding"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        },
+        "target_precondition": {
+          "title": "Target Precondition",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "source_node_id",
+        "target_node_id",
+        "edge_type",
+        "source_fact",
+        "target_precondition",
+        "evidence_ref_ids"
+      ],
+      "title": "ChainEdge",
+      "type": "object"
+    },
+    "ChainNode": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_outcomes": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveOutcome"
+          },
+          "title": "Allowed Outcomes",
+          "type": "array"
+        },
+        "binding_slots": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Binding Slots",
+          "type": "array"
+        },
+        "core_occurrence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Core Occurrence Ids",
+          "type": "array"
+        },
+        "evidence_requirement": {
+          "items": {
+            "$ref": "#/$defs/EvidenceGrade"
+          },
+          "title": "Evidence Requirement",
+          "type": "array"
+        },
+        "macro_primitive_ref": {
+          "title": "Macro Primitive Ref",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "public_postconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Postconditions",
+          "type": "array"
+        },
+        "public_preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Preconditions",
+          "type": "array"
+        },
+        "required_edge_inputs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Edge Inputs",
+          "type": "array"
+        },
+        "required_for_full_chain": {
+          "default": true,
+          "title": "Required For Full Chain",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node_id",
+        "macro_primitive_ref",
+        "core_occurrence_ids",
+        "public_preconditions",
+        "public_postconditions",
+        "required_edge_inputs",
+        "binding_slots",
+        "allowed_outcomes",
+        "evidence_requirement"
+      ],
+      "title": "ChainNode",
+      "type": "object"
+    },
+    "DependencyType": {
+      "enum": [
+        "data",
+        "state",
+        "control",
+        "authorization"
+      ],
+      "title": "DependencyType",
+      "type": "string"
+    },
+    "EvidenceGrade": {
+      "enum": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ],
+      "title": "EvidenceGrade",
+      "type": "string"
+    },
+    "FormalBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_sessions": {
+          "exclusiveMinimum": 0,
+          "title": "Max Sessions",
+          "type": "integer"
+        },
+        "max_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "exclusiveMinimum": 0,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "max_turns": {
+          "exclusiveMinimum": 0,
+          "title": "Max Turns",
+          "type": "integer"
+        },
+        "max_wall_time_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Max Wall Time Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_sessions",
+        "max_turns",
+        "max_tool_calls",
+        "max_tokens",
+        "max_wall_time_seconds"
+      ],
+      "title": "FormalBudget",
+      "type": "object"
+    },
+    "JoinSemantics": {
+      "enum": [
+        "ALL",
+        "ANY",
+        "K_OF_N"
+      ],
+      "title": "JoinSemantics",
+      "type": "string"
+    },
+    "PlannerSampleView": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability_predicates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Applicability Predicates",
+          "type": "array"
+        },
+        "binding_slots": {
+          "items": {
+            "$ref": "#/$defs/BindingSlot"
+          },
+          "title": "Binding Slots",
+          "type": "array"
+        },
+        "budget_profile": {
+          "additionalProperties": {
+            "exclusiveMinimum": 0,
+            "type": "integer"
+          },
+          "title": "Budget Profile",
+          "type": "object"
+        },
+        "component_role_signature": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Component Role Signature",
+          "type": "array"
+        },
+        "evidence_strength": {
+          "enum": [
+            "direct",
+            "deterministic",
+            "interventional",
+            "mixed"
+          ],
+          "title": "Evidence Strength",
+          "type": "string"
+        },
+        "fallback_node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fallback Node Ids",
+          "type": "array"
+        },
+        "macro_edges": {
+          "items": {
+            "$ref": "#/$defs/ChainEdge"
+          },
+          "title": "Macro Edges",
+          "type": "array"
+        },
+        "macro_nodes": {
+          "items": {
+            "$ref": "#/$defs/ChainNode"
+          },
+          "title": "Macro Nodes",
+          "type": "array"
+        },
+        "public_summary": {
+          "title": "Public Summary",
+          "type": "string"
+        },
+        "required_capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Capabilities",
+          "type": "array"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "sample_version": {
+          "title": "Sample Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_id",
+        "sample_version",
+        "public_summary",
+        "macro_nodes",
+        "macro_edges",
+        "applicability_predicates",
+        "required_capabilities",
+        "component_role_signature",
+        "binding_slots",
+        "budget_profile",
+        "fallback_node_ids",
+        "evidence_strength"
+      ],
+      "title": "PlannerSampleView",
+      "type": "object"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    },
+    "PublicSampleIndexEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "planner_view": {
+          "$ref": "#/$defs/PlannerSampleView"
+        },
+        "sample_hash": {
+          "title": "Sample Hash",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_id",
+        "sample_hash",
+        "planner_view"
+      ],
+      "title": "PublicSampleIndexEntry",
+      "type": "object"
+    },
+    "SafeClawBindingSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Sources",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "json_pointer": {
+          "title": "Json Pointer",
+          "type": "string"
+        },
+        "public": {
+          "title": "Public",
+          "type": "boolean"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "value_type": {
+          "enum": [
+            "string",
+            "integer",
+            "boolean",
+            "string_list",
+            "object"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot_id",
+        "json_pointer",
+        "value_type",
+        "public",
+        "allowed_sources",
+        "description"
+      ],
+      "title": "SafeClawBindingSlot",
+      "type": "object"
+    },
+    "SafeClawPublicTaskView": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Actions",
+          "type": "array"
+        },
+        "bindable_slots": {
+          "items": {
+            "$ref": "#/$defs/SafeClawBindingSlot"
+          },
+          "title": "Bindable Slots",
+          "type": "array"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "component_roles": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Component Roles",
+          "type": "object"
+        },
+        "dimension": {
+          "title": "Dimension",
+          "type": "string"
+        },
+        "lifecycle_boundaries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lifecycle Boundaries",
+          "type": "array"
+        },
+        "materialization_template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Materialization Template Id"
+        },
+        "platform": {
+          "const": "openclaw",
+          "default": "openclaw",
+          "title": "Platform",
+          "type": "string"
+        },
+        "public_capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Capabilities",
+          "type": "array"
+        },
+        "public_goal": {
+          "title": "Public Goal",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "session_count": {
+          "exclusiveMinimum": 0,
+          "title": "Session Count",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_source_hash": {
+          "title": "Task Source Hash",
+          "type": "string"
+        },
+        "track": {
+          "$ref": "#/$defs/SafeClawTrack"
+        }
+      },
+      "required": [
+        "task_id",
+        "track",
+        "dimension",
+        "category",
+        "public_goal",
+        "public_capabilities",
+        "component_roles",
+        "session_count",
+        "lifecycle_boundaries",
+        "bindable_slots",
+        "allowed_actions",
+        "task_source_hash"
+      ],
+      "title": "SafeClawPublicTaskView",
+      "type": "object"
+    },
+    "SafeClawTrack": {
+      "enum": [
+        "safeclaw_conformance",
+        "safeclaw_compositional"
+      ],
+      "title": "SafeClawTrack",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "budget": {
+      "$ref": "#/$defs/FormalBudget"
+    },
+    "condition": {
+      "title": "Condition",
+      "type": "string"
+    },
+    "library_hash": {
+      "title": "Library Hash",
+      "type": "string"
+    },
+    "library_id": {
+      "title": "Library Id",
+      "type": "string"
+    },
+    "library_version": {
+      "title": "Library Version",
+      "type": "string"
+    },
+    "planner_input_id": {
+      "title": "Planner Input Id",
+      "type": "string"
+    },
+    "prior_public_session_status": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Prior Public Session Status",
+      "type": "object"
+    },
+    "public_samples": {
+      "items": {
+        "$ref": "#/$defs/PublicSampleIndexEntry"
+      },
+      "title": "Public Samples",
+      "type": "array"
+    },
+    "public_task": {
+      "$ref": "#/$defs/SafeClawPublicTaskView"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "planner_input_id",
+    "library_id",
+    "library_version",
+    "library_hash",
+    "public_samples",
+    "public_task",
+    "budget",
+    "condition",
+    "seed"
+  ],
+  "title": "FormalPlannerInput",
+  "type": "object"
+}

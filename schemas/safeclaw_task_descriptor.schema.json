@@ -1,0 +1,278 @@
+{
+  "$defs": {
+    "SafeClawBindingSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Sources",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "json_pointer": {
+          "title": "Json Pointer",
+          "type": "string"
+        },
+        "public": {
+          "title": "Public",
+          "type": "boolean"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "value_type": {
+          "enum": [
+            "string",
+            "integer",
+            "boolean",
+            "string_list",
+            "object"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot_id",
+        "json_pointer",
+        "value_type",
+        "public",
+        "allowed_sources",
+        "description"
+      ],
+      "title": "SafeClawBindingSlot",
+      "type": "object"
+    },
+    "SafeClawPublicTaskView": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Actions",
+          "type": "array"
+        },
+        "bindable_slots": {
+          "items": {
+            "$ref": "#/$defs/SafeClawBindingSlot"
+          },
+          "title": "Bindable Slots",
+          "type": "array"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "component_roles": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Component Roles",
+          "type": "object"
+        },
+        "dimension": {
+          "title": "Dimension",
+          "type": "string"
+        },
+        "lifecycle_boundaries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lifecycle Boundaries",
+          "type": "array"
+        },
+        "materialization_template_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Materialization Template Id"
+        },
+        "platform": {
+          "const": "openclaw",
+          "default": "openclaw",
+          "title": "Platform",
+          "type": "string"
+        },
+        "public_capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Capabilities",
+          "type": "array"
+        },
+        "public_goal": {
+          "title": "Public Goal",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "session_count": {
+          "exclusiveMinimum": 0,
+          "title": "Session Count",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_source_hash": {
+          "title": "Task Source Hash",
+          "type": "string"
+        },
+        "track": {
+          "$ref": "#/$defs/SafeClawTrack"
+        }
+      },
+      "required": [
+        "task_id",
+        "track",
+        "dimension",
+        "category",
+        "public_goal",
+        "public_capabilities",
+        "component_roles",
+        "session_count",
+        "lifecycle_boundaries",
+        "bindable_slots",
+        "allowed_actions",
+        "task_source_hash"
+      ],
+      "title": "SafeClawPublicTaskView",
+      "type": "object"
+    },
+    "SafeClawTrack": {
+      "enum": [
+        "safeclaw_conformance",
+        "safeclaw_compositional"
+      ],
+      "title": "SafeClawTrack",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
+    "dimension": {
+      "title": "Dimension",
+      "type": "string"
+    },
+    "materialization_template_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Materialization Template Id"
+    },
+    "official_safe_condition_hash": {
+      "title": "Official Safe Condition Hash",
+      "type": "string"
+    },
+    "official_success_condition_hash": {
+      "title": "Official Success Condition Hash",
+      "type": "string"
+    },
+    "platform": {
+      "const": "openclaw",
+      "default": "openclaw",
+      "title": "Platform",
+      "type": "string"
+    },
+    "private_oracle_ref": {
+      "title": "Private Oracle Ref",
+      "type": "string"
+    },
+    "public_view": {
+      "$ref": "#/$defs/SafeClawPublicTaskView"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+    },
+    "source_relative_path": {
+      "title": "Source Relative Path",
+      "type": "string"
+    },
+    "supported": {
+      "title": "Supported",
+      "type": "boolean"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "track": {
+      "$ref": "#/$defs/SafeClawTrack"
+    },
+    "unsupported_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Unsupported Reason"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "track",
+    "dimension",
+    "category",
+    "title",
+    "source_relative_path",
+    "source_hash",
+    "upstream_commit",
+    "public_view",
+    "private_oracle_ref",
+    "official_success_condition_hash",
+    "official_safe_condition_hash",
+    "supported"
+  ],
+  "title": "SafeClawTaskDescriptor",
+  "type": "object"
+}

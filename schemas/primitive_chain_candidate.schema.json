@@ -1,0 +1,417 @@
+{
+  "$defs": {
+    "CandidateAcquisitionMode": {
+      "enum": [
+        "ordinary_trace",
+        "adversarial_trace",
+        "generated",
+        "composed"
+      ],
+      "title": "CandidateAcquisitionMode",
+      "type": "string"
+    },
+    "ChainEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Binding"
+        },
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "guard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guard"
+        },
+        "join_k": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Join K"
+        },
+        "join_semantics": {
+          "$ref": "#/$defs/JoinSemantics",
+          "default": "ALL"
+        },
+        "required_for_full_chain": {
+          "default": true,
+          "title": "Required For Full Chain",
+          "type": "boolean"
+        },
+        "source_fact": {
+          "title": "Source Fact",
+          "type": "string"
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "source_occurrence_outcome": {
+          "$ref": "#/$defs/PrimitiveOutcome",
+          "default": "passed"
+        },
+        "state_binding": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State Binding"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        },
+        "target_precondition": {
+          "title": "Target Precondition",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "source_node_id",
+        "target_node_id",
+        "edge_type",
+        "source_fact",
+        "target_precondition",
+        "evidence_ref_ids"
+      ],
+      "title": "ChainEdge",
+      "type": "object"
+    },
+    "ChainNode": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_outcomes": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveOutcome"
+          },
+          "title": "Allowed Outcomes",
+          "type": "array"
+        },
+        "binding_slots": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Binding Slots",
+          "type": "array"
+        },
+        "core_occurrence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Core Occurrence Ids",
+          "type": "array"
+        },
+        "evidence_requirement": {
+          "items": {
+            "$ref": "#/$defs/EvidenceGrade"
+          },
+          "title": "Evidence Requirement",
+          "type": "array"
+        },
+        "macro_primitive_ref": {
+          "title": "Macro Primitive Ref",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "public_postconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Postconditions",
+          "type": "array"
+        },
+        "public_preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Preconditions",
+          "type": "array"
+        },
+        "required_edge_inputs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Edge Inputs",
+          "type": "array"
+        },
+        "required_for_full_chain": {
+          "default": true,
+          "title": "Required For Full Chain",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node_id",
+        "macro_primitive_ref",
+        "core_occurrence_ids",
+        "public_preconditions",
+        "public_postconditions",
+        "required_edge_inputs",
+        "binding_slots",
+        "allowed_outcomes",
+        "evidence_requirement"
+      ],
+      "title": "ChainNode",
+      "type": "object"
+    },
+    "DependencyType": {
+      "enum": [
+        "data",
+        "state",
+        "control",
+        "authorization"
+      ],
+      "title": "DependencyType",
+      "type": "string"
+    },
+    "EvidenceGrade": {
+      "enum": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ],
+      "title": "EvidenceGrade",
+      "type": "string"
+    },
+    "FilterDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "gate": {
+          "$ref": "#/$defs/FilterGate"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "gate",
+        "passed",
+        "reason_codes",
+        "evidence_ref_ids"
+      ],
+      "title": "FilterDecision",
+      "type": "object"
+    },
+    "FilterGate": {
+      "enum": [
+        "G0",
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5",
+        "G6",
+        "G7",
+        "G8"
+      ],
+      "title": "FilterGate",
+      "type": "string"
+    },
+    "JoinSemantics": {
+      "enum": [
+        "ALL",
+        "ANY",
+        "K_OF_N"
+      ],
+      "title": "JoinSemantics",
+      "type": "string"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "acquisition_mode": {
+      "$ref": "#/$defs/CandidateAcquisitionMode"
+    },
+    "candidate_hash": {
+      "title": "Candidate Hash",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "chain_id": {
+      "title": "Chain Id",
+      "type": "string"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/ChainEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "entry_predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Entry Predicates",
+      "type": "array"
+    },
+    "filter_decisions": {
+      "items": {
+        "$ref": "#/$defs/FilterDecision"
+      },
+      "title": "Filter Decisions",
+      "type": "array"
+    },
+    "forbidden_shortcut_detected": {
+      "title": "Forbidden Shortcut Detected",
+      "type": "boolean"
+    },
+    "interaction_graph_id": {
+      "title": "Interaction Graph Id",
+      "type": "string"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/ChainNode"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "occurrence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Occurrence Ids",
+      "type": "array"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_split": {
+      "title": "Source Split",
+      "type": "string"
+    },
+    "source_task_id": {
+      "title": "Source Task Id",
+      "type": "string"
+    },
+    "source_trace_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Trace Refs",
+      "type": "array"
+    },
+    "terminal_predicates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Terminal Predicates",
+      "type": "array"
+    },
+    "terminal_relation": {
+      "enum": [
+        "observed",
+        "hypothesized",
+        "blocked",
+        "failed"
+      ],
+      "title": "Terminal Relation",
+      "type": "string"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "chain_id",
+    "registry_hash",
+    "interaction_graph_id",
+    "occurrence_ids",
+    "nodes",
+    "edges",
+    "entry_predicates",
+    "terminal_predicates",
+    "acquisition_mode",
+    "source_trace_refs",
+    "source_task_id",
+    "source_split",
+    "terminal_relation",
+    "forbidden_shortcut_detected",
+    "candidate_hash"
+  ],
+  "title": "PrimitiveChainCandidate",
+  "type": "object"
+}

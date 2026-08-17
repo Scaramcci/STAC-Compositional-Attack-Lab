@@ -1,0 +1,137 @@
+{
+  "$defs": {
+    "CorePrimitiveFamily": {
+      "enum": [
+        "TRANSFER",
+        "TRANSFORM",
+        "MUTATE",
+        "CONTROL"
+      ],
+      "title": "CorePrimitiveFamily",
+      "type": "string"
+    },
+    "EvidenceGrade": {
+      "enum": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ],
+      "title": "EvidenceGrade",
+      "type": "string"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_outcomes": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveOutcome"
+      },
+      "title": "Allowed Outcomes",
+      "type": "array"
+    },
+    "family": {
+      "$ref": "#/$defs/CorePrimitiveFamily"
+    },
+    "minimum_hard_evidence": {
+      "items": {
+        "$ref": "#/$defs/EvidenceGrade"
+      },
+      "title": "Minimum Hard Evidence",
+      "type": "array"
+    },
+    "observable_state_differences": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Observable State Differences",
+      "type": "array"
+    },
+    "primitive_id": {
+      "title": "Primitive Id",
+      "type": "string"
+    },
+    "public_summary": {
+      "title": "Public Summary",
+      "type": "string"
+    },
+    "required_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Capabilities",
+      "type": "array"
+    },
+    "required_observations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Observations",
+      "type": "array"
+    },
+    "safety_scope": {
+      "const": "authorized_benchmark_sandbox",
+      "default": "authorized_benchmark_sandbox",
+      "title": "Safety Scope",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Roles",
+      "type": "array"
+    },
+    "subtype": {
+      "title": "Subtype",
+      "type": "string"
+    },
+    "target_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Roles",
+      "type": "array"
+    },
+    "version": {
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "primitive_id",
+    "version",
+    "family",
+    "subtype",
+    "public_summary",
+    "source_roles",
+    "target_roles",
+    "required_capabilities",
+    "required_observations",
+    "observable_state_differences",
+    "allowed_outcomes",
+    "minimum_hard_evidence"
+  ],
+  "title": "CorePrimitiveSpec",
+  "type": "object"
+}

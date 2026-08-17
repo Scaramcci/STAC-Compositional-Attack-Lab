@@ -1,0 +1,513 @@
+{
+  "$defs": {
+    "DependencyType": {
+      "enum": [
+        "data",
+        "state",
+        "control",
+        "authorization"
+      ],
+      "title": "DependencyType",
+      "type": "string"
+    },
+    "InteractionArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "parent_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Parent Artifact Ids",
+          "type": "array"
+        },
+        "producer_event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Producer Event Id"
+        },
+        "source_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ref Ids",
+          "type": "array"
+        },
+        "taint_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Taint Labels",
+          "type": "array"
+        },
+        "trust_label": {
+          "title": "Trust Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_type",
+        "content_hash",
+        "producer_event_id",
+        "parent_artifact_ids",
+        "taint_labels",
+        "trust_label",
+        "source_ref_ids"
+      ],
+      "title": "InteractionArtifact",
+      "type": "object"
+    },
+    "InteractionEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "guard": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guard"
+        },
+        "join_k": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Join K"
+        },
+        "join_semantics": {
+          "$ref": "#/$defs/JoinSemantics",
+          "default": "ALL"
+        },
+        "observable": {
+          "default": true,
+          "title": "Observable",
+          "type": "boolean"
+        },
+        "source_event_id": {
+          "title": "Source Event Id",
+          "type": "string"
+        },
+        "source_fact": {
+          "title": "Source Fact",
+          "type": "string"
+        },
+        "state_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "State Ref"
+        },
+        "target_event_id": {
+          "title": "Target Event Id",
+          "type": "string"
+        },
+        "target_precondition": {
+          "title": "Target Precondition",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "edge_type",
+        "source_event_id",
+        "target_event_id",
+        "source_fact",
+        "target_precondition",
+        "evidence_ref_ids"
+      ],
+      "title": "InteractionEdge",
+      "type": "object"
+    },
+    "InteractionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_role": {
+          "title": "Actor Role",
+          "type": "string"
+        },
+        "component_role": {
+          "title": "Component Role",
+          "type": "string"
+        },
+        "episode_id": {
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "event_type": {
+          "$ref": "#/$defs/InteractionEventType"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "input_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Artifact Ids",
+          "type": "array"
+        },
+        "lifecycle_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lifecycle Id"
+        },
+        "logical_time": {
+          "minimum": 0,
+          "title": "Logical Time",
+          "type": "integer"
+        },
+        "operation": {
+          "title": "Operation",
+          "type": "string"
+        },
+        "output_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Artifact Ids",
+          "type": "array"
+        },
+        "post_state_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Post State Ref"
+        },
+        "pre_state_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pre State Ref"
+        },
+        "public_payload": {
+          "additionalProperties": true,
+          "title": "Public Payload",
+          "type": "object"
+        },
+        "read_state_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Read State Refs",
+          "type": "array"
+        },
+        "request_event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Request Event Id"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sequence_no": {
+          "minimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "source_event_ref": {
+          "title": "Source Event Ref",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/PrimitiveOutcome"
+        },
+        "trajectory_id": {
+          "title": "Trajectory Id",
+          "type": "string"
+        },
+        "write_state_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Write State Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "event_id",
+        "trajectory_id",
+        "episode_id",
+        "session_id",
+        "sequence_no",
+        "logical_time",
+        "actor_role",
+        "event_type",
+        "component_role",
+        "operation",
+        "status",
+        "input_artifact_ids",
+        "output_artifact_ids",
+        "read_state_refs",
+        "write_state_refs",
+        "source_event_ref"
+      ],
+      "title": "InteractionEvent",
+      "type": "object"
+    },
+    "InteractionEventType": {
+      "enum": [
+        "message",
+        "tool_call",
+        "tool_result",
+        "state_read",
+        "state_write",
+        "lifecycle",
+        "policy",
+        "evaluator"
+      ],
+      "title": "InteractionEventType",
+      "type": "string"
+    },
+    "JoinSemantics": {
+      "enum": [
+        "ALL",
+        "ANY",
+        "K_OF_N"
+      ],
+      "title": "JoinSemantics",
+      "type": "string"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    },
+    "UnresolvedInteractionLink": {
+      "additionalProperties": false,
+      "properties": {
+        "link_id": {
+          "title": "Link Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "source_event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Event Id"
+        },
+        "source_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ref Ids",
+          "type": "array"
+        },
+        "target_event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Event Id"
+        }
+      },
+      "required": [
+        "link_id",
+        "reason_code",
+        "source_ref_ids"
+      ],
+      "title": "UnresolvedInteractionLink",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/InteractionArtifact"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "edges": {
+      "items": {
+        "$ref": "#/$defs/InteractionEdge"
+      },
+      "title": "Edges",
+      "type": "array"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/InteractionEvent"
+      },
+      "title": "Events",
+      "type": "array"
+    },
+    "graph_hash": {
+      "title": "Graph Hash",
+      "type": "string"
+    },
+    "graph_id": {
+      "title": "Graph Id",
+      "type": "string"
+    },
+    "normalization_audit_ref": {
+      "title": "Normalization Audit Ref",
+      "type": "string"
+    },
+    "observable_projection_version": {
+      "title": "Observable Projection Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_trajectory_hash": {
+      "title": "Source Trajectory Hash",
+      "type": "string"
+    },
+    "trajectory_id": {
+      "title": "Trajectory Id",
+      "type": "string"
+    },
+    "unresolved_links": {
+      "items": {
+        "$ref": "#/$defs/UnresolvedInteractionLink"
+      },
+      "title": "Unresolved Links",
+      "type": "array"
+    }
+  },
+  "required": [
+    "graph_id",
+    "trajectory_id",
+    "observable_projection_version",
+    "source_trajectory_hash",
+    "events",
+    "artifacts",
+    "edges",
+    "unresolved_links",
+    "normalization_audit_ref",
+    "graph_hash"
+  ],
+  "title": "InteractionGraph",
+  "type": "object"
+}

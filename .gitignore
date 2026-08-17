@@ -33,3 +33,14 @@ reports/*
 data/frozen/smoke-*/
 
 .venv-vllm/
+# Formal v2 generated evidence and run artifacts
+data/interactions/raw/*
+!data/interactions/raw/.gitkeep
+data/interactions/normalized/*
+!data/interactions/normalized/.gitkeep
+data/primitive_candidates/*
+!data/primitive_candidates/.gitkeep
+data/primitive_libraries/generated/*
+!data/primitive_libraries/generated/.gitkeep
+experiments/safeclaw_runs/*
+!experiments/safeclaw_runs/.gitkeep

@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "InteractionEventType": {
+      "enum": [
+        "message",
+        "tool_call",
+        "tool_result",
+        "state_read",
+        "state_write",
+        "lifecycle",
+        "policy",
+        "evaluator"
+      ],
+      "title": "InteractionEventType",
+      "type": "string"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "actor_role": {
+      "title": "Actor Role",
+      "type": "string"
+    },
+    "component_role": {
+      "title": "Component Role",
+      "type": "string"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/InteractionEventType"
+    },
+    "evidence_ref_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence Ref Ids",
+      "type": "array"
+    },
+    "input_artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Input Artifact Ids",
+      "type": "array"
+    },
+    "lifecycle_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Lifecycle Id"
+    },
+    "logical_time": {
+      "minimum": 0,
+      "title": "Logical Time",
+      "type": "integer"
+    },
+    "operation": {
+      "title": "Operation",
+      "type": "string"
+    },
+    "output_artifact_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Output Artifact Ids",
+      "type": "array"
+    },
+    "post_state_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Post State Ref"
+    },
+    "pre_state_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pre State Ref"
+    },
+    "public_payload": {
+      "additionalProperties": true,
+      "title": "Public Payload",
+      "type": "object"
+    },
+    "read_state_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Read State Refs",
+      "type": "array"
+    },
+    "request_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Event Id"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sequence_no": {
+      "minimum": 0,
+      "title": "Sequence No",
+      "type": "integer"
+    },
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "source_event_ref": {
+      "title": "Source Event Ref",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/PrimitiveOutcome"
+    },
+    "trajectory_id": {
+      "title": "Trajectory Id",
+      "type": "string"
+    },
+    "write_state_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Write State Refs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "event_id",
+    "trajectory_id",
+    "episode_id",
+    "session_id",
+    "sequence_no",
+    "logical_time",
+    "actor_role",
+    "event_type",
+    "component_role",
+    "operation",
+    "status",
+    "input_artifact_ids",
+    "output_artifact_ids",
+    "read_state_refs",
+    "write_state_refs",
+    "source_event_ref"
+  ],
+  "title": "InteractionEvent",
+  "type": "object"
+}

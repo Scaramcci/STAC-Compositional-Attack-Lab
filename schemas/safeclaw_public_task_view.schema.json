@@ -1,0 +1,170 @@
+{
+  "$defs": {
+    "SafeClawBindingSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Sources",
+          "type": "array"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "json_pointer": {
+          "title": "Json Pointer",
+          "type": "string"
+        },
+        "public": {
+          "title": "Public",
+          "type": "boolean"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "value_type": {
+          "enum": [
+            "string",
+            "integer",
+            "boolean",
+            "string_list",
+            "object"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot_id",
+        "json_pointer",
+        "value_type",
+        "public",
+        "allowed_sources",
+        "description"
+      ],
+      "title": "SafeClawBindingSlot",
+      "type": "object"
+    },
+    "SafeClawTrack": {
+      "enum": [
+        "safeclaw_conformance",
+        "safeclaw_compositional"
+      ],
+      "title": "SafeClawTrack",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_actions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Actions",
+      "type": "array"
+    },
+    "bindable_slots": {
+      "items": {
+        "$ref": "#/$defs/SafeClawBindingSlot"
+      },
+      "title": "Bindable Slots",
+      "type": "array"
+    },
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
+    "component_roles": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Component Roles",
+      "type": "object"
+    },
+    "dimension": {
+      "title": "Dimension",
+      "type": "string"
+    },
+    "lifecycle_boundaries": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Lifecycle Boundaries",
+      "type": "array"
+    },
+    "materialization_template_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Materialization Template Id"
+    },
+    "platform": {
+      "const": "openclaw",
+      "default": "openclaw",
+      "title": "Platform",
+      "type": "string"
+    },
+    "public_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Public Capabilities",
+      "type": "array"
+    },
+    "public_goal": {
+      "title": "Public Goal",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_count": {
+      "exclusiveMinimum": 0,
+      "title": "Session Count",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_source_hash": {
+      "title": "Task Source Hash",
+      "type": "string"
+    },
+    "track": {
+      "$ref": "#/$defs/SafeClawTrack"
+    }
+  },
+  "required": [
+    "task_id",
+    "track",
+    "dimension",
+    "category",
+    "public_goal",
+    "public_capabilities",
+    "component_roles",
+    "session_count",
+    "lifecycle_boundaries",
+    "bindable_slots",
+    "allowed_actions",
+    "task_source_hash"
+  ],
+  "title": "SafeClawPublicTaskView",
+  "type": "object"
+}

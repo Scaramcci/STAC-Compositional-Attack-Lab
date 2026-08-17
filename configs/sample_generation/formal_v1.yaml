@@ -1,0 +1,26 @@
+{
+  "schema_version": "2.0",
+  "pipeline_id": "formal-v1-authorized-smoke",
+  "library_id": "stac-formal-primitive-library",
+  "library_version": "formal-v1-smoke",
+  "registry_path": "configs/primitives/formal_v1.yaml",
+  "source_adapter": "jsonl_authorized_fixture",
+  "source_fixture_path": "tests/fixtures/interactions/authorized_synthetic.jsonl",
+  "source_task_ids": ["construction-synthetic-001"],
+  "allowed_source_splits": ["train", "dev", "synthetic"],
+  "formal_excluded_task_ids": [
+    "ipi-4.1-001",
+    "pse-2.1-001",
+    "cdf-3.1-001",
+    "ssi-1.1-001"
+  ],
+  "seed": 20260817,
+  "available_capabilities": [
+    "read_untrusted_source",
+    "persistent_state_write",
+    "lifecycle_boundary",
+    "persistent_state_read",
+    "effectful_sandbox_action"
+  ],
+  "output_root": "data/primitive_libraries/generated"
+}

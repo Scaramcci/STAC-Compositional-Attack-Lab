@@ -1,0 +1,532 @@
+{
+  "$defs": {
+    "CausalVerdict": {
+      "enum": [
+        "causal_pass",
+        "fail",
+        "not_reached",
+        "not_observable",
+        "error"
+      ],
+      "title": "CausalVerdict",
+      "type": "string"
+    },
+    "EdgeVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "source_occurrence_id": {
+          "title": "Source Occurrence Id",
+          "type": "string"
+        },
+        "target_occurrence_id": {
+          "title": "Target Occurrence Id",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/CausalVerdict"
+        }
+      },
+      "required": [
+        "edge_id",
+        "verdict",
+        "source_occurrence_id",
+        "target_occurrence_id",
+        "evidence_ref_ids",
+        "reason_codes"
+      ],
+      "title": "EdgeVerdict",
+      "type": "object"
+    },
+    "EvidenceGrade": {
+      "enum": [
+        "E1",
+        "E2",
+        "E3",
+        "E4"
+      ],
+      "title": "EvidenceGrade",
+      "type": "string"
+    },
+    "MacroVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "macro_ref": {
+          "title": "Macro Ref",
+          "type": "string"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/PrimitiveOutcome"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "required_edge_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Edge Ids",
+          "type": "array"
+        },
+        "required_occurrence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Occurrence Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "node_id",
+        "macro_ref",
+        "outcome",
+        "required_occurrence_ids",
+        "required_edge_ids",
+        "evidence_ref_ids",
+        "reason_codes"
+      ],
+      "title": "MacroVerdict",
+      "type": "object"
+    },
+    "OccurrenceVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_grades": {
+          "items": {
+            "$ref": "#/$defs/EvidenceGrade"
+          },
+          "title": "Evidence Grades",
+          "type": "array"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "hard_fact": {
+          "title": "Hard Fact",
+          "type": "boolean"
+        },
+        "occurrence_id": {
+          "title": "Occurrence Id",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/PrimitiveOutcome"
+        },
+        "primitive_ref": {
+          "title": "Primitive Ref",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "occurrence_id",
+        "primitive_ref",
+        "outcome",
+        "hard_fact",
+        "evidence_grades",
+        "evidence_ref_ids",
+        "reason_codes"
+      ],
+      "title": "OccurrenceVerdict",
+      "type": "object"
+    },
+    "OfficialSafeClawVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "attack_succeeded": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Attack Succeeded"
+        },
+        "evaluator_version": {
+          "title": "Evaluator Version",
+          "type": "string"
+        },
+        "evidence_ref_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ref Ids",
+          "type": "array"
+        },
+        "execution_complete": {
+          "title": "Execution Complete",
+          "type": "boolean"
+        },
+        "instrumentation_gaps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Instrumentation Gaps",
+          "type": "array"
+        },
+        "safe_check_results": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Safe Check Results",
+          "type": "object"
+        },
+        "security_score": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Security Score"
+        },
+        "success_check_results": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Success Check Results",
+          "type": "object"
+        },
+        "taint_channels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Taint Channels",
+          "type": "array"
+        },
+        "utility_success": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Utility Success"
+        }
+      },
+      "required": [
+        "evaluator_version",
+        "execution_complete",
+        "attack_succeeded",
+        "utility_success",
+        "safe_check_results",
+        "success_check_results",
+        "taint_channels",
+        "evidence_ref_ids",
+        "instrumentation_gaps"
+      ],
+      "title": "OfficialSafeClawVerdict",
+      "type": "object"
+    },
+    "PrimitiveOutcome": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "passed",
+        "rejected",
+        "error",
+        "timeout",
+        "abstained",
+        "not_observable"
+      ],
+      "title": "PrimitiveOutcome",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "all_required_edges_passed": {
+      "title": "All Required Edges Passed",
+      "type": "boolean"
+    },
+    "all_required_macros_passed": {
+      "title": "All Required Macros Passed",
+      "type": "boolean"
+    },
+    "all_required_occurrences_passed": {
+      "title": "All Required Occurrences Passed",
+      "type": "boolean"
+    },
+    "api_calls": {
+      "minimum": 0,
+      "title": "Api Calls",
+      "type": "integer"
+    },
+    "artifact_paths": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Artifact Paths",
+      "type": "object"
+    },
+    "binding_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Binding Id"
+    },
+    "binding_reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Binding Reason Codes",
+      "type": "array"
+    },
+    "binding_valid": {
+      "title": "Binding Valid",
+      "type": "boolean"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "condition": {
+      "title": "Condition",
+      "type": "string"
+    },
+    "cost": {
+      "minimum": 0.0,
+      "title": "Cost",
+      "type": "number"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "edge_verdicts": {
+      "items": {
+        "$ref": "#/$defs/EdgeVerdict"
+      },
+      "title": "Edge Verdicts",
+      "type": "array"
+    },
+    "execution_error": {
+      "title": "Execution Error",
+      "type": "boolean"
+    },
+    "execution_error_category": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Execution Error Category"
+    },
+    "forbidden_shortcut": {
+      "title": "Forbidden Shortcut",
+      "type": "boolean"
+    },
+    "full_chain_success": {
+      "title": "Full Chain Success",
+      "type": "boolean"
+    },
+    "library_version": {
+      "title": "Library Version",
+      "type": "string"
+    },
+    "macro_verdicts": {
+      "items": {
+        "$ref": "#/$defs/MacroVerdict"
+      },
+      "title": "Macro Verdicts",
+      "type": "array"
+    },
+    "mechanism_completed_terminal_failed": {
+      "title": "Mechanism Completed Terminal Failed",
+      "type": "boolean"
+    },
+    "not_observable_count": {
+      "minimum": 0,
+      "title": "Not Observable Count",
+      "type": "integer"
+    },
+    "occurrence_verdicts": {
+      "items": {
+        "$ref": "#/$defs/OccurrenceVerdict"
+      },
+      "title": "Occurrence Verdicts",
+      "type": "array"
+    },
+    "official_verdict": {
+      "$ref": "#/$defs/OfficialSafeClawVerdict"
+    },
+    "pair_id": {
+      "title": "Pair Id",
+      "type": "string"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "planner_type": {
+      "title": "Planner Type",
+      "type": "string"
+    },
+    "provenance_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Provenance Hashes",
+      "type": "object"
+    },
+    "result_id": {
+      "title": "Result Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "sample_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Sample Id"
+    },
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "terminal_only_or_shortcut": {
+      "title": "Terminal Only Or Shortcut",
+      "type": "boolean"
+    },
+    "tokens": {
+      "minimum": 0,
+      "title": "Tokens",
+      "type": "integer"
+    },
+    "tool_calls": {
+      "minimum": 0,
+      "title": "Tool Calls",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "result_id",
+    "run_id",
+    "case_id",
+    "pair_id",
+    "condition",
+    "seed",
+    "planner_type",
+    "library_version",
+    "sample_id",
+    "plan_id",
+    "binding_id",
+    "task_id",
+    "binding_valid",
+    "binding_reason_codes",
+    "occurrence_verdicts",
+    "edge_verdicts",
+    "macro_verdicts",
+    "all_required_occurrences_passed",
+    "all_required_edges_passed",
+    "all_required_macros_passed",
+    "official_verdict",
+    "forbidden_shortcut",
+    "full_chain_success",
+    "terminal_only_or_shortcut",
+    "mechanism_completed_terminal_failed",
+    "execution_error",
+    "execution_error_category",
+    "not_observable_count",
+    "tool_calls",
+    "tokens",
+    "api_calls",
+    "duration_ms",
+    "cost",
+    "artifact_paths",
+    "provenance_hashes"
+  ],
+  "title": "FormalRunResult",
+  "type": "object"
+}
