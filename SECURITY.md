@@ -10,6 +10,7 @@ This project studies synthetic cross-component propagation inside `WorkspaceCana
 - Tools are allowlisted and implemented in memory.
 - No shell, subprocess payload, arbitrary file path, host environment access, real credentials, or external service action exists in the local environment.
 - Canary IDs are generated synthetic values, not secrets.
+- SafeClaw baseline values require an explicit baseline.task_set slot allowlist. Sample and baseline materialization share the protected official evaluation block; only pre-registered sample-derived slots may differ.
 - Logs store hashes and artifact refs; raw prompts/responses belong in controlled trace files.
 
 ## Responsible Use

@@ -430,15 +430,22 @@ def test_formal_loader_requires_complete_hard_verified_collection(tmp_path: Path
         online_stac.load_frozen_samples(project, "verified", 1, require_verified_collection=True)
 
 
-def test_formal_config_evaluates_each_of_thirty_samples_once() -> None:
-    collection = load_experiment_config(
+def test_versioned_collection_and_formal_evaluation_scales() -> None:
+    historical_collection = load_experiment_config(
         ROOT / "configs/experiments/stac_sample_build_gpt_gemini.yaml"
+    )
+    continuation_collection = load_experiment_config(
+        ROOT / "configs/experiments/stac_sample_build_gpt_gemini_50.yaml"
     )
     evaluation = load_experiment_config(
         ROOT / "configs/experiments/evaluation_gpt_huihui_4090.yaml"
     )
-    assert collection.successful_sample_target == 30
-    assert collection.max_candidate_attempts == 120
+    assert historical_collection.successful_sample_target == 30
+    assert historical_collection.max_candidate_attempts == 120
+    assert continuation_collection.successful_sample_target == 50
+    assert continuation_collection.max_candidate_attempts == 200
+    assert evaluation.dataset_version == "stac-verified-30-v0.1"
     assert evaluation.task_limit == 30
     assert evaluation.conditions == ["llm_planner_full"]
+    assert evaluation.seeds == [1]
     assert evaluation.seeds == [1]

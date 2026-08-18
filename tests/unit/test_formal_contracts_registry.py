@@ -40,7 +40,7 @@ def test_formal_registry_is_frozen_and_legacy_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(FORMAL_SCHEMA_MODELS) == 16
+    assert len(FORMAL_SCHEMA_MODELS) == 17
     for model in FORMAL_SCHEMA_MODELS.values():
         schema = model.model_json_schema()
         assert schema["type"] == "object"

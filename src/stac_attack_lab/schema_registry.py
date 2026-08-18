@@ -9,6 +9,7 @@ from stac_attack_lab.datasets.primitive_chain import (
     SampleLibraryManifest,
 )
 from stac_attack_lab.environments.safeclaw.contracts import (
+    BaselineBinding,
     BenchmarkBinding,
     SafeClawEpisodeResult,
     SafeClawPublicTaskView,
@@ -37,6 +38,7 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "sample_library_manifest": SampleLibraryManifest,
     "safeclaw_task_descriptor": SafeClawTaskDescriptor,
     "safeclaw_public_task_view": SafeClawPublicTaskView,
+    "baseline_binding": BaselineBinding,
     "benchmark_binding": BenchmarkBinding,
     "formal_planner_input": FormalPlannerInput,
     "formal_evaluation_plan": FormalEvaluationPlan,

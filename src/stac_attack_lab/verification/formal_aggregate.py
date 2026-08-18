@@ -177,10 +177,11 @@ def aggregate_formal_result(
     artifact_paths: dict[str, str] | None = None,
     provenance_hashes: dict[str, str] | None = None,
 ) -> FormalRunResult:
-    binding_valid = plan.binding is not None and plan.binding.binding_valid
+    active_binding = plan.binding or plan.baseline_binding
+    binding_valid = active_binding is not None and active_binding.binding_valid
     binding_reasons = (
-        plan.binding.validation_reason_codes
-        if plan.binding is not None
+        active_binding.validation_reason_codes
+        if active_binding is not None
         else [plan.abstain_reason or "planner_abstained"]
     )
     occurrence_pass = bool(mechanism.occurrence_verdicts) and all(
@@ -202,7 +203,9 @@ def aggregate_formal_result(
         episode.error_category or episode.status.value if execution_error else None
     )
     mechanism_complete = (
-        binding_valid
+        plan.selected_sample_id is not None
+        and plan.binding is not None
+        and binding_valid
         and occurrence_pass
         and edge_pass
         and macro_pass
@@ -230,7 +233,7 @@ def aggregate_formal_result(
         library_version=library_version,
         sample_id=plan.selected_sample_id,
         plan_id=plan.plan_id,
-        binding_id=plan.binding.binding_id if plan.binding else None,
+        binding_id=active_binding.binding_id if active_binding else None,
         task_id=episode.task_id,
         binding_valid=binding_valid,
         binding_reason_codes=binding_reasons,

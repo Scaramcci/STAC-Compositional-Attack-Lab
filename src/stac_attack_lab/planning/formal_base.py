@@ -7,6 +7,7 @@ from pydantic import Field, PositiveInt, model_validator
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.datasets.primitive_chain import PlannerSampleView
 from stac_attack_lab.environments.safeclaw.contracts import (
+    BaselineBinding,
     BenchmarkBinding,
     SafeClawPublicTaskView,
 )
@@ -57,6 +58,7 @@ class FormalEvaluationPlan(StrictModel):
     selected_chain_id: str | None
     task_template_id: str
     binding: BenchmarkBinding | None
+    baseline_binding: BaselineBinding | None = None
     materialization_variant: str
     condition: str
     budget: FormalBudget
@@ -68,8 +70,28 @@ class FormalEvaluationPlan(StrictModel):
 
     @model_validator(mode="after")
     def validate_plan_or_abstention(self) -> FormalEvaluationPlan:
-        abstained = self.selected_sample_id is None
-        if abstained != (self.binding is None) or abstained != (self.abstain_reason is not None):
+        selected = self.selected_sample_id is not None
+        has_sample_binding = self.binding is not None
+        has_baseline_binding = self.baseline_binding is not None
+        if selected:
+            if (
+                not has_sample_binding
+                or has_baseline_binding
+                or self.selected_chain_id is None
+                or self.abstain_reason is not None
+            ):
+                raise ValueError("formal_plan_selection_fields_mismatch")
+        elif has_baseline_binding:
+            if (
+                has_sample_binding
+                or self.selected_chain_id is not None
+                or self.abstain_reason is not None
+                or self.materialization_variant != "legal_baseline"
+            ):
+                raise ValueError("formal_plan_baseline_fields_mismatch")
+        elif (
+            has_sample_binding or self.selected_chain_id is not None or self.abstain_reason is None
+        ):
             raise ValueError("formal_plan_abstention_fields_mismatch")
         return self
 

@@ -7,6 +7,7 @@ __pycache__/
 src/*.egg-info/
 integrations/.conda-agentdojo/
 integrations/agentdojo/
+integrations/safeclaw/upstream/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/

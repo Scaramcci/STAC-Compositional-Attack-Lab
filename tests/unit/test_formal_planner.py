@@ -98,7 +98,7 @@ def _planner_input(tmp_path: Path) -> tuple[FormalPlannerInput, PrimitiveChainLi
                 json_pointer=f"/bindable/{role}",
                 value_type="string",
                 public=True,
-                allowed_sources=["sample.execution_view"],
+                allowed_sources=["sample.execution_view", "baseline.task_set"],
                 description=f"Public {role} binding.",
             )
             for role in ROLES
@@ -182,6 +182,10 @@ def test_formal_baselines_preserve_budget_and_seeded_choice(tmp_path: Path) -> N
     assert all(plan.budget == planner_input.budget for plan in plans)
     assert plans[0].selected_sample_id is None
     assert all(plan.selected_sample_id == sample_id for plan in plans[1:])
+    assert plans[0].baseline_binding is not None and plans[0].baseline_binding.binding_valid
+    assert plans[0].binding is None
+    assert plans[0].abstain_reason is None
+    assert plans[0].materialization_variant == "legal_baseline"
     assert RandomCompatiblePlanner().plan(planner_input).plan_hash == plans[2].plan_hash
 
 
@@ -208,3 +212,23 @@ def test_llm_compatible_selection_is_revalidated_and_hashed(tmp_path: Path) -> N
     assert plan.binding is not None and plan.binding.binding_valid
     assert plan.selection_evidence.decision_source == "llm_tiebreak"
     assert plan.selection_evidence.public_prompt_hash
+
+
+def test_no_sample_requires_explicit_template_source_authorization(tmp_path: Path) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    unauthorized_task = planner_input.public_task.model_copy(
+        update={
+            "bindable_slots": [
+                slot.model_copy(update={"allowed_sources": ["sample.execution_view"]})
+                for slot in planner_input.public_task.bindable_slots
+            ]
+        }
+    )
+    plan = NoSamplePlanner().plan(
+        planner_input.model_copy(
+            update={"public_task": unauthorized_task, "condition": "no_sample"}
+        )
+    )
+
+    assert plan.baseline_binding is None
+    assert plan.abstain_reason == "legal_baseline_binding_invalid"

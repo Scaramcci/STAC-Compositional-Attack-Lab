@@ -104,6 +104,20 @@ class BenchmarkBinding(StrictModel):
     binding_hash: str
 
 
+class BaselineBinding(StrictModel):
+    schema_version: Literal["2.0"] = "2.0"
+    binding_id: str
+    materialization_source: Literal["legal_baseline"] = "legal_baseline"
+    task_id: str
+    materialization_template_id: str
+    task_source_hash: str
+    assignments: list[BindingAssignment]
+    allowed_actions: list[str]
+    binding_valid: bool
+    validation_reason_codes: list[str]
+    binding_hash: str
+
+
 class MaterializedTaskReference(StrictModel):
     task_id: str
     template_id: str

@@ -91,6 +91,8 @@ data/seeds/tasks.jsonl
 
 离线阶段的正式配置是 `configs/experiments/stac_sample_build_gpt_gemini.yaml`。候选执行完整攻击链并通过 hard verification 后才进入冻结数据集。evaluation 使用 `configs/experiments/evaluation_gpt_huihui_4090.yaml`，保持 GPT 角色不变，只把 Victim 替换为本地 Huihui。
 
+SafeClaw formal matrix adds a matched no_sample path. BaselineBinding carries no sample/chain identity; it can materialize only template slots that explicitly allow baseline.task_set. Each task-set row declares both value maps and the exact sample_derived_slots delta. Sample-bound and baseline cases share the pair id, task, seed, budget, template, official oracle hash, environment configuration, and runner.
+
 ## 角色隔离
 
 - Planner 只看到公开攻击图、合法 frontier、预算和粗粒度阶段状态，不看到 private oracle。
@@ -140,6 +142,8 @@ experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/
 `recording/progress.py` 为每个攻击建立幂等 key，原子更新 `progress.json`，并将状态追加到 `attack_progress.jsonl`。配额或临时错误不会删除已完成攻击，恢复命令跳过已经完成的 key。
 
 `recording/conversations.py` 为模型和工具交互分配稳定 call/event id，过滤环境秘密，并运行 transcript audit。当前已知的 attempt 级事件标识和运行指标问题记录在 `docs/RESEARCH_STATUS.md`，扩展实验前必须修正。
+
+For SafeClaw no_sample, planner and materialization artifacts record legal_baseline, a baseline binding id, canonical changed pointers, template hash, and protected evaluation hash. Interaction normalization and official evaluation still run, while attack-mechanism aggregation remains empty because no sample chain was selected.
 
 ## 扩展方法
 

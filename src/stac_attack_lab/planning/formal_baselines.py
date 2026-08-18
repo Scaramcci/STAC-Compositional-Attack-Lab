@@ -4,7 +4,10 @@ import random
 from typing import Literal
 
 from stac_attack_lab.hashing import stable_hash
-from stac_attack_lab.planning.binding_planner import build_benchmark_binding
+from stac_attack_lab.planning.binding_planner import (
+    build_baseline_binding,
+    build_benchmark_binding,
+)
 from stac_attack_lab.planning.formal_base import (
     FormalEvaluationPlan,
     FormalPlannerInput,
@@ -37,6 +40,7 @@ def _abstain_plan(
         "task_template_id": planner_input.public_task.materialization_template_id
         or planner_input.public_task.task_id,
         "binding": None,
+        "baseline_binding": None,
         "materialization_variant": "no_sample",
         "condition": planner_input.condition,
         "budget": planner_input.budget.model_dump(mode="json"),
@@ -85,6 +89,7 @@ def build_selected_plan(
         "task_template_id": planner_input.public_task.materialization_template_id
         or planner_input.public_task.task_id,
         "binding": binding.model_dump(mode="json"),
+        "baseline_binding": None,
         "materialization_variant": "bound_sample",
         "condition": planner_input.condition,
         "budget": planner_input.budget.model_dump(mode="json"),
@@ -115,7 +120,44 @@ class NoSamplePlanner:
 
     def plan(self, planner_input: FormalPlannerInput) -> FormalEvaluationPlan:
         selection = select_compatible_samples(planner_input)
-        return _abstain_plan(planner_input, self.planner_type, selection, "no_sample_control")
+        binding = build_baseline_binding(planner_input.public_task)
+        if not binding.binding_valid:
+            return _abstain_plan(
+                planner_input,
+                self.planner_type,
+                selection,
+                "legal_baseline_binding_invalid",
+            )
+        evidence = PlannerSelectionEvidence(
+            compatible_sample_ids=[item.sample_id for item in selection.compatible],
+            rejected_sample_reason_codes=selection.rejected_reason_codes,
+            rank_scores={item.sample_id: item.score for item in selection.compatible},
+            decision_source="deterministic",
+        )
+        payload: dict[str, object] = {
+            "planner_input_id": planner_input.planner_input_id,
+            "planner_type": self.planner_type,
+            "selected_sample_id": None,
+            "selected_chain_id": None,
+            "task_template_id": planner_input.public_task.materialization_template_id
+            or planner_input.public_task.task_id,
+            "binding": None,
+            "baseline_binding": binding.model_dump(mode="json"),
+            "materialization_variant": "legal_baseline",
+            "condition": planner_input.condition,
+            "budget": planner_input.budget.model_dump(mode="json"),
+            "expected_public_stage_effects": {},
+            "ablation_labels": ["no_sample", "legal_baseline"],
+            "selection_evidence": evidence.model_dump(mode="json"),
+            "abstain_reason": None,
+        }
+        return FormalEvaluationPlan.model_validate(
+            {
+                **payload,
+                "plan_id": "plan-" + stable_hash(payload)[:20],
+                "plan_hash": stable_hash(payload),
+            }
+        )
 
 
 class FixedSamplePlanner:

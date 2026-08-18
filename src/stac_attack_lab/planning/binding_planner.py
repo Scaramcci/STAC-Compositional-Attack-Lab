@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from stac_attack_lab.datasets.primitive_chain import PlannerSampleView
 from stac_attack_lab.environments.safeclaw.contracts import (
+    BaselineBinding,
     BenchmarkBinding,
     BindingAssignment,
     SafeClawPublicTaskView,
@@ -24,6 +25,9 @@ def build_benchmark_binding(
             continue
         if benchmark_slot is None:
             reason_codes.append(f"missing_bindable_slot:{slot.slot_id}")
+            continue
+        if "sample.execution_view" not in benchmark_slot.allowed_sources:
+            reason_codes.append(f"sample_source_not_allowed:{slot.slot_id}")
             continue
         if slot.required_capability and slot.required_capability not in task.public_capabilities:
             reason_codes.append(f"missing_slot_capability:{slot.required_capability}")
@@ -67,6 +71,7 @@ def build_benchmark_binding(
     payload = {
         "schema_version": "2.0",
         "binding_id": binding_id,
+        "materialization_template_id": task.materialization_template_id,
         "sample_id": sample.sample_id,
         "chain_id": stable_hash([node.macro_primitive_ref for node in sample.macro_nodes]),
         "task_id": task.task_id,
@@ -82,3 +87,49 @@ def build_benchmark_binding(
         "validation_reason_codes": reason_codes or ["binding_valid"],
     }
     return BenchmarkBinding.model_validate({**payload, "binding_hash": stable_hash(payload)})
+
+
+def build_baseline_binding(task: SafeClawPublicTaskView) -> BaselineBinding:
+    assignments: list[BindingAssignment] = []
+    reason_codes: list[str] = []
+    for slot in task.bindable_slots:
+        if not slot.public:
+            continue
+        if "baseline.task_set" not in slot.allowed_sources:
+            reason_codes.append(f"baseline_source_not_allowed:{slot.slot_id}")
+            continue
+        assignments.append(
+            BindingAssignment(
+                sample_slot_id=slot.slot_id,
+                benchmark_slot_id=slot.slot_id,
+                public_value_ref=f"baseline_task_set:{slot.slot_id}",
+                component_role="baseline_materialization",
+                capability="legal_baseline_value",
+            )
+        )
+    if not assignments:
+        reason_codes.append("no_public_baseline_slots")
+    template_id = task.materialization_template_id or task.task_id
+    binding_id = (
+        "baseline-binding-"
+        + stable_hash(
+            {
+                "task_id": task.task_id,
+                "template_id": template_id,
+                "assignments": [item.model_dump(mode="json") for item in assignments],
+            }
+        )[:20]
+    )
+    payload = {
+        "schema_version": "2.0",
+        "binding_id": binding_id,
+        "materialization_source": "legal_baseline",
+        "task_id": task.task_id,
+        "materialization_template_id": template_id,
+        "task_source_hash": task.task_source_hash,
+        "assignments": [item.model_dump(mode="json") for item in assignments],
+        "allowed_actions": task.allowed_actions,
+        "binding_valid": not reason_codes,
+        "validation_reason_codes": reason_codes or ["baseline_binding_valid"],
+    }
+    return BaselineBinding.model_validate({**payload, "binding_hash": stable_hash(payload)})

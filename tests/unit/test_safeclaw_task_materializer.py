@@ -16,7 +16,10 @@ from stac_attack_lab.execution.sample_generation import (
 )
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.planning.formal_base import FormalBudget, FormalPlannerInput
-from stac_attack_lab.planning.formal_baselines import RuleBasedFormalPlanner
+from stac_attack_lab.planning.formal_baselines import (
+    NoSamplePlanner,
+    RuleBasedFormalPlanner,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 TASK = ROOT / "tests/fixtures/safeclaw/compositional_task.json"
@@ -62,6 +65,17 @@ def _slot_values() -> dict[str, str]:
         "untrusted_source": "SYNTHETIC_UNTRUSTED_MARKER",
         "agent_context": "Authorized synthetic context.",
         "persistent_memory": "Store only SYNTHETIC_UNTRUSTED_MARKER in benchmark memory.",
+        "session_lifecycle": "Authorized second benchmark session.",
+        "effect_tool": "sim_google.synthetic_effect",
+        "sandbox_external_state": "SYNTHETIC_TERMINAL_STATE",
+    }
+
+
+def _baseline_slot_values() -> dict[str, str]:
+    return {
+        "untrusted_source": "SYNTHETIC_BENIGN_REFERENCE",
+        "agent_context": "Authorized benign baseline context.",
+        "persistent_memory": "Summarize SYNTHETIC_BENIGN_REFERENCE.",
         "session_lifecycle": "Authorized second benchmark session.",
         "effect_tool": "sim_google.synthetic_effect",
         "sandbox_external_state": "SYNTHETIC_TERMINAL_STATE",
@@ -137,3 +151,87 @@ def test_forbidden_oracle_binding_pointer_is_explicitly_unsupported(
     assert descriptor.supported is False
     assert descriptor.unsupported_reason is not None
     assert "forbidden_binding_pointer" in descriptor.unsupported_reason
+
+
+def test_no_sample_uses_same_template_with_only_preregistered_content_delta(
+    tmp_path: Path,
+) -> None:
+    descriptor, sample_plan, library = _plan(tmp_path)
+    assert sample_plan.selected_sample_id is not None
+    baseline_input = FormalPlannerInput(
+        planner_input_id="safeclaw-baseline-input",
+        library_id=library.manifest.library_id,
+        library_version=library.manifest.library_version,
+        library_hash=library.manifest.tree_hash,
+        public_samples=library.public_index(),
+        public_task=descriptor.public_view,
+        budget=sample_plan.budget,
+        condition="no_sample",
+        seed=31,
+    )
+    baseline_plan = NoSamplePlanner().plan(baseline_input)
+    assert baseline_plan.baseline_binding is not None
+    assert baseline_plan.abstain_reason is None
+
+    sample = materialize_safeclaw_task(
+        TASK,
+        descriptor,
+        sample_plan,
+        library.execution_view(sample_plan.selected_sample_id),
+        _slot_values(),
+        tmp_path / "sample-materialization",
+    )
+    baseline = materialize_safeclaw_task(
+        TASK,
+        descriptor,
+        baseline_plan,
+        None,
+        _baseline_slot_values(),
+        tmp_path / "baseline-materialization",
+    )
+    sample_task = json.loads(sample.path.read_text(encoding="utf-8"))
+    baseline_task = json.loads(baseline.path.read_text(encoding="utf-8"))
+    sample_manifest = json.loads(
+        (sample.path.parent / sample.reference.binding_manifest_ref).read_text(encoding="utf-8")
+    )
+    baseline_manifest = json.loads(
+        (baseline.path.parent / baseline.reference.binding_manifest_ref).read_text(encoding="utf-8")
+    )
+
+    assert sample.reference.task_id == baseline.reference.task_id
+    assert sample.reference.template_id == baseline.reference.template_id
+    assert sample_plan.budget == baseline_plan.budget
+    assert sample_manifest["template_hash"] == baseline_manifest["template_hash"]
+    assert (
+        sample_manifest["official_evaluation_hash"]
+        == (baseline_manifest["official_evaluation_hash"])
+    )
+    assert sample_manifest["changed_pointers"] == baseline_manifest["changed_pointers"]
+    assert sample_task["evaluation"] == baseline_task["evaluation"]
+    assert (
+        sample_task["environment"]["sim_google_data"]
+        == (baseline_task["environment"]["sim_google_data"])
+    )
+    assert sample_task["sessions"][1] == baseline_task["sessions"][1]
+    assert (
+        sample_task["environment"]["workspace_files"]
+        != (baseline_task["environment"]["workspace_files"])
+    )
+    assert sample_task["sessions"][0] != baseline_task["sessions"][0]
+    assert baseline_manifest["materialization_variant"] == "legal_baseline"
+
+
+def test_materializer_rejects_unbound_extra_value(tmp_path: Path) -> None:
+    descriptor, plan, library = _plan(tmp_path)
+    assert plan.selected_sample_id is not None
+    values = {**_slot_values(), "unregistered_slot": "SYNTHETIC_EXTRA"}
+
+    with pytest.raises(ValueError, match="materialization_value_slot_set_mismatch"):
+        materialize_safeclaw_task(
+            TASK,
+            descriptor,
+            plan,
+            library.execution_view(plan.selected_sample_id),
+            values,
+            tmp_path / "invalid-extra-value",
+        )

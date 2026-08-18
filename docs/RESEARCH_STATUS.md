@@ -34,6 +34,7 @@ retrieval tool injection
 - 每个攻击单独 checkpoint、append-only 进度、quota pause 和 resume。
 - 模型请求/响应、工具交互和 verifier feedback 的完整可观察 transcript。
 - 基础 clean、单点消融、memory guard 和报告代码路径。
+- SafeClaw no_sample 合法同模板对照：仅预注册的 sample-derived slot 可改变，且不会被计为完整攻击链成功。
 - AgentDojo 与 SHADE_Arena 的只读 adapter/contract smoke。
 
 ## 已经完成的运行
@@ -42,6 +43,7 @@ retrieval tool injection
 - evaluation 阶段的 30 个计划 episode 已全部完成，目录为 `experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/`。
 - evaluation 中只有一个 primary attack condition 和一个 seed。
 - clean、ablation 和 defense 尚未进行同等规模的正式模型运行。
+- 50-from-200 continuation 收集配置已实现但尚未运行；它必须冻结为新版本，不能覆盖现有 30 行数据集。
 
 ## 对话数据索引
 

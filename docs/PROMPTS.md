@@ -17,6 +17,8 @@ All prompts are markdown assets with YAML front matter: `prompt_id`, `version`, 
 
 Runtime role configs are independent. Current temporary config `stac_sample_build_gemini.yaml` maps every role to Gemini. The intended sample-builder maps planner, attacker, prompt-writer, verifier, and judge to GPT-compatible models while leaving victim on Gemini. Evaluation maps victim to local Huihui; its Attacker receives the selected sample stage and frozen verified prompt and may not invent a different route.
 
+The SafeClaw formal no_sample condition does not invoke a planner or attacker model to invent a route. It emits a deterministic legal_baseline plan with a separate baseline binding, then sends the normally materialized task through the same Victim system/tool contract. No sample graph, verifier target, or private oracle is exposed to the Victim.
+
 ## Judges
 
 - `judges.semantic_stage_verifier`: semantic labels only, with evidence ids.

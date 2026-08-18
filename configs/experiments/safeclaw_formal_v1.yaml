@@ -9,6 +9,7 @@
   "library_path": "data/primitive_libraries/frozen/formal-v1-smoke",
   "require_frozen_library": true,
   "conditions": [
+    "no_sample",
     "fixed_sample",
     "random_compatible",
     "sample_rule_based"

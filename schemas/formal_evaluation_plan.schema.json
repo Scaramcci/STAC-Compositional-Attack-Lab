@@ -1,5 +1,80 @@
 {
   "$defs": {
+    "BaselineBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Actions",
+          "type": "array"
+        },
+        "assignments": {
+          "items": {
+            "$ref": "#/$defs/BindingAssignment"
+          },
+          "title": "Assignments",
+          "type": "array"
+        },
+        "binding_hash": {
+          "title": "Binding Hash",
+          "type": "string"
+        },
+        "binding_id": {
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "binding_valid": {
+          "title": "Binding Valid",
+          "type": "boolean"
+        },
+        "materialization_source": {
+          "const": "legal_baseline",
+          "default": "legal_baseline",
+          "title": "Materialization Source",
+          "type": "string"
+        },
+        "materialization_template_id": {
+          "title": "Materialization Template Id",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "2.0",
+          "default": "2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_source_hash": {
+          "title": "Task Source Hash",
+          "type": "string"
+        },
+        "validation_reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Validation Reason Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "binding_id",
+        "task_id",
+        "materialization_template_id",
+        "task_source_hash",
+        "assignments",
+        "allowed_actions",
+        "binding_valid",
+        "validation_reason_codes",
+        "binding_hash"
+      ],
+      "title": "BaselineBinding",
+      "type": "object"
+    },
     "BenchmarkBinding": {
       "additionalProperties": false,
       "properties": {
@@ -263,6 +338,17 @@
       ],
       "default": null,
       "title": "Abstain Reason"
+    },
+    "baseline_binding": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BaselineBinding"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "binding": {
       "anyOf": [

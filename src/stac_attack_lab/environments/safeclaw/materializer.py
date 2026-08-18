@@ -70,7 +70,7 @@ def materialize_safeclaw_task(
     template_path: Path,
     descriptor: SafeClawTaskDescriptor,
     plan: FormalEvaluationPlan,
-    execution_view: ExecutionBindingView,
+    execution_view: ExecutionBindingView | None,
     slot_values: dict[str, Any],
     temporary_root: Path,
 ) -> MaterializedTask:
@@ -80,10 +80,26 @@ def materialize_safeclaw_task(
         raise ValueError("unsupported_safeclaw_compositional_template")
     if plan.task_template_id != descriptor.materialization_template_id:
         raise ValueError("formal_plan_template_id_mismatch")
-    if plan.binding is None or not plan.binding.binding_valid:
+    active_binding = plan.binding or plan.baseline_binding
+    if active_binding is None or not active_binding.binding_valid:
         raise ValueError("formal_plan_requires_valid_binding")
-    if plan.selected_sample_id != execution_view.sample_id:
-        raise ValueError("execution_view_sample_mismatch")
+    if active_binding.task_id != descriptor.task_id:
+        raise ValueError("binding_task_id_mismatch")
+    if active_binding.task_source_hash != descriptor.source_hash:
+        raise ValueError("binding_task_source_hash_mismatch")
+    if (
+        active_binding.materialization_template_id is not None
+        and active_binding.materialization_template_id != descriptor.materialization_template_id
+    ):
+        raise ValueError("binding_template_id_mismatch")
+    if plan.binding is not None:
+        if execution_view is None or plan.selected_sample_id != execution_view.sample_id:
+            raise ValueError("execution_view_sample_mismatch")
+    elif execution_view is not None:
+        raise ValueError("baseline_materialization_forbids_execution_view")
+    required_value_slots = {assignment.sample_slot_id for assignment in active_binding.assignments}
+    if set(slot_values) != required_value_slots:
+        raise ValueError("materialization_value_slot_set_mismatch")
     if file_hash(template_path) != descriptor.source_hash:
         raise ValueError("safeclaw_template_hash_mismatch")
     task = json.loads(template_path.read_text(encoding="utf-8"))
@@ -91,7 +107,7 @@ def materialize_safeclaw_task(
     protected_before = stable_hash(task.get("evaluation"))
     slots = {slot.slot_id: slot for slot in descriptor.public_view.bindable_slots}
     changed_pointers: list[str] = []
-    for assignment in plan.binding.assignments:
+    for assignment in active_binding.assignments:
         slot = slots.get(assignment.benchmark_slot_id)
         if slot is None or not slot.public:
             raise ValueError(f"binding_uses_unknown_or_private_slot:{assignment.benchmark_slot_id}")
@@ -122,11 +138,12 @@ def materialize_safeclaw_task(
     binding_manifest_path = temporary_root / f"{plan.plan_id}-binding.json"
     binding_manifest = {
         "plan_id": plan.plan_id,
-        "binding_id": plan.binding.binding_id,
+        "binding_id": active_binding.binding_id,
+        "materialization_variant": plan.materialization_variant,
         "task_id": descriptor.task_id,
         "template_hash": descriptor.source_hash,
         "materialized_task_hash": materialized_hash,
-        "changed_pointers": changed_pointers,
+        "changed_pointers": sorted(changed_pointers),
         "official_evaluation_hash": protected_before,
     }
     binding_manifest_path.write_text(
@@ -136,7 +153,7 @@ def materialize_safeclaw_task(
     reference = MaterializedTaskReference(
         task_id=descriptor.task_id,
         template_id=descriptor.materialization_template_id,
-        binding_id=plan.binding.binding_id,
+        binding_id=active_binding.binding_id,
         materialized_task_hash=materialized_hash,
         sanitized_projection_ref=binding_manifest_path.name,
         binding_manifest_ref=binding_manifest_path.name,

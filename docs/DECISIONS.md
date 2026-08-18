@@ -111,3 +111,19 @@ Problem: `task_limit` incorrectly served as both candidate count and accepted sa
 Decision: Follow AgentLAB STAC's generate → execute/verify → prompt artifact → evaluate boundary, strengthened by executing the final frozen prompt during offline validation. Treat 10 seed tasks as a rotating scenario pool, try at most 120 uniquely seeded candidates, and accept only deterministic hard-pass candidates until 30 are collected. Preserve all rejection records. Freeze only complete collections with per-sample selection, graph, and prompt hashes. The primary Huihui config consumes the resulting 30 rows once each; controls and ablations are separate.
 
 Impact: Existing `mvp-v0.1` remains an engineering fixture and cannot be used by the formal profile. The formal dataset version is `stac-verified-30-v0.1`. Actual candidate/API cost depends on acceptance rate rather than being fixed at 30 attempts, while the main evaluation is exactly 30 attack episodes.
+
+## ADR-013: No-sample is a legal matched materialization, not planner abstention
+
+Problem: The SafeClaw formal no_sample planner returned an abstention, so the control never reached the same task template or official evaluator as sample-bound conditions.
+
+Decision: Add a separate BaselineBinding with no sample or chain identity. A compositional template must explicitly allow baseline.task_set as a source. Task-set entries provide sample and benign baseline values for the same slots and pre-register the exact sample_derived_slots that may differ. The materializer uses the same template, protected official evaluation, allowed actions, seed, budget, and runner path for both conditions.
+
+Impact: no_sample produces an executable, binding-valid control result. It has no required attack mechanism and therefore cannot become a full-chain success merely because the official evaluator observes terminal behavior. Existing sample-bound plans remain unchanged.
+
+## ADR-014: Version the 50/200 continuation collection without rewriting the 30-row study
+
+Problem: The continuation specification requests 50 accepted samples from at most 200 candidates, while ADR-012 and the completed frozen/evaluation artifacts define a 30-from-120 collection and a 30-row Huihui evaluation.
+
+Decision: Preserve stac_sample_build_gpt_gemini.yaml, stac-verified-30-v0.1, and evaluation_gpt_huihui_4090.yaml as historical artifacts. Add stac_sample_build_gpt_gemini_50.yaml as the next immutable collection profile with target 50 and cap 200. A future successful run must freeze under a new dataset version; it does not replace or silently extend the 30-row dataset.
+
+Impact: Historical conclusions and hashes remain stable. The new collection configuration is implemented and contract-tested but was intentionally not run because real model calls are prohibited during this continuation task.

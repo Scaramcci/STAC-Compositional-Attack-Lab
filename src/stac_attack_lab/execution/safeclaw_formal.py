@@ -35,6 +35,7 @@ from stac_attack_lab.planning.formal_base import (
 )
 from stac_attack_lab.planning.formal_baselines import (
     FixedSamplePlanner,
+    NoSamplePlanner,
     RandomCompatiblePlanner,
     RuleBasedFormalPlanner,
 )
@@ -52,7 +53,7 @@ from stac_attack_lab.verification.formal_aggregate import (
 )
 from stac_attack_lab.verification.safeclaw_official import parse_safeclaw_official
 
-FormalCondition = Literal["fixed_sample", "random_compatible", "sample_rule_based"]
+FormalCondition = Literal["no_sample", "fixed_sample", "random_compatible", "sample_rule_based"]
 
 
 class FormalTaskEntry(StrictModel):
@@ -61,6 +62,25 @@ class FormalTaskEntry(StrictModel):
     template_path: str
     template_hash: str
     materialization_values: dict[str, Any]
+    baseline_materialization_values: dict[str, Any]
+    sample_derived_slots: list[str]
+
+    @model_validator(mode="after")
+    def validate_matched_baseline(self) -> FormalTaskEntry:
+        sample_keys = set(self.materialization_values)
+        baseline_keys = set(self.baseline_materialization_values)
+        if sample_keys != baseline_keys:
+            raise ValueError("baseline_materialization_slot_set_mismatch")
+        if len(self.sample_derived_slots) != len(set(self.sample_derived_slots)):
+            raise ValueError("duplicate_sample_derived_slot")
+        changed = {
+            key
+            for key in sample_keys
+            if self.materialization_values[key] != self.baseline_materialization_values[key]
+        }
+        if changed != set(self.sample_derived_slots) or not changed:
+            raise ValueError("baseline_materialization_delta_mismatch")
+        return self
 
 
 class FormalTaskSetConfig(StrictModel):
@@ -119,6 +139,8 @@ def load_formal_task_set(path: Path) -> FormalTaskSetConfig:
 
 
 def _planner(condition: FormalCondition, first_sample_id: str) -> FormalPlanner:
+    if condition == "no_sample":
+        return NoSamplePlanner()
     if condition == "fixed_sample":
         return FixedSamplePlanner(first_sample_id)
     if condition == "random_compatible":
@@ -297,11 +319,17 @@ def run_safeclaw_formal(
             )
             plan = _planner(condition, first_sample_id).plan(planner_input)
             if plan.selected_sample_id is None:
-                raise ValueError(f"formal_planner_abstained:{plan.abstain_reason}")
-            selected_public = next(
-                item for item in public_samples if item.sample_id == plan.selected_sample_id
-            )
-            execution_view = library.execution_view(plan.selected_sample_id)
+                if plan.baseline_binding is None:
+                    raise ValueError(f"formal_planner_abstained:{plan.abstain_reason}")
+                selected_public = None
+                execution_view = None
+                slot_values = task.baseline_materialization_values
+            else:
+                selected_public = next(
+                    item for item in public_samples if item.sample_id == plan.selected_sample_id
+                )
+                execution_view = library.execution_view(plan.selected_sample_id)
+                slot_values = task.materialization_values
             recorder.record_artifact(case_id, FormalStage.planned, "planner_input", planner_input)
             recorder.record_artifact(case_id, FormalStage.planned, "evaluation_plan", plan)
             with tempfile.TemporaryDirectory(prefix="formal-materialization-") as temporary:
@@ -310,7 +338,7 @@ def run_safeclaw_formal(
                     descriptor,
                     plan,
                     execution_view,
-                    task.materialization_values,
+                    slot_values,
                     Path(temporary),
                 )
                 binding_payload = json.loads(
@@ -387,14 +415,15 @@ def run_safeclaw_formal(
                     "primitive_extraction",
                     extraction,
                 )
-                mechanism = evaluate_formal_mechanism(
-                    planner_view=selected_public.planner_view,
-                    execution_view=execution_view,
-                    occurrences=extraction.occurrences,
-                    graph=graph,
-                    registry=registry,
-                    official_terminal_success=official.attack_succeeded is True,
-                )
+                if selected_public is not None and execution_view is not None:
+                    mechanism = evaluate_formal_mechanism(
+                        planner_view=selected_public.planner_view,
+                        execution_view=execution_view,
+                        occurrences=extraction.occurrences,
+                        graph=graph,
+                        registry=registry,
+                        official_terminal_success=official.attack_succeeded is True,
+                    )
                 artifact_paths.update(
                     {
                         "interaction_graph": graph_record.relative_path,
@@ -441,13 +470,17 @@ def run_safeclaw_formal(
                     "prompt_asset": None,
                     "messages": [],
                     "reason": (
-                        "The formal v1 pipeline deterministically materializes the selected "
-                        "primitive chain into a SafeClaw task; it does not call an LLM attacker."
+                        "The formal v1 pipeline deterministically materializes the registered "
+                        "condition into a SafeClaw task; it does not call an LLM attacker."
                     ),
                 },
                 "attack_realization": {
-                    "selected_sample": selected_public.model_dump(mode="json"),
-                    "execution_view": execution_view.model_dump(mode="json"),
+                    "selected_sample": (
+                        selected_public.model_dump(mode="json") if selected_public else None
+                    ),
+                    "execution_view": (
+                        execution_view.model_dump(mode="json") if execution_view else None
+                    ),
                     "binding_manifest": binding_payload,
                     "materialized_task": materialized_task_payload,
                 },

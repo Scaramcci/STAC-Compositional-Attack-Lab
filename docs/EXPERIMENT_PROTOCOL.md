@@ -24,9 +24,17 @@ The target sample-construction run is `configs/experiments/stac_sample_build_gpt
 
 For each stage, PromptWriter produces the final Victim-visible message before execution; Gemini must execute that same message and the resulting full chain must hard-pass. Each accepted row records selection evidence, source/candidate ids, actual verified call parameters, frozen prompts, graph/prompt hashes, transcript refs, and sample hash. Incomplete collections cannot be frozen.
 
+### Versioned continuation collection
+
+configs/experiments/stac_sample_build_gpt_gemini.yaml remains the historical 30-from-120 profile that produced stac-verified-30-v0.1. The next collection uses configs/experiments/stac_sample_build_gpt_gemini_50.yaml: the same role assignments and hard acceptance boundary, exactly 50 accepted rows, and at most 200 uniquely seeded candidates. It must be frozen under a new immutable dataset version and was not run during the implementation-only continuation.
+
 ## Formal Evaluation
 
 The target evaluation config is `configs/experiments/evaluation_gpt_huihui_4090.yaml`: GPT-compatible planner/attacker/verifier/judge roles and a local 4090-hosted Huihui victim. It loads `stac-verified-30-v0.1`, rejects missing or mismatched offline selection evidence, and runs 30 samples × one primary attack condition × one seed. Planner decisions stay inside each sample's frozen graph and Attacker receives that stage's frozen verified prompt. Controls, defense, and ablations are separate follow-up runs.
+
+### SafeClaw matched no-sample control
+
+The SafeClaw formal matrix defines no_sample as an executable legal baseline, not an abstention. It uses the same task template, task id, pair group, seed, budget, target environment, official evaluation block, tool contract, and allowlisted JSON pointers as the sample-bound case. Task-set configuration pre-registers sample_derived_slots; only those values may differ. The control has a valid BaselineBinding but no selected sample or expected attack mechanism, so it is excluded from full-chain success by construction.
 
 The completed primary run is stored at `experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac`. All 30 planned episodes reached a completed execution state. This statement describes execution progress only; it is not an attack-effect claim.
 

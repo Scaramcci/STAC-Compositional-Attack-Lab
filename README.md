@@ -74,6 +74,7 @@
 - 运行支持逐攻击 checkpoint、失败后 resume、append-only 进度日志和 transcript audit。
 - 当前运行验证了上述单一攻击链的执行闭环；clean、ablation、defense 和更多攻击拓扑尚未进行正式模型实验。
 - 当前结果只应视为系统工程与基线攻击链验证。传播因果分析、转折点定位和多防御比较仍是下一阶段工作。
+- 下一版本离线收集配置为 configs/experiments/stac_sample_build_gpt_gemini_50.yaml（50 个 hard-pass，最多 200 个候选）；本次未运行任何真实模型调用。
 
 ## 已实现的系统能力
 
@@ -87,6 +88,7 @@
 - 每个攻击完成后持久化进度，配额中断后可恢复；
 - 完整可观察对话记录与自动 transcript audit；
 - 基础 clean、ablation、memory guard 和报告代码路径。
+- SafeClaw no_sample 使用同一模板的合法 benign materialization，并保持 task/seed/budget/environment 配对。
 
 ## 尚未实现的研究扩展
 
@@ -114,3 +116,5 @@ make smoke-report
 ```
 
 Fake profile 不需要 API key 或网络。真实模型配置和运行命令见 [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)。凭证只从本地环境变量读取，不写入代码、配置、文档或日志。
+
+SafeClaw formal 配置 configs/experiments/safeclaw_formal_v1.yaml 当前保持 execution_enabled: false 和 task-set blocked。其 no_sample condition 已通过 synthetic runner 测试；解除 blocker 前不得用于结果声明。历史 30/120 配置和下一版本 50/200 配置的边界见实验协议。

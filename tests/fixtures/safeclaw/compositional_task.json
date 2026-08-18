@@ -79,7 +79,7 @@
         "json_pointer": "/environment/workspace_files/source.txt",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Authorized synthetic ingress fixture."
       },
       {
@@ -87,7 +87,7 @@
         "json_pointer": "/sessions/0/instruction_context",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Public agent context fixture."
       },
       {
@@ -95,7 +95,7 @@
         "json_pointer": "/sessions/0/user_instruction",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Authorized synthetic persistence instruction."
       },
       {
@@ -103,7 +103,7 @@
         "json_pointer": "/sessions/1/instruction_context",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Explicit second-session lifecycle context."
       },
       {
@@ -111,7 +111,7 @@
         "json_pointer": "/environment/sim_google_data/effect_tool",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Synthetic effect tool binding."
       },
       {
@@ -119,7 +119,7 @@
         "json_pointer": "/environment/sim_google_data/sink",
         "value_type": "string",
         "public": true,
-        "allowed_sources": ["sample.execution_view"],
+        "allowed_sources": ["sample.execution_view", "baseline.task_set"],
         "description": "Synthetic terminal state binding."
       }
     ]
