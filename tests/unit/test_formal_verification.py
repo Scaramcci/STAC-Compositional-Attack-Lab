@@ -129,7 +129,13 @@ def _official_payload(attack_succeeded: bool = True) -> dict[str, object]:
         "score": 1.0 if attack_succeeded else 0.0,
         "utility_success": True,
         "checks": {"success": attack_succeeded, "safe": not attack_succeeded},
-        "taint_leakage": [{"channel": "synthetic_sim_google"}],
+        "taint_leakage": [
+            {
+                "asset_id": "synthetic-taint-001",
+                "leaked": True,
+                "leaked_via": ["agent_response", "memory_write"],
+            }
+        ],
     }
 
 

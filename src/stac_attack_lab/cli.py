@@ -45,6 +45,7 @@ from stac_attack_lab.recording.progress import ExperimentProgress
 from stac_attack_lab.reporting.formal_report import build_formal_report
 from stac_attack_lab.reporting.report import build_report
 from stac_attack_lab.schema_registry import SCHEMA_MODELS, validate_schema_registry
+from stac_attack_lab.verification.safeclaw_official import smoke_official_pse_evaluator
 
 
 def project_root() -> Path:
@@ -106,6 +107,9 @@ def _main(argv: list[str] | None = None) -> int:
     safeclaw_inventory.add_argument("--task", action="append", required=True)
     safeclaw_preflight = safeclaw_sub.add_parser("preflight")
     safeclaw_preflight.add_argument("--config", required=True)
+    safeclaw_pse_smoke = safeclaw_sub.add_parser("pse-smoke")
+    safeclaw_pse_smoke.add_argument("--upstream", required=True)
+    safeclaw_pse_smoke.add_argument("--task", required=True)
     safeclaw_run = safeclaw_sub.add_parser("run")
     safeclaw_run.add_argument("--config", required=True)
     safeclaw_run.add_argument("--run-id", default=None)
@@ -202,6 +206,14 @@ def _main(argv: list[str] | None = None) -> int:
         preflight_report = run_safeclaw_preflight(root, preflight_config)
         print(preflight_report.model_dump_json(indent=2))
         return 0 if preflight_report.passed else 1
+    if args.cmd == "safeclaw" and args.safeclaw_cmd == "pse-smoke":
+        upstream = root / args.upstream
+        pse_report = smoke_official_pse_evaluator(
+            upstream / "scripts/judge.py",
+            upstream / args.task,
+        )
+        print(pse_report.model_dump_json(indent=2))
+        return 0 if pse_report.passed else 1
     if args.cmd == "safeclaw" and args.safeclaw_cmd == "run":
         try:
             formal_config = load_safeclaw_formal_config(root / args.config)

@@ -89,6 +89,7 @@ def parse_safeclaw_task(
     *,
     upstream_root: Path,
     upstream_commit: str = PINNED_SAFECLAW_COMMIT,
+    formal_experiment: dict[str, Any] | None = None,
 ) -> SafeClawTaskDescriptor:
     task = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(task, dict):
@@ -98,7 +99,7 @@ def parse_safeclaw_task(
     sessions = task.get("sessions", [])
     if not isinstance(metadata, dict) or not isinstance(evaluation, dict) or not sessions:
         raise ValueError("safeclaw_task_missing_metadata_evaluation_or_sessions")
-    formal = task.get("formal_experiment")
+    formal = formal_experiment if formal_experiment is not None else task.get("formal_experiment")
     formal_mapping = formal if isinstance(formal, dict) else {}
     track = SafeClawTrack.compositional if formal_mapping else SafeClawTrack.conformance
     slots, slot_errors = _parse_bindable_slots(formal_mapping)

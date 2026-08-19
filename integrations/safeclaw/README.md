@@ -8,7 +8,9 @@ The supported upstream identity is commit
 `a11f5cceaba0676be721021f8d232638fd111305` with image
 `openclaw-env:2026.3.12`. The formal runner uses upstream `scripts/judge.py` as a
 whole-episode subprocess. It does not import judge internals or pretend that
-SafeClaw exposes a per-tool `step()` API.
+SafeClaw exposes a per-tool `step()` API. The separate `safeclaw pse-smoke`
+command loads the pinned official `Evaluator` only to exercise its PSE scoring
+function without starting a Docker episode.
 
 `patches/a11f5cce-safety.patch` removes credential suffixes and raw auth profile
 content from official result serialization. The runner applies it only to an
@@ -16,15 +18,17 @@ ephemeral copy of the pinned checkout. The upstream checkout itself is never
 modified.
 
 Preflight is read-only and fails closed on a missing checkout, commit mismatch,
-missing critical file, missing patch, unavailable Docker daemon, missing model
-variable, missing required embedding endpoint, or insufficient disk. It does not
-clone, build, download, change permissions, or broaden access automatically.
+missing critical file, missing patch, unavailable Docker daemon, missing Docker
+image, missing model variable, missing required embedding endpoint, or
+insufficient disk. It does not clone, build, download, change permissions, or
+broaden access automatically.
 
-Only task templates with an explicit `formal_experiment` block can be
-materialized. Bindable JSON pointers are allow-listed in that block. Pointers
-containing evaluation, success/safe condition, oracle, canary, auth, credential,
-token, password, or secret fields are rejected. Official unchanged tasks remain
-the `safeclaw_conformance` track and cannot be materialized.
+Only task templates paired with an explicit `formal_experiment` block or
+task-set overlay can be materialized. Bindable JSON pointers are allow-listed in
+that metadata. Pointers containing evaluation, success/safe condition, oracle,
+canary, auth, credential, token, password, or secret fields are rejected.
+Official tasks without that external metadata remain the `safeclaw_conformance`
+track and cannot be materialized.
 
 Each formal case stores `materialized_task.json` and
 `complete_interaction_record.json` under `cases/<case-id>/`. The complete record
@@ -43,18 +47,18 @@ same run id resumes completed cases instead of duplicating them.
 
 ```bash
 tmux new-session -d -s safeclaw-formal \
-  "cd /path/to/stac-compositional-attack-lab && bash scripts/run_safeclaw_formal_tmux.sh safeclaw-formal-v1-main"
+  "cd /path/to/stac-compositional-attack-lab && bash scripts/run_formal_evaluation.sh"
 tmux attach -t safeclaw-formal
 ```
 
 Detach with `Ctrl-b d`. If the process exits, inspect the persistent log and
-rerun the same `tmux new-session` command to resume. The launcher intentionally
-does not override `execution_enabled=false` or a blocked task set.
+rerun the same `tmux new-session` command to resume. The launcher respects the
+configured execution and task-set gates and does not override them.
 
 The current formal path consumes model API only inside the OpenClaw victim
 episode. Deterministic planners, task materialization, primitive extraction,
 mechanism verification, and the official SafeClaw checks do not call an LLM.
-Each current task has two sessions, so the nine-case matrix issues at least 18
+Each current task has two sessions, so the 12-case matrix issues at least 24
 OpenClaw gateway requests before malformed-call or whole-episode retries. A
 gateway request can trigger multiple provider completions during tool-use loops.
 Current `tokens`, `cost`, and `api_calls` result fields are not provider billing

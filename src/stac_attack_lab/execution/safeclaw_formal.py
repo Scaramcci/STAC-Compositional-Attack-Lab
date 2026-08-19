@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import PositiveInt, model_validator
+from pydantic import Field, PositiveInt, model_validator
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.datasets.library import PrimitiveChainLibrary
@@ -61,6 +61,7 @@ class FormalTaskEntry(StrictModel):
     pair_group: str
     template_path: str
     template_hash: str
+    formal_experiment: dict[str, Any] | None = None
     materialization_values: dict[str, Any]
     baseline_materialization_values: dict[str, Any]
     sample_derived_slots: list[str]
@@ -114,6 +115,7 @@ class SafeClawFormalConfig(StrictModel):
     conditions: list[FormalCondition]
     seeds: list[int]
     target_model_env: str
+    allowed_target_models: list[str] = Field(default_factory=list)
     target_base_url_env: str
     target_api_key_env: str
     timeout_seconds: PositiveInt = 1200
@@ -222,6 +224,9 @@ def run_safeclaw_formal(
     missing_env = [name for name in required_env if not env.get(name)]
     if missing_env:
         raise ValueError("missing_formal_environment_variables:" + ",".join(missing_env))
+    target_model = str(env[config.target_model_env])
+    if config.allowed_target_models and target_model not in config.allowed_target_models:
+        raise ValueError(f"formal_target_model_not_allowed:{target_model}")
     task_set = load_formal_task_set(project_root / config.task_set_path)
     if task_set.status != "ready":
         raise ValueError(f"formal_task_set_blocked:{task_set.blocked_reason}")
@@ -303,6 +308,7 @@ def run_safeclaw_formal(
                 template_path,
                 upstream_root=project_root,
                 upstream_commit=task_set.upstream_commit,
+                formal_experiment=task.formal_experiment,
             )
             if descriptor.task_id != task_id:
                 raise ValueError("formal_task_entry_identity_mismatch")

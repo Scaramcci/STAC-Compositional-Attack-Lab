@@ -117,4 +117,16 @@ make smoke-report
 
 Fake profile 不需要 API key 或网络。真实模型配置和运行命令见 [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)。凭证只从本地环境变量读取，不写入代码、配置、文档或日志。
 
-SafeClaw formal 配置 configs/experiments/safeclaw_formal_v1.yaml 当前保持 execution_enabled: false 和 task-set blocked。其 no_sample condition 已通过 synthetic runner 测试；解除 blocker 前不得用于结果声明。历史 30/120 配置和下一版本 50/200 配置的边界见实验协议。
+正式样本采集与 SafeClaw 评估统一通过以下入口启动；两个入口都支持
+`--help` 和 `--print-output-dir`，并使用稳定 run id、文件锁和持久日志：
+
+```bash
+bash scripts/run_sample_collection.sh
+bash scripts/run_formal_evaluation.sh
+```
+
+样本默认写入配置 hash 派生的 `data/generated/<run-id>/`。SafeClaw formal
+默认写入 `experiments/safeclaw_runs/safeclaw-formal-v1-main/`。
+
+SafeClaw formal 配置已在授权后切换为 ready；启动入口仍会依次执行官方
+PSE smoke、Docker/image/model preflight，并只接受配置 allowlist 中的 target model。

@@ -23,6 +23,7 @@ class SafeClawPreflightConfig(StrictModel):
     patch_path: str
     require_docker: bool = True
     target_model_env: str
+    allowed_target_models: list[str] = Field(default_factory=list)
     target_base_url_env: str
     target_api_key_env: str
     embedding_policy: Literal["required_endpoint", "disabled_semantic_memory", "exclude_tasks"]
@@ -141,6 +142,12 @@ def run_safeclaw_preflight(
         ):
             required_env_names.append("INVALID_EMBEDDING_CONFIG")
     missing_env = sorted(name for name in required_env_names if not env.get(name))
+    target_model = env.get(config.target_model_env)
+    target_model_allowed = (
+        not target_model
+        or not config.allowed_target_models
+        or (target_model in config.allowed_target_models)
+    )
     checks.append(
         PreflightCheck(
             check_id="model_environment",
@@ -151,16 +158,43 @@ def run_safeclaw_preflight(
             public_details={"missing_variable_names": ",".join(missing_env)},
         )
     )
+    checks.append(
+        PreflightCheck(
+            check_id="target_model",
+            passed=target_model_allowed,
+            reason_code=(
+                "target_model_allowed" if target_model_allowed else "target_model_not_allowed"
+            ),
+            public_details={
+                "configured_model": target_model or "missing",
+                "allowed_models": ",".join(config.allowed_target_models),
+            },
+        )
+    )
     if config.require_docker:
         docker = command_runner(["docker", "info", "--format", "{{json .ServerVersion}}"], None)
         docker_ok = docker.returncode == 0
+        image = command_runner(
+            ["docker", "image", "inspect", config.image_tag, "--format", "{{json .Id}}"],
+            None,
+        )
+        image_ok = image.returncode == 0
     else:
         docker_ok = True
+        image_ok = True
     checks.append(
         PreflightCheck(
             check_id="docker",
             passed=docker_ok,
             reason_code="docker_available" if docker_ok else "docker_unavailable",
+        )
+    )
+    checks.append(
+        PreflightCheck(
+            check_id="docker_image",
+            passed=image_ok,
+            reason_code="docker_image_present" if image_ok else "docker_image_missing",
+            public_details={"image_tag": config.image_tag},
         )
     )
     disk_base = upstream if upstream.exists() else project_root

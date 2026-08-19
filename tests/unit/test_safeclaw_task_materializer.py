@@ -94,6 +94,24 @@ def test_task_adapter_physically_separates_public_and_private_fields() -> None:
     assert descriptor.official_success_condition_hash
 
 
+def test_task_adapter_accepts_separate_public_formal_overlay(tmp_path: Path) -> None:
+    task = json.loads(TASK.read_text(encoding="utf-8"))
+    formal_overlay = task.pop("formal_experiment")
+    official = tmp_path / "official-without-overlay.json"
+    official.write_text(json.dumps(task), encoding="utf-8")
+
+    descriptor = parse_safeclaw_task(
+        official,
+        upstream_root=tmp_path,
+        formal_experiment=formal_overlay,
+    )
+
+    assert descriptor.track == SafeClawTrack.compositional
+    assert descriptor.supported is True
+    assert descriptor.materialization_template_id == "safeclaw-persistence-chain-v1"
+    assert "evaluation" not in descriptor.public_view.model_dump_json()
+
+
 def test_materializer_changes_only_allowlisted_fields_and_preserves_oracle(
     tmp_path: Path,
 ) -> None:
