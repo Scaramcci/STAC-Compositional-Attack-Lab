@@ -155,7 +155,7 @@ def test_formal_mechanism_verifies_all_required_layers(tmp_path: Path) -> None:
 
     assert len(mechanism.occurrence_verdicts) == 8
     assert len(mechanism.edge_verdicts) == 7
-    assert len(mechanism.macro_verdicts) == 4
+    assert len(mechanism.macro_verdicts) == 5
     assert all(item.outcome == PrimitiveOutcome.passed for item in mechanism.occurrence_verdicts)
     assert all(item.verdict == CausalVerdict.causal_pass for item in mechanism.edge_verdicts)
     assert all(item.outcome == PrimitiveOutcome.passed for item in mechanism.macro_verdicts)

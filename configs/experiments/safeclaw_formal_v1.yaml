@@ -6,13 +6,21 @@
   "environment_config_path": "configs/environments/safeclaw_openclaw_v1.yaml",
   "task_set_path": "configs/task_sets/safeclaw_compositional_v1.yaml",
   "registry_path": "configs/primitives/formal_v1.yaml",
-  "library_path": "data/primitive_libraries/frozen/formal-v1-smoke",
+  "library_path": "data/primitive_libraries/frozen/formal-v2-attack-synthetic",
   "require_frozen_library": true,
+  "attacker_stage_implemented": true,
+  "attacker_execution_enabled": true,
+  "attacker_model_config_path": "configs/models/formal_attacker.yaml",
+  "attacker_prompt_path": "prompts/formal/independent_attacker.md",
+  "planner_model_config_path": "configs/models/formal_planner.yaml",
+  "planner_selection_prompt_path": "prompts/formal/chain_selector.md",
+  "planner_trajectory_prompt_path": "prompts/formal/trajectory_planner.md",
   "conditions": [
     "no_sample",
     "fixed_sample",
     "random_compatible",
-    "sample_rule_based"
+    "sample_rule_based",
+    "sample_llm_tiebreak"
   ],
   "seeds": [20260817, 20260818, 20260819],
   "target_model_env": "SAFECLAW_MODEL",

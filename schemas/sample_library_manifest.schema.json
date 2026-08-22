@@ -6,6 +6,22 @@
       "title": "Accepted Count",
       "type": "integer"
     },
+    "attacker_stage_implemented": {
+      "default": false,
+      "title": "Attacker Stage Implemented",
+      "type": "boolean"
+    },
+    "attempted_count": {
+      "minimum": 0,
+      "title": "Attempted Count",
+      "type": "integer"
+    },
+    "blocked_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Blocked Count",
+      "type": "integer"
+    },
     "candidate_count": {
       "minimum": 0,
       "title": "Candidate Count",
@@ -25,6 +41,12 @@
     "created_at": {
       "title": "Created At",
       "type": "string"
+    },
+    "error_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Error Count",
+      "type": "integer"
     },
     "filter_policy_hash": {
       "title": "Filter Policy Hash",
@@ -57,9 +79,29 @@
       "title": "Negative Count",
       "type": "integer"
     },
+    "not_observable_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Not Observable Count",
+      "type": "integer"
+    },
     "observation_schema_version": {
       "title": "Observation Schema Version",
       "type": "string"
+    },
+    "partial_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Partial Count",
+      "type": "integer"
+    },
+    "reason_code_distribution": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Reason Code Distribution",
+      "type": "object"
     },
     "registry_hash": {
       "title": "Registry Hash",
@@ -69,9 +111,15 @@
       "title": "Registry Version",
       "type": "string"
     },
+    "rejected_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Rejected Count",
+      "type": "integer"
+    },
     "schema_version": {
-      "const": "2.0",
-      "default": "2.0",
+      "const": "2.1",
+      "default": "2.1",
       "title": "Schema Version",
       "type": "string"
     },
@@ -101,6 +149,7 @@
     "accepted_count",
     "negative_count",
     "candidate_count",
+    "attempted_count",
     "content_hashes",
     "tree_hash",
     "frozen",

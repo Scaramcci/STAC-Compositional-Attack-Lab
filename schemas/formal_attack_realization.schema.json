@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "FormalAttackerStageAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action_type": {
+          "enum": [
+            "victim_message",
+            "session_transition",
+            "tool_surface",
+            "stop"
+          ],
+          "title": "Action Type",
+          "type": "string"
+        },
+        "benchmark_surface": {
+          "title": "Benchmark Surface",
+          "type": "string"
+        },
+        "expected_public_predicate": {
+          "title": "Expected Public Predicate",
+          "type": "string"
+        },
+        "macro_ref": {
+          "title": "Macro Ref",
+          "type": "string"
+        },
+        "public_slot_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Slot Refs",
+          "type": "array"
+        },
+        "rationale_summary": {
+          "title": "Rationale Summary",
+          "type": "string"
+        },
+        "stage_id": {
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "victim_visible_content": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victim Visible Content"
+        }
+      },
+      "required": [
+        "stage_id",
+        "macro_ref",
+        "action_type",
+        "benchmark_surface",
+        "public_slot_refs",
+        "expected_public_predicate",
+        "rationale_summary"
+      ],
+      "title": "FormalAttackerStageAction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "abstain_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Abstain Reason"
+    },
+    "attacker_input_id": {
+      "title": "Attacker Input Id",
+      "type": "string"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "public_slot_values": {
+      "additionalProperties": true,
+      "title": "Public Slot Values",
+      "type": "object"
+    },
+    "realization_hash": {
+      "title": "Realization Hash",
+      "type": "string"
+    },
+    "sample_id": {
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage_actions": {
+      "items": {
+        "$ref": "#/$defs/FormalAttackerStageAction"
+      },
+      "title": "Stage Actions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "attacker_input_id",
+    "sample_id",
+    "plan_id",
+    "public_slot_values",
+    "stage_actions",
+    "realization_hash"
+  ],
+  "title": "FormalAttackRealization",
+  "type": "object"
+}

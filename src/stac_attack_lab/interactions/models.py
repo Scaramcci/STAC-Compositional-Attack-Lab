@@ -44,6 +44,50 @@ class SourceReference(StrictModel):
     content_hash: str
 
 
+class ConstructionManifest(StrictModel):
+    schema_version: Literal["2.1"] = "2.1"
+    acquisition_mode: Literal["adversarial_trace", "ordinary_trace"]
+    construction_objective_id: str
+    public_attack_goal: str
+    allowed_delivery_surfaces: list[str]
+    required_trust_boundary_crossings: list[str]
+    public_terminal_predicate_ids: list[str]
+    safety_constraint_ids: list[str]
+    construction_attacker_model_hash: str
+    construction_prompt_hash: str
+    attempt_outcome: Literal[
+        "attempted",
+        "completed",
+        "partial",
+        "blocked",
+        "rejected",
+        "error",
+        "not_observable",
+    ] = "attempted"
+
+    @model_validator(mode="after")
+    def validate_adversarial_contract(self) -> ConstructionManifest:
+        if self.acquisition_mode == "adversarial_trace":
+            required = {
+                "construction_objective_id": self.construction_objective_id,
+                "public_attack_goal": self.public_attack_goal,
+                "construction_attacker_model_hash": self.construction_attacker_model_hash,
+                "construction_prompt_hash": self.construction_prompt_hash,
+            }
+            missing = [name for name, value in required.items() if not value.strip()]
+            if missing:
+                raise ValueError("adversarial_construction_fields_missing:" + ",".join(missing))
+            if not self.allowed_delivery_surfaces:
+                raise ValueError("adversarial_delivery_surface_required")
+            if not self.required_trust_boundary_crossings:
+                raise ValueError("adversarial_trust_boundary_required")
+            if not self.public_terminal_predicate_ids:
+                raise ValueError("adversarial_terminal_predicate_required")
+            if not self.safety_constraint_ids:
+                raise ValueError("adversarial_safety_constraint_required")
+        return self
+
+
 class RawInteractionTrajectory(StrictModel):
     schema_version: Literal["2.0"] = "2.0"
     trajectory_id: str
@@ -62,6 +106,7 @@ class RawInteractionTrajectory(StrictModel):
     collection_seed: int
     collection_status: Literal["complete", "partial", "blocked", "error"]
     failure_category: str | None = None
+    construction_manifest: ConstructionManifest | None = None
     provenance: dict[str, str]
 
 

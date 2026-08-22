@@ -1,0 +1,91 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_type": {
+      "enum": [
+        "deliver_message",
+        "start_new_session",
+        "retry",
+        "reroute",
+        "stop"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "delivery_surface": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Delivery Surface"
+    },
+    "expected_public_predicate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Public Predicate Id"
+    },
+    "public_message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Public Message"
+    },
+    "rationale_summary": {
+      "title": "Rationale Summary",
+      "type": "string"
+    },
+    "reroute_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reroute Id"
+    },
+    "retry_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Id"
+    }
+  },
+  "required": [
+    "action_id",
+    "action_type",
+    "rationale_summary"
+  ],
+  "title": "ConstructionAttackerAction",
+  "type": "object"
+}

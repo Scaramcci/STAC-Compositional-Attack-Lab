@@ -50,6 +50,20 @@
           "default": true,
           "title": "Required",
           "type": "boolean"
+        },
+        "required_output_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Output Types",
+          "type": "array"
+        },
+        "required_semantic_labels": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Semantic Labels",
+          "type": "array"
         }
       },
       "required": [
@@ -58,6 +72,21 @@
       ],
       "title": "MacroCoreNode",
       "type": "object"
+    },
+    "SemanticMacroName": {
+      "enum": [
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover"
+      ],
+      "title": "SemanticMacroName",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -126,10 +155,30 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "2.0",
-      "default": "2.0",
+      "const": "2.1",
+      "default": "2.1",
       "title": "Schema Version",
       "type": "string"
+    },
+    "semantic_can_override_hard_fact": {
+      "const": false,
+      "default": false,
+      "title": "Semantic Can Override Hard Fact",
+      "type": "boolean"
+    },
+    "semantic_evidence_grades": {
+      "items": {
+        "enum": [
+          "E3",
+          "E4"
+        ],
+        "type": "string"
+      },
+      "title": "Semantic Evidence Grades",
+      "type": "array"
+    },
+    "semantic_name": {
+      "$ref": "#/$defs/SemanticMacroName"
     },
     "version": {
       "title": "Version",
@@ -139,6 +188,7 @@
   "required": [
     "macro_id",
     "version",
+    "semantic_name",
     "public_summary",
     "entry_predicates",
     "exit_predicates",

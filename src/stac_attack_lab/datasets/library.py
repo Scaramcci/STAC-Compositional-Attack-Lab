@@ -10,11 +10,9 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from stac_attack_lab.datasets.chain_builder import (
-    build_primitive_chain_sample,
-    calculate_sample_hash,
-)
+from stac_attack_lab.datasets.chain_builder import build_primitive_chain_sample
 from stac_attack_lab.datasets.primitive_chain import (
+    AcceptedSampleRecord,
     ExecutionBindingView,
     PlannerSampleView,
     PrimitiveChainCandidate,
@@ -41,12 +39,19 @@ LIBRARY_FILES = (
 )
 
 PUBLIC_FORBIDDEN_KEYS = (
+    "prompt",
+    "payload",
+    "victim_message",
+    "frozen_prompt",
+    "verified_prompt",
+    "transcript",
     "private_oracle",
+    "oracle",
     "canary_id",
+    "canary",
     "success_condition",
     "safe_condition",
     "api_key",
-    "authorization",
     "password",
     "secret",
 )
@@ -84,6 +89,36 @@ def _content_hashes(path: Path) -> dict[str, str]:
     return {name: file_hash(path / name) for name in LIBRARY_FILES}
 
 
+def _accepted_record(sample: PrimitiveChainSample) -> AcceptedSampleRecord:
+    payload = {
+        "schema_version": "2.1",
+        "sample_id": sample.sample_id,
+        "sample_version": sample.sample_version,
+        "dataset_version": sample.dataset_version,
+        "chain_id": sample.chain_id,
+        "chain_hash": sample.chain_hash,
+        "registry_version": sample.registry_version,
+        "registry_hash": sample.registry_hash,
+        "observation_schema_version": sample.observation_schema_version,
+        "construction_pipeline_version": sample.construction_pipeline_version,
+        "acquisition_mode": sample.acquisition_mode,
+        "validation_level": sample.validation.validation_level,
+        "validation_hash": stable_hash(sample.validation.model_dump(mode="json")),
+        "planner_view_hash": stable_hash(sample.planner_view.model_dump(mode="json")),
+        "execution_view_hash": stable_hash(sample.execution_view.model_dump(mode="json")),
+        "private_evidence_hash": stable_hash(sample.private_evidence_view.model_dump(mode="json")),
+        "source_split": sample.source_split,
+        "source_task_ids": sample.source_task_ids,
+    }
+    return AcceptedSampleRecord.model_validate({**payload, "sample_hash": stable_hash(payload)})
+
+
+def _accepted_record_hash(record: AcceptedSampleRecord) -> str:
+    payload = record.model_dump(mode="json")
+    payload.pop("sample_hash")
+    return stable_hash(payload)
+
+
 def build_primitive_chain_library(
     output_dir: Path,
     *,
@@ -95,6 +130,8 @@ def build_primitive_chain_library(
     library_id: str,
     library_version: str,
     formal_exclusion_hash: str,
+    attempt_outcome_counts: dict[str, int] | None = None,
+    attacker_stage_implemented: bool = False,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     samples = [
@@ -106,8 +143,9 @@ def build_primitive_chain_library(
         )
         for candidate in accepted_candidates
     ]
+    accepted_records = [_accepted_record(sample) for sample in samples]
     _atomic_jsonl(output_dir / "candidates.jsonl", [*accepted_candidates, *negative_candidates])
-    _atomic_jsonl(output_dir / "accepted_samples.jsonl", samples)
+    _atomic_jsonl(output_dir / "accepted_samples.jsonl", accepted_records)
     _atomic_jsonl(output_dir / "negative_samples.jsonl", negative_candidates)
     _atomic_jsonl(output_dir / "filter_decisions.jsonl", filter_records)
     _atomic_jsonl(
@@ -124,6 +162,14 @@ def build_primitive_chain_library(
     split_summary: dict[str, int] = {}
     for sample in samples:
         split_summary[sample.source_split] = split_summary.get(sample.source_split, 0) + 1
+    outcomes = attempt_outcome_counts or {"completed": len(samples)}
+    reason_counts: dict[str, int] = {}
+    for record in filter_records:
+        for decision in record.decisions:
+            if not decision.passed:
+                for reason in decision.reason_codes:
+                    reason_counts[reason] = reason_counts.get(reason, 0) + 1
+    non_accepted_completed = max(0, outcomes.get("completed", 0) - len(samples))
     manifest = SampleLibraryManifest(
         library_id=library_id,
         library_version=library_version,
@@ -139,6 +185,14 @@ def build_primitive_chain_library(
         accepted_count=len(samples),
         negative_count=len(negative_candidates),
         candidate_count=len(accepted_candidates) + len(negative_candidates),
+        attempted_count=sum(outcomes.values()),
+        partial_count=outcomes.get("partial", 0),
+        blocked_count=outcomes.get("blocked", 0),
+        rejected_count=outcomes.get("rejected", 0) + non_accepted_completed,
+        error_count=outcomes.get("error", 0),
+        not_observable_count=outcomes.get("not_observable", 0),
+        reason_code_distribution=reason_counts,
+        attacker_stage_implemented=attacker_stage_implemented,
         content_hashes=content_hashes,
         tree_hash=stable_hash(content_hashes),
         frozen=False,
@@ -175,7 +229,7 @@ def audit_primitive_library(path: Path) -> list[str]:
     if stable_hash(manifest.content_hashes) != manifest.tree_hash:
         errors.append("library_tree_hash_mismatch")
     try:
-        samples = _load_jsonl(path / "accepted_samples.jsonl", PrimitiveChainSample)
+        samples = _load_jsonl(path / "accepted_samples.jsonl", AcceptedSampleRecord)
         negatives = _load_jsonl(path / "negative_samples.jsonl", PrimitiveChainCandidate)
         candidates = _load_jsonl(path / "candidates.jsonl", PrimitiveChainCandidate)
         public_views = _load_jsonl(path / "planner_public_index.jsonl", PlannerSampleView)
@@ -195,15 +249,36 @@ def audit_primitive_library(path: Path) -> list[str]:
     sample_ids = [sample.sample_id for sample in samples]
     if len(sample_ids) != len(set(sample_ids)):
         errors.append("duplicate_sample_id")
+    public_by_id = {item.sample_id: item for item in public_views}
+    execution_by_id = {item.sample_id: item for item in execution_views}
+    private_by_id = {item.sample_id: item for item in private_views}
     for sample in samples:
-        if calculate_sample_hash(sample) != sample.sample_hash:
+        if _accepted_record_hash(sample) != sample.sample_hash:
             errors.append(f"sample_hash_mismatch:{sample.sample_id}")
         if sample.registry_hash != manifest.registry_hash:
             errors.append(f"sample_registry_hash_mismatch:{sample.sample_id}")
         if sample.source_split == "test":
             errors.append(f"formal_test_source_leak:{sample.sample_id}")
-        if not all(decision.passed for decision in sample.validation.gate_decisions):
-            errors.append(f"unaccepted_sample_in_accepted_pool:{sample.sample_id}")
+        if sample.acquisition_mode != "adversarial_trace":
+            errors.append(f"accepted_sample_not_adversarial:{sample.sample_id}")
+        public_view = public_by_id.get(sample.sample_id)
+        execution_view = execution_by_id.get(sample.sample_id)
+        private_view = private_by_id.get(sample.sample_id)
+        if (
+            public_view is not None
+            and stable_hash(public_view.model_dump(mode="json")) != sample.planner_view_hash
+        ):
+            errors.append(f"planner_view_hash_mismatch:{sample.sample_id}")
+        if (
+            execution_view is not None
+            and stable_hash(execution_view.model_dump(mode="json")) != sample.execution_view_hash
+        ):
+            errors.append(f"execution_view_hash_mismatch:{sample.sample_id}")
+        if (
+            private_view is not None
+            and stable_hash(private_view.model_dump(mode="json")) != sample.private_evidence_hash
+        ):
+            errors.append(f"private_evidence_hash_mismatch:{sample.sample_id}")
     expected_ids = set(sample_ids)
     view_sets = {
         "public": {item.sample_id for item in public_views},
@@ -214,9 +289,12 @@ def audit_primitive_library(path: Path) -> list[str]:
         if view_ids != expected_ids:
             errors.append(f"{name}_view_identity_mismatch")
     public_payload = (path / "planner_public_index.jsonl").read_text(encoding="utf-8").lower()
-    for forbidden in PUBLIC_FORBIDDEN_KEYS:
-        if forbidden in public_payload:
-            errors.append(f"planner_public_view_forbidden_field:{forbidden}")
+    execution_payload = (path / "execution_views.jsonl").read_text(encoding="utf-8").lower()
+    view_payloads = (("planner_public", public_payload), ("execution", execution_payload))
+    for view_name, payload in view_payloads:
+        for forbidden in PUBLIC_FORBIDDEN_KEYS:
+            if forbidden in payload:
+                errors.append(f"{view_name}_view_forbidden_field:{forbidden}")
     return errors
 
 
@@ -237,7 +315,7 @@ class PrimitiveChainLibrary:
     def public_index(self) -> list[PublicSampleIndexEntry]:
         sample_hashes = {
             sample.sample_id: sample.sample_hash
-            for sample in _load_jsonl(self.path / "accepted_samples.jsonl", PrimitiveChainSample)
+            for sample in _load_jsonl(self.path / "accepted_samples.jsonl", AcceptedSampleRecord)
         }
         return [
             PublicSampleIndexEntry(

@@ -36,6 +36,10 @@ def build_primitive_chain_sample(
         decision.passed for decision in candidate.filter_decisions
     ):
         raise ValueError("only_fully_accepted_candidates_can_become_samples")
+    if candidate.acquisition_mode.value != "adversarial_trace":
+        raise ValueError("accepted_sample_requires_adversarial_trace")
+    if candidate.construction_manifest is None:
+        raise ValueError("accepted_sample_requires_construction_manifest")
     occurrence_by_id = {item.occurrence_id: item for item in occurrences}
     unknown = set(candidate.occurrence_ids) - set(occurrence_by_id)
     if unknown:
@@ -68,6 +72,17 @@ def build_primitive_chain_sample(
         )
         for role in component_roles
     ]
+    public_nodes = [node.model_copy(update={"core_occurrence_ids": []}) for node in candidate.nodes]
+    public_edges = [
+        edge.model_copy(
+            update={
+                "artifact_binding": None,
+                "state_binding": None,
+                "evidence_ref_ids": [],
+            }
+        )
+        for edge in candidate.edges
+    ]
     planner_view = PlannerSampleView(
         sample_id=sample_id,
         sample_version="2.0",
@@ -75,8 +90,8 @@ def build_primitive_chain_sample(
             "Authorized benchmark chain: untrusted ingress, persistent state, explicit "
             "lifecycle boundary, delayed retrieval, and sandbox effect."
         ),
-        macro_nodes=candidate.nodes,
-        macro_edges=candidate.edges,
+        macro_nodes=public_nodes,
+        macro_edges=public_edges,
         applicability_predicates=[
             "authorized_benchmark_sandbox",
             "explicit_lifecycle_boundary",
@@ -156,6 +171,10 @@ def build_primitive_chain_sample(
         provenance_hashes={
             "candidate_hash": candidate.candidate_hash,
             "registry_hash": registry.registry_hash,
+            "construction_attacker_model_hash": (
+                candidate.construction_manifest.construction_attacker_model_hash
+            ),
+            "construction_prompt_hash": candidate.construction_manifest.construction_prompt_hash,
         },
     )
     sample = PrimitiveChainSample(
@@ -169,6 +188,7 @@ def build_primitive_chain_sample(
         registry_hash=registry.registry_hash,
         observation_schema_version=registry.observable_projection_version,
         construction_pipeline_version=construction_pipeline_version,
+        acquisition_mode="adversarial_trace",
         planner_view=planner_view,
         execution_view=execution_view,
         private_evidence_view=private_view,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from pydantic import BaseModel
 
 from stac_attack_lab.datasets.library import PrimitiveChainLibrary
@@ -19,14 +20,21 @@ from stac_attack_lab.models.base import ModelClient
 from stac_attack_lab.planning.formal_base import (
     FormalBudget,
     FormalPlannerInput,
+    LongHorizonAttackFamily,
 )
 from stac_attack_lab.planning.formal_baselines import (
     FixedSamplePlanner,
     NoSamplePlanner,
     RandomCompatiblePlanner,
     RuleBasedFormalPlanner,
+    build_long_horizon_trajectory,
+    supported_attack_families,
 )
-from stac_attack_lab.planning.formal_llm import FormalLLMPlanner, LLMSelectionProposal
+from stac_attack_lab.planning.formal_llm import (
+    FormalLLMPlanner,
+    LLMSelectionProposal,
+    LLMTrajectoryProposal,
+)
 from stac_attack_lab.planning.sample_selector import select_compatible_samples
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +76,37 @@ class _ProposalClient(ModelClient):
             rationale_summary="Uses only public compatibility.",
             confidence=0.7,
         )
+
+
+class _TrajectoryClient(ModelClient):
+    def __init__(self, planner_input: FormalPlannerInput) -> None:
+        self.planner_input = planner_input
+        self.schemas: list[type[BaseModel]] = []
+
+    def generate(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: type[BaseModel],
+        seed: int,
+        timeout: int,
+    ) -> BaseModel:
+        del messages, seed, timeout
+        self.schemas.append(response_schema)
+        sample = self.planner_input.public_samples[0]
+        if response_schema is LLMSelectionProposal:
+            return LLMSelectionProposal(
+                selected_sample_id=sample.sample_id,
+                abstain_reason=None,
+                rationale_summary="The public backbone is compatible.",
+                confidence=0.8,
+            )
+        if response_schema is LLMTrajectoryProposal:
+            return LLMTrajectoryProposal(
+                sample_id=sample.sample_id,
+                trajectory=build_long_horizon_trajectory(sample, self.planner_input),
+                rationale_summary="Uses the exact validated public primitive backbone.",
+            )
+        raise AssertionError(response_schema)
 
 
 def _planner_input(tmp_path: Path) -> tuple[FormalPlannerInput, PrimitiveChainLibrary]:
@@ -134,6 +173,17 @@ def test_selector_and_binding_use_only_public_compatible_fields(tmp_path: Path) 
     assert len(selection.compatible) == 1
     assert plan.binding is not None and plan.binding.binding_valid
     assert plan.selected_sample_id == planner_input.public_samples[0].sample_id
+    assert plan.adversarial_trajectory is not None
+    assert len(plan.adversarial_trajectory.primitive_sequence) == 5
+    assert plan.adversarial_trajectory.persistence.enabled
+    assert plan.adversarial_trajectory.trigger.enabled
+    assert len(plan.adversarial_trajectory.control_cases) == 5
+    for previous, current in zip(
+        plan.adversarial_trajectory.primitive_sequence,
+        plan.adversarial_trajectory.primitive_sequence[1:],
+        strict=False,
+    ):
+        assert previous.output_state_ref in current.input_state_refs
     assert all(
         assignment.public_value_ref.startswith("public_component:")
         for assignment in plan.binding.assignments
@@ -214,6 +264,23 @@ def test_llm_compatible_selection_is_revalidated_and_hashed(tmp_path: Path) -> N
     assert plan.selection_evidence.public_prompt_hash
 
 
+def test_llm_planner_uses_separate_validated_trajectory_prompt(tmp_path: Path) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    client = _TrajectoryClient(planner_input)
+    planner = FormalLLMPlanner(
+        client,
+        ROOT / "prompts/formal/chain_selector.md",
+        ROOT / "prompts/formal/trajectory_planner.md",
+    )
+
+    plan = planner.plan(planner_input)
+
+    assert client.schemas == [LLMSelectionProposal, LLMTrajectoryProposal]
+    assert plan.adversarial_trajectory is not None
+    assert plan.planner_type == "sample_llm_tiebreak"
+    assert plan.selection_evidence.public_prompt_hash
+
+
 def test_no_sample_requires_explicit_template_source_authorization(tmp_path: Path) -> None:
     planner_input, _ = _planner_input(tmp_path)
     unauthorized_task = planner_input.public_task.model_copy(
@@ -232,3 +299,22 @@ def test_no_sample_requires_explicit_template_source_authorization(tmp_path: Pat
 
     assert plan.baseline_binding is None
     assert plan.abstain_reason == "legal_baseline_binding_invalid"
+
+
+def test_all_long_horizon_mechanisms_use_the_primitive_backbone(tmp_path: Path) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    sample = planner_input.public_samples[0]
+
+    supported = supported_attack_families(sample)
+    assert supported
+    for family in supported:
+        trajectory = build_long_horizon_trajectory(sample, planner_input, family)
+        assert trajectory.attack_family == family
+        assert trajectory.primitive_sequence[0].macro_ref == "macro.ingest@2"
+        assert trajectory.primitive_sequence[-1].macro_ref == "macro.act@2"
+        assert trajectory.intermediate_state_refs
+        assert trajectory.observable_evidence
+        assert trajectory.judge_condition == "sandbox_terminal_effect_observed"
+    for family in set(LongHorizonAttackFamily) - supported:
+        with pytest.raises(ValueError, match="unsupported_attack_family_for_sample"):
+            build_long_horizon_trajectory(sample, planner_input, family)

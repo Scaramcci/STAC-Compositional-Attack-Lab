@@ -52,6 +52,12 @@ def _match_event(event: InteractionEvent) -> tuple[CorePrimitiveFamily, str] | N
         if event.component_role == "untrusted_source":
             return CorePrimitiveFamily.transfer, "external_ingress"
         return CorePrimitiveFamily.transfer, "response"
+    if (
+        event.event_type == InteractionEventType.message
+        and event.component_role == "untrusted_source"
+        and "deliver" in operation
+    ):
+        return CorePrimitiveFamily.transfer, "external_ingress"
     if event.event_type == InteractionEventType.state_read:
         if event.component_role == "persistent_memory":
             return CorePrimitiveFamily.transfer, "retrieve"

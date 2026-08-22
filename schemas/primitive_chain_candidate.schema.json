@@ -198,6 +198,96 @@
       "title": "ChainNode",
       "type": "object"
     },
+    "ConstructionManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "acquisition_mode": {
+          "enum": [
+            "adversarial_trace",
+            "ordinary_trace"
+          ],
+          "title": "Acquisition Mode",
+          "type": "string"
+        },
+        "allowed_delivery_surfaces": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Delivery Surfaces",
+          "type": "array"
+        },
+        "attempt_outcome": {
+          "default": "attempted",
+          "enum": [
+            "attempted",
+            "completed",
+            "partial",
+            "blocked",
+            "rejected",
+            "error",
+            "not_observable"
+          ],
+          "title": "Attempt Outcome",
+          "type": "string"
+        },
+        "construction_attacker_model_hash": {
+          "title": "Construction Attacker Model Hash",
+          "type": "string"
+        },
+        "construction_objective_id": {
+          "title": "Construction Objective Id",
+          "type": "string"
+        },
+        "construction_prompt_hash": {
+          "title": "Construction Prompt Hash",
+          "type": "string"
+        },
+        "public_attack_goal": {
+          "title": "Public Attack Goal",
+          "type": "string"
+        },
+        "public_terminal_predicate_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Terminal Predicate Ids",
+          "type": "array"
+        },
+        "required_trust_boundary_crossings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Trust Boundary Crossings",
+          "type": "array"
+        },
+        "safety_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safety Constraint Ids",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "2.1",
+          "default": "2.1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "acquisition_mode",
+        "construction_objective_id",
+        "public_attack_goal",
+        "allowed_delivery_surfaces",
+        "required_trust_boundary_crossings",
+        "public_terminal_predicate_ids",
+        "safety_constraint_ids",
+        "construction_attacker_model_hash",
+        "construction_prompt_hash"
+      ],
+      "title": "ConstructionManifest",
+      "type": "object"
+    },
     "DependencyType": {
       "enum": [
         "data",
@@ -285,6 +375,7 @@
         "error",
         "timeout",
         "abstained",
+        "stopped",
         "not_observable"
       ],
       "title": "PrimitiveOutcome",
@@ -307,6 +398,17 @@
     "chain_id": {
       "title": "Chain Id",
       "type": "string"
+    },
+    "construction_manifest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConstructionManifest"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "edges": {
       "items": {

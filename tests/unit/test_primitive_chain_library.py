@@ -38,12 +38,24 @@ def test_raw_to_library_build_has_physically_separated_views(tmp_path: Path) -> 
     public = library.public_index()
 
     assert library.manifest.accepted_count == 1
-    assert library.manifest.negative_count == 0
+    assert library.manifest.negative_count == 1
+    assert library.manifest.attempted_count == 2
+    assert library.manifest.blocked_count == 1
     assert len(public) == 1
     sample_id = public[0].sample_id
     public_payload = (library_path / "planner_public_index.jsonl").read_text(encoding="utf-8")
     assert "private_oracle" not in public_payload
     assert "snapshot:memory-post" not in public_payload
+    assert "occ-" not in public_payload
+    assert "prompt" not in public_payload.lower()
+    execution_payload = (library_path / "execution_views.jsonl").read_text(encoding="utf-8")
+    assert "prompt" not in execution_payload.lower()
+    assert "SYNTHETIC_MARKER" not in execution_payload
+    accepted_payload = (library_path / "accepted_samples.jsonl").read_text(encoding="utf-8")
+    assert '"planner_view":' not in accepted_payload
+    assert '"execution_view":' not in accepted_payload
+    assert '"private_evidence_view":' not in accepted_payload
+    assert "snapshot:memory-post" not in accepted_payload
     assert library.execution_view(sample_id).sample_id == sample_id
     assert "snapshot:memory-post" in library.private_evidence_view(sample_id).hard_verifier_refs
 

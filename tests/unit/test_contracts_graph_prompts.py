@@ -18,9 +18,15 @@ from stac_attack_lab.contracts import (
     VictimAction,
 )
 from stac_attack_lab.errors import ContractError
+from stac_attack_lab.execution.formal_attacker import FormalAttackRealization
 from stac_attack_lab.graph.compiler import default_attack_graph
 from stac_attack_lab.graph.validator import GraphValidator
-from stac_attack_lab.planning.formal_llm import LLMBindingProposal, LLMSelectionProposal
+from stac_attack_lab.interactions.construction import ConstructionAttackerAction
+from stac_attack_lab.planning.formal_llm import (
+    LLMBindingProposal,
+    LLMSelectionProposal,
+    LLMTrajectoryProposal,
+)
 from stac_attack_lab.prompts.loader import load_prompt
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,9 +77,12 @@ def test_prompt_contracts_and_legal_examples_parse() -> None:
         "JudgeVerdict": JudgeVerdict,
         "LLMSelectionProposal": LLMSelectionProposal,
         "LLMBindingProposal": LLMBindingProposal,
+        "LLMTrajectoryProposal": LLMTrajectoryProposal,
+        "ConstructionAttackerAction": ConstructionAttackerAction,
+        "FormalAttackRealization": FormalAttackRealization,
     }
     prompts = list((ROOT / "prompts").glob("**/*.md"))
-    assert len(prompts) == 12
+    assert len(prompts) == 15
     victim_hashes = set()
     for path in prompts:
         asset = load_prompt(path)

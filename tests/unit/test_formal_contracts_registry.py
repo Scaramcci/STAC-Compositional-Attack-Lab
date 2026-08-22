@@ -30,17 +30,59 @@ def test_formal_registry_is_frozen_and_legacy_aliases_resolve() -> None:
     second = load_formal_registry(path)
 
     assert len(first.core_primitives) == 20
-    assert len(first.attack_macros) == 4
+    assert len(first.attack_macros) == 9
     assert first.registry_hash == second.registry_hash
-    assert first.resolve_macro("memory_write").macro_id == "macro.persistent_state_write@1"
-    assert first.resolve_macro("canary_tool_trigger@1").macro_id == (
-        "macro.tainted_effectful_action@1"
-    )
+    assert {item.semantic_name.value for item in first.attack_macros} == {
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover",
+    }
+    assert first.resolve_macro("memory_write").macro_id == "macro.persist@2"
+    assert first.resolve_macro("canary_tool_trigger").macro_id == "macro.act@2"
+    assert first.resolve_macro("macro.untrusted_ingress@1").macro_id == "macro.ingest@2"
+    adopt = first.resolve_macro("macro.adopt@2")
+    assert adopt.core_nodes[0].primitive_ref.startswith("core.transform.")
+    assert adopt.semantic_evidence_grades == ["E3", "E4"]
+    assert adopt.semantic_can_override_hard_fact is False
+    assert all(PrimitiveOutcome.stopped in item.allowed_outcomes for item in first.core_primitives)
+    families_by_macro = {
+        macro.semantic_name.value: {
+            first.core_by_id(node.primitive_ref).family for node in macro.core_nodes
+        }
+        for macro in first.attack_macros
+    }
+    assert families_by_macro["Ingest"] == {CorePrimitiveFamily.transfer}
+    assert families_by_macro["Recall"] == {
+        CorePrimitiveFamily.control,
+        CorePrimitiveFamily.transfer,
+    }
+    assert families_by_macro["Persist"] <= {
+        CorePrimitiveFamily.transform,
+        CorePrimitiveFamily.mutate,
+    }
+    assert families_by_macro["Adopt"] == {CorePrimitiveFamily.transform}
+    assert families_by_macro["Select"] == {CorePrimitiveFamily.transform}
+    assert families_by_macro["Bind"] == {CorePrimitiveFamily.transform}
+    assert families_by_macro["Act"] <= {
+        CorePrimitiveFamily.transfer,
+        CorePrimitiveFamily.mutate,
+    }
+    assert families_by_macro["Record"] == {CorePrimitiveFamily.mutate}
+    assert families_by_macro["Recover"] <= {
+        CorePrimitiveFamily.control,
+        CorePrimitiveFamily.transform,
+    }
 
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(FORMAL_SCHEMA_MODELS) == 17
+    assert len(FORMAL_SCHEMA_MODELS) == 23
     for model in FORMAL_SCHEMA_MODELS.values():
         schema = model.model_json_schema()
         assert schema["type"] == "object"

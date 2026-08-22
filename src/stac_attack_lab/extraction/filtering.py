@@ -197,12 +197,30 @@ def filter_chain_candidate(
         }
     )
     relevance_errors: list[str] = []
+    manifest = candidate.construction_manifest
+    if candidate.acquisition_mode.value != "adversarial_trace":
+        relevance_errors.append("adversarial_acquisition_required")
+    if manifest is None:
+        relevance_errors.append("construction_manifest_missing")
+    else:
+        if manifest.acquisition_mode != "adversarial_trace":
+            relevance_errors.append("construction_manifest_not_adversarial")
+        if not manifest.construction_objective_id or not manifest.public_attack_goal:
+            relevance_errors.append("construction_objective_missing")
+        if not manifest.required_trust_boundary_crossings:
+            relevance_errors.append("required_trust_boundary_crossing_missing")
+        if not manifest.public_terminal_predicate_ids:
+            relevance_errors.append("public_terminal_predicate_missing")
+        if manifest.attempt_outcome != "completed":
+            relevance_errors.append(f"construction_attempt_not_complete:{manifest.attempt_outcome}")
     if not tainted_ingress:
         relevance_errors.append("untrusted_ingress_not_tainted")
     if candidate.forbidden_shortcut_detected:
         relevance_errors.append("forbidden_shortcut_detected")
     if not candidate.terminal_predicates:
         relevance_errors.append("terminal_predicate_missing")
+    if candidate.terminal_relation != "observed":
+        relevance_errors.append(f"terminal_relation_not_observed:{candidate.terminal_relation}")
     decisions.append(
         _decision(
             FilterGate.attack_relevance,

@@ -31,8 +31,10 @@ from stac_attack_lab.execution.safeclaw_formal import (
 )
 from stac_attack_lab.execution.sample_generation import (
     build_sample_library,
+    collect_sample_interactions,
     load_sample_generation_config,
 )
+from stac_attack_lab.execution.sample_preflight import run_sample_collection_preflight
 from stac_attack_lab.integration_smoke import smoke_models
 from stac_attack_lab.models.discovery import ModelDiscoveryError, discover_huihui_model
 from stac_attack_lab.recording.conversations import (
@@ -92,8 +94,14 @@ def _main(argv: list[str] | None = None) -> int:
 
     sample = sub.add_parser("sample")
     sample_sub = sample.add_subparsers(dest="sample_cmd", required=True)
+    sample_attack_build = sample_sub.add_parser("attack-build")
+    sample_attack_build.add_argument("--config", required=True)
     sample_build = sample_sub.add_parser("build")
     sample_build.add_argument("--config", required=True)
+    sample_collect_preflight = sample_sub.add_parser("collect-preflight")
+    sample_collect_preflight.add_argument("--config", required=True)
+    sample_collect = sample_sub.add_parser("collect")
+    sample_collect.add_argument("--config", required=True)
     sample_audit = sample_sub.add_parser("audit")
     sample_audit.add_argument("--library", required=True)
     sample_freeze = sample_sub.add_parser("freeze")
@@ -175,9 +183,22 @@ def _main(argv: list[str] | None = None) -> int:
         target = freeze_dataset(root / args.dataset, args.version, root)
         print(target)
         return 0
-    if args.cmd == "sample" and args.sample_cmd == "build":
+    if args.cmd == "sample" and args.sample_cmd in {"attack-build", "build"}:
         sample_config = load_sample_generation_config(root / args.config)
         print(build_sample_library(root, sample_config))
+        return 0
+    if args.cmd == "sample" and args.sample_cmd == "collect-preflight":
+        sample_config = load_sample_generation_config(root / args.config)
+        collection_preflight = run_sample_collection_preflight(root, sample_config)
+        print(collection_preflight.model_dump_json(indent=2))
+        return 0 if collection_preflight.passed else 1
+    if args.cmd == "sample" and args.sample_cmd == "collect":
+        sample_config = load_sample_generation_config(root / args.config)
+        collection_preflight = run_sample_collection_preflight(root, sample_config)
+        if not collection_preflight.passed:
+            print(collection_preflight.model_dump_json(indent=2))
+            return 1
+        print(collect_sample_interactions(root, sample_config))
         return 0
     if args.cmd == "sample" and args.sample_cmd == "audit":
         errors = audit_primitive_library(root / args.library)

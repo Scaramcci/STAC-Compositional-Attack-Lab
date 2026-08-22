@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
 
 from stac_attack_lab.contracts import StrictModel
-from stac_attack_lab.interactions.models import DependencyType, JoinSemantics
+from stac_attack_lab.interactions.models import ConstructionManifest, DependencyType, JoinSemantics
 from stac_attack_lab.primitives.core import EvidenceGrade, PrimitiveOutcome
 
 
@@ -78,6 +78,7 @@ class PrimitiveChainCandidate(StrictModel):
     entry_predicates: list[str]
     terminal_predicates: list[str]
     acquisition_mode: CandidateAcquisitionMode
+    construction_manifest: ConstructionManifest | None = None
     source_trace_refs: list[str]
     source_task_id: str
     source_split: str
@@ -171,6 +172,7 @@ class PrimitiveChainSample(StrictModel):
     registry_hash: str
     observation_schema_version: str
     construction_pipeline_version: str
+    acquisition_mode: Literal["adversarial_trace"]
     planner_view: PlannerSampleView
     execution_view: ExecutionBindingView
     private_evidence_view: PrivateEvidenceView
@@ -191,8 +193,30 @@ class PrimitiveChainSample(StrictModel):
         return self
 
 
+class AcceptedSampleRecord(StrictModel):
+    schema_version: Literal["2.1"] = "2.1"
+    sample_id: str
+    sample_version: str
+    dataset_version: str
+    chain_id: str
+    chain_hash: str
+    sample_hash: str
+    registry_version: str
+    registry_hash: str
+    observation_schema_version: str
+    construction_pipeline_version: str
+    acquisition_mode: Literal["adversarial_trace"]
+    validation_level: str
+    validation_hash: str
+    planner_view_hash: str
+    execution_view_hash: str
+    private_evidence_hash: str
+    source_split: str
+    source_task_ids: list[str]
+
+
 class SampleLibraryManifest(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["2.1"] = "2.1"
     manifest_type: Literal["primitive_chain_library"] = "primitive_chain_library"
     library_id: str
     library_version: str
@@ -206,6 +230,14 @@ class SampleLibraryManifest(StrictModel):
     accepted_count: NonNegativeInt
     negative_count: NonNegativeInt
     candidate_count: NonNegativeInt
+    attempted_count: NonNegativeInt
+    partial_count: NonNegativeInt = 0
+    blocked_count: NonNegativeInt = 0
+    rejected_count: NonNegativeInt = 0
+    error_count: NonNegativeInt = 0
+    not_observable_count: NonNegativeInt = 0
+    reason_code_distribution: dict[str, NonNegativeInt] = Field(default_factory=dict)
+    attacker_stage_implemented: bool = False
     content_hashes: dict[str, str]
     tree_hash: str
     frozen: bool
@@ -215,4 +247,14 @@ class SampleLibraryManifest(StrictModel):
     def validate_counts(self) -> SampleLibraryManifest:
         if self.accepted_count + self.negative_count > self.candidate_count:
             raise ValueError("library_pool_counts_exceed_candidates")
+        classified = (
+            self.accepted_count
+            + self.partial_count
+            + self.blocked_count
+            + self.rejected_count
+            + self.error_count
+            + self.not_observable_count
+        )
+        if classified > self.attempted_count:
+            raise ValueError("library_attempt_outcome_counts_exceed_attempts")
         return self

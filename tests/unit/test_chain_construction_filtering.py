@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from stac_attack_lab.datasets.primitive_chain import FilterGate
-from stac_attack_lab.extraction.chains import construct_chain_candidates
+from stac_attack_lab.extraction.chains import construct_chain_candidates, match_semantic_macros
 from stac_attack_lab.extraction.filtering import (
     ChainFilteringPolicy,
     filter_chain_candidates,
@@ -14,7 +14,7 @@ from stac_attack_lab.interactions.collector import (
     collect_interactions,
 )
 from stac_attack_lab.interactions.fixture_adapter import JsonlFixtureInteractionAdapter
-from stac_attack_lab.interactions.models import InteractionGraph
+from stac_attack_lab.interactions.models import ConstructionManifest, InteractionGraph
 from stac_attack_lab.interactions.normalizer import normalize_trajectory
 from stac_attack_lab.primitives.formal_registry import load_formal_registry
 
@@ -27,6 +27,18 @@ CAPABILITIES = [
     "persistent_state_read",
     "effectful_sandbox_action",
 ]
+CONSTRUCTION_MANIFEST = ConstructionManifest(
+    acquisition_mode="adversarial_trace",
+    construction_objective_id="objective:test",
+    public_attack_goal="Propagate a synthetic marker to the local no-value sink.",
+    allowed_delivery_surfaces=["fixture", "memory", "local_sink"],
+    required_trust_boundary_crossings=["source_to_context", "memory_to_later_session"],
+    public_terminal_predicate_ids=["sandbox_terminal_effect_observed"],
+    safety_constraint_ids=["synthetic_only", "no_network"],
+    construction_attacker_model_hash="fake-attacker-v1",
+    construction_prompt_hash="public-objective-v1",
+    attempt_outcome="completed",
+)
 
 
 def _inputs(tmp_path: Path) -> tuple[InteractionGraph, object, object]:
@@ -54,6 +66,7 @@ def test_canonical_chain_passes_all_g0_g8_filters(tmp_path: Path) -> None:
         graph,
         extraction.occurrences,
         registry,
+        construction_manifest=CONSTRUCTION_MANIFEST,
         source_split="synthetic",
         source_task_id="construction-synthetic-001",
     )
@@ -66,7 +79,7 @@ def test_canonical_chain_passes_all_g0_g8_filters(tmp_path: Path) -> None:
     )
 
     assert len(candidates) == 1
-    assert len(candidates[0].nodes) == 4
+    assert len(candidates[0].nodes) == 5
     assert len(result.accepted) == 1
     assert result.negative == []
     assert [decision.gate for decision in result.records[0].decisions] == list(FilterGate)
@@ -88,6 +101,7 @@ def test_temporal_order_without_typed_edge_is_rejected(tmp_path: Path) -> None:
         graph,
         extraction.occurrences,
         registry,
+        construction_manifest=CONSTRUCTION_MANIFEST,
         source_split="synthetic",
         source_task_id="construction-synthetic-001",
     )
@@ -115,6 +129,7 @@ def test_duplicate_candidate_enters_negative_pool(tmp_path: Path) -> None:
         graph,
         extraction.occurrences,
         registry,
+        construction_manifest=CONSTRUCTION_MANIFEST,
         source_split="synthetic",
         source_task_id="construction-synthetic-001",
     )[0]
@@ -134,3 +149,44 @@ def test_duplicate_candidate_enters_negative_pool(tmp_path: Path) -> None:
         if decision.gate == FilterGate.portability_dedup
     )
     assert portability.reason_codes == ["duplicate_candidate_hash"]
+
+
+def test_ordinary_trace_fails_closed_at_attack_relevance_gate(tmp_path: Path) -> None:
+    graph, registry, extraction = _inputs(tmp_path)
+    candidate = construct_chain_candidates(
+        graph,
+        extraction.occurrences,
+        registry,
+        source_split="synthetic",
+        source_task_id="construction-synthetic-001",
+    )[0]
+    result = filter_chain_candidates(
+        [candidate],
+        {graph.graph_id: graph},
+        {graph.graph_id: extraction.occurrences},
+        registry,
+        ChainFilteringPolicy(available_capabilities=CAPABILITIES),
+    )
+    relevance = next(
+        item for item in result.records[0].decisions if item.gate == FilterGate.attack_relevance
+    )
+
+    assert result.accepted == []
+    assert len(result.negative) == 1
+    assert "adversarial_acquisition_required" in relevance.reason_codes
+    assert "construction_manifest_missing" in relevance.reason_codes
+
+
+def test_nine_macro_matcher_requires_typed_outputs_and_semantic_evidence(tmp_path: Path) -> None:
+    graph, registry, extraction = _inputs(tmp_path)
+    matches = match_semantic_macros(graph, extraction.occurrences, registry)
+
+    assert set(matches) == {
+        "macro.ingest@2",
+        "macro.persist@2",
+        "macro.recall@2",
+        "macro.bind@2",
+        "macro.act@2",
+    }
+    assert "macro.adopt@2" not in matches
+    assert "macro.select@2" not in matches

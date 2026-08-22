@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from pydantic import Field, PositiveInt
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.interactions.models import InteractionGraph, RawInteractionTrajectory
+
+if TYPE_CHECKING:
+    from stac_attack_lab.interactions.construction import ConstructionAttacker
+    from stac_attack_lab.interactions.models import ConstructionManifest
 
 
 class SourceInteractionTask(StrictModel):
@@ -49,3 +53,15 @@ class InteractionSourceAdapter(Protocol):
     def normalize(
         self, trajectory: RawInteractionTrajectory, artifact_root: str
     ) -> InteractionGraph: ...
+
+
+class AdversarialInteractionSourceAdapter(InteractionSourceAdapter, Protocol):
+    def collect_adversarial(
+        self,
+        task: SourceInteractionTask,
+        manifest: ConstructionManifest,
+        attacker: ConstructionAttacker,
+        *,
+        seed: int,
+        budget: CollectionBudget,
+    ) -> CollectedInteraction: ...

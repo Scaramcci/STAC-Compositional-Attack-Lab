@@ -27,6 +27,32 @@
 
 当前实现覆盖一个入口、一个线性传播拓扑、一种记忆介质和一个本地 canary sink。因此，它是后续系统化攻击图谱的第一类基线，不能表述为已经覆盖完整 Agent 攻击面。
 
+## Formal-v2 primitive 与冻结库
+
+formal-v2 底层只使用 `TRANSFER / TRANSFORM / MUTATE / CONTROL` 四个互斥 family。`Ingest / Adopt / Persist / Recall / Select / Bind / Act / Record / Recover` 是建立在 core occurrence 与 typed causal edge 上的语义宏，不是九个底层 enum；outcome 和 evidence grade 与 family 正交。
+
+新的 synthetic construction 入口为：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample attack-build \
+  --config configs/sample_generation/formal_v1.yaml
+```
+
+已冻结的 `data/primitive_libraries/frozen/formal-v2-attack-synthetic/` 来自显式对抗目标下的受控 fake/synthetic 轨迹，包含一个 accepted positive 和一个 defense-blocked negative。Planner public view、execution binding view 与 private construction evidence 物理分离；public/execution 不含离线攻击 prompt、payload、canary/oracle 或 transcript。历史 `OfflineSample` 数据和 `offline build` 仍是 legacy prompt-bearing 路径，不能当作 formal-v2 库。
+
+Phase A synthetic construction 已完成并保留为历史 frozen fixture。真实 adaptive Construction Attacker、完整 SafeClaw Victim driver、primitive-aware trajectory planner 和 independent Formal Attacker 已实现；materializer 与官方 evaluator 仍不是 Attacker。尚未启动真实模型 Sample Collection，也未进行正式 ASR/迁移性实验。
+
+真实 Sample Collection 的配置为 `configs/sample_generation/safeclaw_adversarial_v1.yaml`。按顺序先运行只读 preflight，确认全部检查通过后再运行 collection：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample collect-preflight \
+  --config configs/sample_generation/safeclaw_adversarial_v1.yaml
+PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample collect \
+  --config configs/sample_generation/safeclaw_adversarial_v1.yaml
+```
+
+`collect-preflight` 不启动 Victim、Attacker 或 Docker task；`collect` 才开始真实模型调用。每个 source task 独立原子落盘并按稳定 trajectory id 恢复。
+
 ## 对话数据在哪里
 
 仓库保留了两组完整可观察对话，均为 JSONL，每行一个按 `sequence_no` 排序的事件。

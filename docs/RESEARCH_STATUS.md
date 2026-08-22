@@ -2,6 +2,17 @@
 
 本文档面向项目审阅，说明当前实验已经实现到哪里、尚未实现什么，以及扩展为系统化攻击传播与防御研究前必须修正的问题。这里不讨论攻击成功率或模型优劣。
 
+## 2026-08-20 formal-v2 状态
+
+- 底层 primitive 已统一为 `TRANSFER / TRANSFORM / MUTATE / CONTROL` 四个可观察状态差分 family。
+- 老师的九项 capability-transition primitive 已实现为 semantic macro registry；`Adopt` 的 E3/E4 语义证据不能覆盖缺失的 E1/E2 hard fact。
+- formal sample acquisition 需要显式 Construction Attacker manifest；`ordinary_trace` 在 G5 fail closed，只能进入 negative/control pool。
+- synthetic construction 已尝试 2 条轨迹：1 条 accepted、1 条 defense-blocked negative。冻结版本为 `formal-v2-attack-synthetic`。
+- public planner、execution binding 和 private evidence 三视图已物理分离并通过泄漏审计。
+- formal planner 先选择 public macro chain，再用独立 prompt 提议 primitive/state trajectory；代码会重验 backbone、机制支持、persistence、trigger、公开 judge predicate、allowed actions 和因果 controls。
+- independent formal Attacker 已实现并 fail closed：它只接收 public task、execution view 和 validated plan，生成 fresh slot values 与逐 stage actions；materializer 和 evaluator 仍不充当 Attacker。
+- SafeClaw adaptive construction adapter、完整 Victim subprocess driver、非执行 preflight 和 crash-safe resume 已实现；真实模型 Sample Collection、正式 attack run、ASR 与迁移性结论均未运行。
+
 ## 当前研究思路
 
 项目把攻击表示为由攻击原语组成的有向图。每个原语对应一次组件交互，每次交互记录消息、工具事件、artifact、lineage、环境前后快照和 verifier evidence。这样可以从完整轨迹回答攻击从哪里进入、经过哪些组件、在哪里持久化、何时影响行为，以及危害在哪个本地 sink 形成。
@@ -77,6 +88,12 @@ jq -c 'select(.event_type == "model_response") |
 这些 transcript 包含 Planner decision、Attacker message、Victim 可观察请求/响应、tool request/result、Verifier 评论和 Judge 标签。仓库不记录隐藏 chain-of-thought。
 
 ## 尚未实现
+
+### Formal-v2 下一执行阶段
+
+- 运行 `configs/sample_generation/safeclaw_adversarial_v1.yaml` 的 preflight 与真实 construction collection。
+- 用真实 construction trace 扩展新版本 frozen library，保留 positive、partial、blocked、rejected 和 error。
+- 随后执行 matched formal attack/control；在此之前不报告 ASR。
 
 ### 系统化攻击覆盖
 

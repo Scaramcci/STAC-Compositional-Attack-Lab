@@ -10,6 +10,7 @@ from typing import Any, Literal
 
 from pydantic import Field, PositiveInt, model_validator
 
+from stac_attack_lab.config import RoleModelConfig, load_simple_yaml
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.datasets.library import PrimitiveChainLibrary
 from stac_attack_lab.environments.safeclaw.contracts import (
@@ -26,8 +27,15 @@ from stac_attack_lab.environments.safeclaw.preflight import (
 from stac_attack_lab.environments.safeclaw.runner import SafeClawRunner
 from stac_attack_lab.environments.safeclaw.task_adapter import parse_safeclaw_task
 from stac_attack_lab.environments.safeclaw.trajectory import normalize_safeclaw_episode
+from stac_attack_lab.execution.formal_attacker import (
+    FormalAttacker,
+    FormalAttackRealization,
+    ModelFormalAttacker,
+    make_formal_attacker_input,
+)
 from stac_attack_lab.extraction.occurrences import extract_primitive_occurrences
 from stac_attack_lab.hashing import file_hash, stable_hash
+from stac_attack_lab.models.factory import build_model_client
 from stac_attack_lab.planning.formal_base import (
     FormalBudget,
     FormalPlanner,
@@ -39,6 +47,7 @@ from stac_attack_lab.planning.formal_baselines import (
     RandomCompatiblePlanner,
     RuleBasedFormalPlanner,
 )
+from stac_attack_lab.planning.formal_llm import FormalLLMPlanner
 from stac_attack_lab.primitives.formal_registry import load_formal_registry
 from stac_attack_lab.recording.formal_run_recorder import (
     FormalRunManifest,
@@ -53,7 +62,13 @@ from stac_attack_lab.verification.formal_aggregate import (
 )
 from stac_attack_lab.verification.safeclaw_official import parse_safeclaw_official
 
-FormalCondition = Literal["no_sample", "fixed_sample", "random_compatible", "sample_rule_based"]
+FormalCondition = Literal[
+    "no_sample",
+    "fixed_sample",
+    "random_compatible",
+    "sample_rule_based",
+    "sample_llm_tiebreak",
+]
 
 
 class FormalTaskEntry(StrictModel):
@@ -112,6 +127,13 @@ class SafeClawFormalConfig(StrictModel):
     registry_path: str
     library_path: str
     require_frozen_library: bool = True
+    attacker_stage_implemented: bool = False
+    attacker_execution_enabled: bool = False
+    attacker_model_config_path: str | None = None
+    attacker_prompt_path: str | None = None
+    planner_model_config_path: str | None = None
+    planner_selection_prompt_path: str | None = None
+    planner_trajectory_prompt_path: str | None = None
     conditions: list[FormalCondition]
     seeds: list[int]
     target_model_env: str
@@ -129,6 +151,18 @@ class SafeClawFormalConfig(StrictModel):
             raise ValueError("formal_conditions_and_seeds_must_be_nonempty")
         if len(self.conditions) != len(set(self.conditions)):
             raise ValueError("duplicate_formal_condition")
+        if self.attacker_execution_enabled and (
+            not self.attacker_stage_implemented
+            or self.attacker_model_config_path is None
+            or self.attacker_prompt_path is None
+        ):
+            raise ValueError("formal_attacker_enabled_without_complete_configuration")
+        if "sample_llm_tiebreak" in self.conditions and (
+            self.planner_model_config_path is None
+            or self.planner_selection_prompt_path is None
+            or self.planner_trajectory_prompt_path is None
+        ):
+            raise ValueError("formal_llm_planner_condition_without_complete_configuration")
         return self
 
 
@@ -140,14 +174,58 @@ def load_formal_task_set(path: Path) -> FormalTaskSetConfig:
     return FormalTaskSetConfig.model_validate_json(path.read_text(encoding="utf-8"))
 
 
-def _planner(condition: FormalCondition, first_sample_id: str) -> FormalPlanner:
+def _planner(
+    condition: FormalCondition,
+    first_sample_id: str,
+    llm_planner: FormalLLMPlanner | None = None,
+) -> FormalPlanner:
     if condition == "no_sample":
         return NoSamplePlanner()
     if condition == "fixed_sample":
         return FixedSamplePlanner(first_sample_id)
     if condition == "random_compatible":
         return RandomCompatiblePlanner()
+    if condition == "sample_llm_tiebreak":
+        if llm_planner is None:
+            raise ValueError("formal_llm_planner_not_configured")
+        return llm_planner
     return RuleBasedFormalPlanner()
+
+
+def _configured_attacker(
+    project_root: Path, config: SafeClawFormalConfig
+) -> ModelFormalAttacker | None:
+    if not config.attacker_execution_enabled:
+        return None
+    if config.attacker_model_config_path is None or config.attacker_prompt_path is None:
+        raise ValueError("formal_attacker_configuration_missing")
+    model_config = RoleModelConfig.model_validate(
+        load_simple_yaml(project_root / config.attacker_model_config_path)
+    )
+    return ModelFormalAttacker(
+        build_model_client(model_config), project_root / config.attacker_prompt_path
+    )
+
+
+def _configured_llm_planner(
+    project_root: Path, config: SafeClawFormalConfig
+) -> FormalLLMPlanner | None:
+    if "sample_llm_tiebreak" not in config.conditions:
+        return None
+    if (
+        config.planner_model_config_path is None
+        or config.planner_selection_prompt_path is None
+        or config.planner_trajectory_prompt_path is None
+    ):
+        raise ValueError("formal_llm_planner_configuration_missing")
+    model_config = RoleModelConfig.model_validate(
+        load_simple_yaml(project_root / config.planner_model_config_path)
+    )
+    return FormalLLMPlanner(
+        build_model_client(model_config),
+        project_root / config.planner_selection_prompt_path,
+        project_root / config.planner_trajectory_prompt_path,
+    )
 
 
 def _case_matrix(
@@ -211,11 +289,14 @@ def run_safeclaw_formal(
     environment: Mapping[str, str] | None = None,
     preflight_report: SafeClawPreflightReport | None = None,
     runner: SafeClawRunner | None = None,
+    attacker: FormalAttacker | None = None,
     after_case: Callable[[int], None] | None = None,
 ) -> Path:
     if not config.execution_enabled:
         raise ValueError("formal_execution_disabled_by_config")
     env = environment if environment is not None else os.environ
+    formal_attacker = attacker or _configured_attacker(project_root, config)
+    llm_planner = _configured_llm_planner(project_root, config)
     required_env = [
         config.target_model_env,
         config.target_base_url_env,
@@ -323,7 +404,9 @@ def run_safeclaw_formal(
                 condition=condition,
                 seed=seed,
             )
-            plan = _planner(condition, first_sample_id).plan(planner_input)
+            plan = _planner(condition, first_sample_id, llm_planner).plan(planner_input)
+            realization: FormalAttackRealization | None = None
+            attacker_input = None
             if plan.selected_sample_id is None:
                 if plan.baseline_binding is None:
                     raise ValueError(f"formal_planner_abstained:{plan.abstain_reason}")
@@ -335,9 +418,31 @@ def run_safeclaw_formal(
                     item for item in public_samples if item.sample_id == plan.selected_sample_id
                 )
                 execution_view = library.execution_view(plan.selected_sample_id)
-                slot_values = task.materialization_values
+                if not config.attacker_stage_implemented or formal_attacker is None:
+                    raise ValueError("independent_formal_attacker_required")
+                attacker_input = make_formal_attacker_input(
+                    case_id=case_id,
+                    public_task=descriptor.public_view,
+                    execution_view=execution_view,
+                    plan=plan,
+                )
+                realization = formal_attacker.realize(attacker_input, seed=seed)
+                slot_values = realization.public_slot_values
             recorder.record_artifact(case_id, FormalStage.planned, "planner_input", planner_input)
             recorder.record_artifact(case_id, FormalStage.planned, "evaluation_plan", plan)
+            if attacker_input is not None and realization is not None:
+                recorder.record_artifact(
+                    case_id,
+                    FormalStage.planned,
+                    "formal_attacker_input",
+                    attacker_input,
+                )
+                recorder.record_artifact(
+                    case_id,
+                    FormalStage.planned,
+                    "formal_attack_realization",
+                    realization,
+                )
             with tempfile.TemporaryDirectory(prefix="formal-materialization-") as temporary:
                 materialized = materialize_safeclaw_task(
                     template_path,
@@ -471,14 +576,21 @@ def run_safeclaw_formal(
                     "output": plan.model_dump(mode="json"),
                 },
                 "attacker_stage": {
-                    "implemented": False,
-                    "model_id": None,
-                    "prompt_asset": None,
-                    "messages": [],
-                    "reason": (
-                        "The formal v1 pipeline deterministically materializes the registered "
-                        "condition into a SafeClaw task; it does not call an LLM attacker."
+                    "implemented": realization is not None,
+                    "model_id": (
+                        getattr(getattr(formal_attacker, "client", None), "model", None)
+                        if realization is not None
+                        else None
                     ),
+                    "prompt_asset": (
+                        getattr(getattr(formal_attacker, "prompt", None), "hash", None)
+                        if realization is not None
+                        else None
+                    ),
+                    "messages": [],
+                    "input": attacker_input.model_dump(mode="json") if attacker_input else None,
+                    "output": realization.model_dump(mode="json") if realization else None,
+                    "reason": None if realization is not None else "legal_baseline_condition",
                 },
                 "attack_realization": {
                     "selected_sample": (
@@ -488,6 +600,9 @@ def run_safeclaw_formal(
                         execution_view.model_dump(mode="json") if execution_view else None
                     ),
                     "binding_manifest": binding_payload,
+                    "independent_attacker_realization": (
+                        realization.model_dump(mode="json") if realization else None
+                    ),
                     "materialized_task": materialized_task_payload,
                 },
                 "victim_stage": {

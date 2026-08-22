@@ -127,3 +127,11 @@ Problem: The continuation specification requests 50 accepted samples from at mos
 Decision: Preserve stac_sample_build_gpt_gemini.yaml, stac-verified-30-v0.1, and evaluation_gpt_huihui_4090.yaml as historical artifacts. Add stac_sample_build_gpt_gemini_50.yaml as the next immutable collection profile with target 50 and cap 200. A future successful run must freeze under a new dataset version; it does not replace or silently extend the 30-row dataset.
 
 Impact: Historical conclusions and hashes remain stable. The new collection configuration is implemented and contract-tested but was intentionally not run because real model calls are prohibited during this continuation task.
+
+## ADR-015: Four core families, nine semantic macros, and attack-driven sanitized freezing
+
+Problem: The nine capability-transition terms mixed visibility, derivation, world mutation, and control-flow levels. Formal sample generation also allowed ordinary fixture traces to become accepted attack samples and exposed occurrence/state references in public views.
+
+Decision: Keep only `TRANSFER / TRANSFORM / MUTATE / CONTROL` as mutually exclusive bottom-level families over the observable `V/D/W/C` projection. Implement `Ingest / Adopt / Persist / Recall / Select / Bind / Act / Record / Recover` as verifiable semantic macros. Require an explicit adversarial Construction Manifest at G5, retain failed/blocked attempts, and freeze physically separated public, execution, and private views. The formal planner derives long-horizon state trajectories from the sanitized macro sequence; it never receives construction payload text.
+
+Impact: Legacy `OfflineSample` prompt replay remains immutable and separate. `ordinary_trace` cannot enter the accepted macro pool. The first v2 frozen library is synthetic evidence only; independent formal Attacker execution and real-model effectiveness claims remain future work.

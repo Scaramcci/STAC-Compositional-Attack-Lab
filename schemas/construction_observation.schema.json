@@ -1,0 +1,78 @@
+{
+  "additionalProperties": false,
+  "description": "Evaluator-free state exposed to the construction attacker.",
+  "properties": {
+    "legal_reroute_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Legal Reroute Ids",
+      "type": "array"
+    },
+    "legal_retry_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Legal Retry Ids",
+      "type": "array"
+    },
+    "public_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Public Capabilities",
+      "type": "array"
+    },
+    "public_component_inventory": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Public Component Inventory",
+      "type": "object"
+    },
+    "public_stage_status": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Public Stage Status",
+      "type": "object"
+    },
+    "public_transcript": {
+      "items": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object"
+      },
+      "title": "Public Transcript",
+      "type": "array"
+    },
+    "remaining_events": {
+      "title": "Remaining Events",
+      "type": "integer"
+    },
+    "remaining_sessions": {
+      "title": "Remaining Sessions",
+      "type": "integer"
+    },
+    "session_index": {
+      "title": "Session Index",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "session_index",
+    "remaining_sessions",
+    "remaining_events"
+  ],
+  "title": "ConstructionObservation",
+  "type": "object"
+}

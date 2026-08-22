@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from stac_attack_lab.contracts import SCHEMA_MODELS as LEGACY_SCHEMA_MODELS
 from stac_attack_lab.datasets.primitive_chain import (
+    AcceptedSampleRecord,
     PrimitiveChainCandidate,
     PrimitiveChainSample,
     SampleLibraryManifest,
@@ -14,6 +15,15 @@ from stac_attack_lab.environments.safeclaw.contracts import (
     SafeClawEpisodeResult,
     SafeClawPublicTaskView,
     SafeClawTaskDescriptor,
+)
+from stac_attack_lab.execution.formal_attacker import (
+    FormalAttackerInput,
+    FormalAttackRealization,
+)
+from stac_attack_lab.execution.sample_preflight import SampleCollectionPreflightReport
+from stac_attack_lab.interactions.construction import (
+    ConstructionAttackerAction,
+    ConstructionObservation,
 )
 from stac_attack_lab.interactions.models import (
     InteractionEvent,
@@ -35,6 +45,7 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "primitive_occurrence": PrimitiveOccurrence,
     "primitive_chain_candidate": PrimitiveChainCandidate,
     "primitive_chain_sample": PrimitiveChainSample,
+    "accepted_sample_record": AcceptedSampleRecord,
     "sample_library_manifest": SampleLibraryManifest,
     "safeclaw_task_descriptor": SafeClawTaskDescriptor,
     "safeclaw_public_task_view": SafeClawPublicTaskView,
@@ -44,6 +55,11 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "formal_evaluation_plan": FormalEvaluationPlan,
     "safeclaw_episode_result": SafeClawEpisodeResult,
     "formal_run_result": FormalRunResult,
+    "construction_observation": ConstructionObservation,
+    "construction_attacker_action": ConstructionAttackerAction,
+    "formal_attacker_input": FormalAttackerInput,
+    "formal_attack_realization": FormalAttackRealization,
+    "sample_collection_preflight_report": SampleCollectionPreflightReport,
 }
 
 

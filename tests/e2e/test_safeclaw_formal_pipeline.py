@@ -12,6 +12,11 @@ from stac_attack_lab.datasets.library import (
 from stac_attack_lab.environments.safeclaw.preflight import SafeClawPreflightReport
 from stac_attack_lab.environments.safeclaw.runner import SafeClawRunner
 from stac_attack_lab.environments.safeclaw.task_adapter import PINNED_SAFECLAW_COMMIT
+from stac_attack_lab.execution.formal_attacker import (
+    FormalAttackerInput,
+    FormalAttackerStageAction,
+    FormalAttackRealization,
+)
 from stac_attack_lab.execution.safeclaw_formal import (
     SafeClawFormalConfig,
     run_safeclaw_formal,
@@ -20,7 +25,7 @@ from stac_attack_lab.execution.sample_generation import (
     build_sample_library,
     load_sample_generation_config,
 )
-from stac_attack_lab.hashing import file_hash
+from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.planning.formal_base import FormalBudget
 from stac_attack_lab.recording.events import read_jsonl
 
@@ -28,6 +33,52 @@ ROOT = Path(__file__).resolve().parents[2]
 TASK = ROOT / "tests/fixtures/safeclaw/compositional_task.json"
 PATCH = ROOT / "integrations/safeclaw/patches/a11f5cce-safety.patch"
 API_KEY = "sk-formal-e2e-secret-123456789"
+
+
+class _FormalAttacker:
+    attacker_id = "formal-e2e-attacker"
+
+    def realize(
+        self, attacker_input: FormalAttackerInput, *, seed: int
+    ) -> FormalAttackRealization:
+        del seed
+        plan = attacker_input.validated_plan
+        assert plan.binding is not None and plan.adversarial_trajectory is not None
+        values = {
+            "untrusted_source": "SYNTHETIC_UNTRUSTED_MARKER",
+            "agent_context": "Authorized synthetic context.",
+            "persistent_memory": "Store SYNTHETIC_UNTRUSTED_MARKER.",
+            "session_lifecycle": "Authorized second session.",
+            "effect_tool": "sim_google.synthetic_effect",
+            "sandbox_external_state": "SYNTHETIC_TERMINAL_STATE",
+        }
+        predicates = list(plan.expected_public_stage_effects.values())
+        surface = attacker_input.execution_view.allowed_benchmark_surfaces[0]
+        actions = [
+            FormalAttackerStageAction(
+                stage_id=stage.stage_id,
+                macro_ref=stage.macro_ref,
+                action_type="victim_message",
+                benchmark_surface=surface,
+                victim_visible_content=f"Synthetic e2e action for {stage.stage_id}.",
+                public_slot_refs=list(values),
+                expected_public_predicate=predicates[index],
+                rationale_summary="Deterministic public e2e realization.",
+            )
+            for index, stage in enumerate(plan.adversarial_trajectory.primitive_sequence)
+        ]
+        payload = {
+            "schema_version": "1.0",
+            "attacker_input_id": attacker_input.attacker_input_id,
+            "sample_id": attacker_input.execution_view.sample_id,
+            "plan_id": plan.plan_id,
+            "public_slot_values": values,
+            "stage_actions": [action.model_dump(mode="json") for action in actions],
+            "abstain_reason": None,
+        }
+        return FormalAttackRealization.model_validate(
+            {**payload, "realization_hash": stable_hash(payload)}
+        )
 
 
 class _FormalJudge:
@@ -206,6 +257,7 @@ def _project(tmp_path: Path) -> tuple[Path, SafeClawFormalConfig, SafeClawRunner
     config = SafeClawFormalConfig(
         experiment_id="formal-e2e",
         execution_enabled=True,
+        attacker_stage_implemented=True,
         track="safeclaw_compositional",
         environment_config_path="configs/environments/safeclaw.json",
         task_set_path="configs/task_sets/formal.json",
@@ -261,6 +313,7 @@ def test_formal_pipeline_records_reports_and_resumes_without_duplicates(
         environment=environment,
         preflight_report=preflight,
         runner=runner,
+        attacker=_FormalAttacker(),
     )
     resumed = run_safeclaw_formal(
         project,
@@ -270,6 +323,7 @@ def test_formal_pipeline_records_reports_and_resumes_without_duplicates(
         environment=environment,
         preflight_report=preflight,
         runner=runner,
+        attacker=_FormalAttacker(),
     )
 
     results = read_jsonl(run_root / "results.jsonl")
@@ -281,7 +335,7 @@ def test_formal_pipeline_records_reports_and_resumes_without_duplicates(
         (case_root / "complete_interaction_record.json").read_text(encoding="utf-8")
     )
     assert complete_record["planner_stage"]["model_id"] is None
-    assert complete_record["attacker_stage"]["implemented"] is False
+    assert complete_record["attacker_stage"]["implemented"] is True
     assert complete_record["victim_stage"]["model_id"] == "synthetic-model"
     assert complete_record["victim_stage"]["sessions"] == [
         {

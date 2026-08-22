@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from stac_attack_lab.contracts import StrictModel
 
@@ -23,6 +23,7 @@ class PrimitiveOutcome(StrEnum):
     error = "error"
     timeout = "timeout"
     abstained = "abstained"
+    stopped = "stopped"
     not_observable = "not_observable"
 
 
@@ -44,7 +45,7 @@ class EvidencePolicy(StrictModel):
 
 
 class CorePrimitiveSpec(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["2.1"] = "2.1"
     primitive_id: str
     version: str
     family: CorePrimitiveFamily
@@ -58,6 +59,17 @@ class CorePrimitiveSpec(StrictModel):
     allowed_outcomes: list[PrimitiveOutcome]
     minimum_hard_evidence: list[EvidenceGrade]
     safety_scope: Literal["authorized_benchmark_sandbox"] = "authorized_benchmark_sandbox"
+
+    @field_validator("allowed_outcomes", mode="before")
+    @classmethod
+    def migrate_orthogonal_outcomes(cls, value: object) -> object:
+        if (
+            isinstance(value, list)
+            and PrimitiveOutcome.stopped not in value
+            and "stopped" not in value
+        ):
+            return [*value, PrimitiveOutcome.stopped]
+        return value
 
     @model_validator(mode="after")
     def validate_identity_and_evidence(self) -> CorePrimitiveSpec:
@@ -86,6 +98,7 @@ CORE_SUBTYPES: dict[CorePrimitiveFamily, tuple[str, ...]] = {
         "response",
         "retrieve",
         "publish",
+        "delegate",
     ),
     CorePrimitiveFamily.transform: (
         "extract",
@@ -93,12 +106,17 @@ CORE_SUBTYPES: dict[CorePrimitiveFamily, tuple[str, ...]] = {
         "parameterize",
         "merge",
         "sanitize",
+        "select",
+        "bind",
+        "plan",
     ),
     CorePrimitiveFamily.mutate: (
         "memory_write",
         "workspace_write",
         "config_update",
         "external_effect",
+        "log_write",
+        "state_delete",
     ),
     CorePrimitiveFamily.control: (
         "branch",
@@ -107,6 +125,11 @@ CORE_SUBTYPES: dict[CorePrimitiveFamily, tuple[str, ...]] = {
         "wait",
         "restart",
         "stop",
+        "approve",
+        "schedule",
+        "cancel",
+        "grant",
+        "revoke",
     ),
 }
 

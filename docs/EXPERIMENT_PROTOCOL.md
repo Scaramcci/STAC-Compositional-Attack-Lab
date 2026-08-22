@@ -20,6 +20,14 @@ Conditions: `clean`, `single_entry`, `fixed_full`, `random_legal_full`, `rule_pl
 
 ## STAC Sample Construction
 
+### Formal-v2 attack-driven synthetic construction
+
+formal-v2 的正样本只来自带 `adversarial_trace` manifest 的受控 construction attempt。主路径为 Construction Attacker public objective -> complete synthetic Victim trajectory -> InteractionGraph -> core occurrence -> nine-macro matcher -> G0-G8 -> physically separated frozen views。普通轨迹只能作为 reachability、control 或 negative evidence。
+
+当前确定性 fixture 运行尝试 2 条轨迹，保留 1 条完整 positive 和 1 条 defense-blocked negative。正式 accepted 要求 E1/E2 hard occurrence、typed causal edge、可观察 trust-boundary crossing、deterministic terminal relation、no shortcut 与 construction/test split exclusion。冻结库不保存攻击原文；正式 planner 只看到 sanitized macro structure。
+
+Planner 从 primitive sequence 构造并验证长周期状态轨迹，为 remove-poisoning、remove-trigger、break-dependency、benign-state replacement 和 pre-activation truncation 生成 control specification。独立 Formal Attacker 已接入，但真实 Sample Collection 和 matched formal run 尚未执行，因此本阶段不报告真实模型 ASR。
+
 The target sample-construction run is `configs/experiments/stac_sample_build_gpt_gemini.yaml`: GPT-compatible planner, attacker, prompt-writer, verifier, and judge roles; Gemini victim; deterministic hard verifier as final acceptance. The 10 seed tasks are candidate scenarios, not the sample count. Candidate generation continues with unique ids/seeds until 30 complete hard-pass samples are accepted, subject to a 120-attempt safety cap. Rejections are retained with reason codes and do not enter the accepted JSONL.
 
 For each stage, PromptWriter produces the final Victim-visible message before execution; Gemini must execute that same message and the resulting full chain must hard-pass. Each accepted row records selection evidence, source/candidate ids, actual verified call parameters, frozen prompts, graph/prompt hashes, transcript refs, and sample hash. Incomplete collections cannot be frozen.

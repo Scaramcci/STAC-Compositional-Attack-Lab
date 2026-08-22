@@ -29,6 +29,7 @@
         "error",
         "timeout",
         "abstained",
+        "stopped",
         "not_observable"
       ],
       "title": "PrimitiveOutcome",

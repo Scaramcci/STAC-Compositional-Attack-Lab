@@ -10,6 +10,7 @@ from stac_attack_lab.datasets.primitive_chain import (
 )
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.models import (
+    ConstructionManifest,
     DependencyType,
     InteractionEdge,
     InteractionGraph,
@@ -19,10 +20,11 @@ from stac_attack_lab.primitives.core import EvidenceGrade, PrimitiveOutcome
 from stac_attack_lab.primitives.formal_registry import FormalPrimitiveRegistry
 
 CANONICAL_MACRO_ORDER = (
-    "macro.untrusted_ingress@1",
-    "macro.persistent_state_write@1",
-    "macro.delayed_reactivation@1",
-    "macro.tainted_effectful_action@1",
+    "macro.ingest@2",
+    "macro.persist@2",
+    "macro.recall@2",
+    "macro.bind@2",
+    "macro.act@2",
 )
 
 CANONICAL_REQUIRED_CORE_EDGES = (
@@ -93,12 +95,58 @@ def _matching_graph_edge(
     )
 
 
+def match_semantic_macros(
+    graph: InteractionGraph,
+    occurrences: list[PrimitiveOccurrence],
+    registry: FormalPrimitiveRegistry,
+) -> dict[str, list[str]]:
+    selected = _first_by_primitive(graph, occurrences)
+    artifacts = {item.artifact_id: item for item in graph.artifacts}
+    matches: dict[str, list[str]] = {}
+    for macro in registry.attack_macros:
+        matched_occurrence_ids: list[str] = []
+        macro_matches = True
+        for pattern_node in macro.core_nodes:
+            occurrence = selected.get(pattern_node.primitive_ref)
+            if occurrence is None:
+                if pattern_node.required:
+                    macro_matches = False
+                continue
+            output_types = {
+                artifacts[artifact_id].artifact_type
+                for artifact_id in occurrence.output_artifact_ids
+                if artifact_id in artifacts
+            }
+            if pattern_node.required_output_types and not (
+                output_types & set(pattern_node.required_output_types)
+            ):
+                if pattern_node.required:
+                    macro_matches = False
+                continue
+            semantic_values = {
+                *occurrence.semantic_labels,
+                *occurrence.semantic_labels.values(),
+            }
+            if (
+                pattern_node.required_semantic_labels
+                and not set(pattern_node.required_semantic_labels) <= semantic_values
+            ):
+                if pattern_node.required:
+                    macro_matches = False
+                continue
+            matched_occurrence_ids.append(occurrence.occurrence_id)
+        if macro_matches:
+            matches[macro.macro_id] = matched_occurrence_ids
+    return matches
+
+
 def construct_chain_candidates(
     graph: InteractionGraph,
     occurrences: list[PrimitiveOccurrence],
     registry: FormalPrimitiveRegistry,
     *,
-    acquisition_mode: CandidateAcquisitionMode = CandidateAcquisitionMode.ordinary_trace,
+    acquisition_mode: CandidateAcquisitionMode | None = None,
+    construction_manifest: ConstructionManifest | None = None,
     source_split: str,
     source_task_id: str,
 ) -> list[PrimitiveChainCandidate]:
@@ -106,27 +154,14 @@ def construct_chain_candidates(
     ingress = selected.get("core.transfer.external_ingress@1")
     if ingress is None:
         return []
-    macro_occurrences: dict[str, list[str]] = {
-        "macro.untrusted_ingress@1": [ingress.occurrence_id],
-        "macro.persistent_state_write@1": [
-            item.occurrence_id
-            for ref in ("core.transform.extract@1", "core.mutate.memory_write@1")
-            if (item := selected.get(ref)) is not None
-        ],
-        "macro.delayed_reactivation@1": [
-            item.occurrence_id
-            for ref in ("core.control.restart@1", "core.transfer.retrieve@1")
-            if (item := selected.get(ref)) is not None
-        ],
-        "macro.tainted_effectful_action@1": [
-            item.occurrence_id
-            for ref in (
-                "core.transform.parameterize@1",
-                "core.transfer.request@1",
-                "core.mutate.external_effect@1",
-            )
-            if (item := selected.get(ref)) is not None
-        ],
+    resolved_acquisition_mode = acquisition_mode or (
+        CandidateAcquisitionMode(construction_manifest.acquisition_mode)
+        if construction_manifest is not None
+        else CandidateAcquisitionMode.ordinary_trace
+    )
+    all_macro_matches = match_semantic_macros(graph, occurrences, registry)
+    macro_occurrences = {
+        macro_ref: all_macro_matches.get(macro_ref, []) for macro_ref in CANONICAL_MACRO_ORDER
     }
     nodes = [
         ChainNode(
@@ -170,6 +205,13 @@ def construct_chain_candidates(
             selected.get("core.transform.parameterize@1"),
             DependencyType.data,
         ),
+        (
+            nodes[3],
+            nodes[4],
+            selected.get("core.transform.parameterize@1"),
+            selected.get("core.transfer.request@1"),
+            DependencyType.data,
+        ),
     )
     chain_edges: list[ChainEdge] = []
     for source_node, target_node, source_occurrence, target_occurrence, edge_type in macro_pairs:
@@ -196,9 +238,14 @@ def construct_chain_candidates(
     effect = selected.get("core.mutate.external_effect@1")
     forbidden_shortcut = False
     if effect and effect.outcome == PrimitiveOutcome.passed:
-        forbidden_shortcut = not _has_path(
-            graph, ingress.source_event_ids[0], effect.source_event_ids[0]
+        full_path_exists = _has_path(graph, ingress.source_event_ids[0], effect.source_event_ids[0])
+        direct_shortcut = any(
+            edge.source_event_id in ingress.source_event_ids
+            and edge.target_event_id in effect.source_event_ids
+            and edge.observable
+            for edge in graph.edges
         )
+        forbidden_shortcut = direct_shortcut or not full_path_exists
     terminal_relation = "hypothesized"
     if effect is not None:
         if effect.outcome == PrimitiveOutcome.passed:
@@ -218,7 +265,12 @@ def construct_chain_candidates(
         "edges": [item.model_dump(mode="json") for item in chain_edges],
         "entry_predicates": ["untrusted_artifact_available"],
         "terminal_predicates": ["sandbox_terminal_effect_observed"],
-        "acquisition_mode": acquisition_mode,
+        "acquisition_mode": resolved_acquisition_mode,
+        "construction_manifest": (
+            construction_manifest.model_dump(mode="json")
+            if construction_manifest is not None
+            else None
+        ),
         "source_trace_refs": [graph.trajectory_id],
         "source_task_id": source_task_id,
         "source_split": source_split,

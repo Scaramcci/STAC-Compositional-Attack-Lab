@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "SampleCollectionPreflightCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "public_details": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Public Details",
+          "type": "object"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "passed",
+        "reason_code"
+      ],
+      "title": "SampleCollectionPreflightCheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/SampleCollectionPreflightCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "execution_started": {
+      "const": false,
+      "default": false,
+      "title": "Execution Started",
+      "type": "boolean"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "passed",
+    "checks"
+  ],
+  "title": "SampleCollectionPreflightReport",
+  "type": "object"
+}

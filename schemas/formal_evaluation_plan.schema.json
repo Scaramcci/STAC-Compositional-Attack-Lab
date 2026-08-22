@@ -219,6 +219,16 @@
       "title": "BindingAssignment",
       "type": "object"
     },
+    "CorePrimitiveFamily": {
+      "enum": [
+        "TRANSFER",
+        "TRANSFORM",
+        "MUTATE",
+        "CONTROL"
+      ],
+      "title": "CorePrimitiveFamily",
+      "type": "string"
+    },
     "FormalBudget": {
       "additionalProperties": false,
       "properties": {
@@ -256,6 +266,226 @@
         "max_wall_time_seconds"
       ],
       "title": "FormalBudget",
+      "type": "object"
+    },
+    "LongHorizonAdversarialTrajectory": {
+      "additionalProperties": false,
+      "properties": {
+        "attack_entry_stage_id": {
+          "title": "Attack Entry Stage Id",
+          "type": "string"
+        },
+        "attack_family": {
+          "$ref": "#/$defs/LongHorizonAttackFamily"
+        },
+        "benign_objective": {
+          "title": "Benign Objective",
+          "type": "string"
+        },
+        "control_cases": {
+          "items": {
+            "$ref": "#/$defs/PlannerControlCase"
+          },
+          "title": "Control Cases",
+          "type": "array"
+        },
+        "expected_final_effect": {
+          "title": "Expected Final Effect",
+          "type": "string"
+        },
+        "intermediate_state_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Intermediate State Refs",
+          "type": "array"
+        },
+        "judge_condition": {
+          "title": "Judge Condition",
+          "type": "string"
+        },
+        "objective_trajectory": {
+          "items": {
+            "$ref": "#/$defs/ObjectiveTrajectoryPoint"
+          },
+          "title": "Objective Trajectory",
+          "type": "array"
+        },
+        "observable_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Observable Evidence",
+          "type": "array"
+        },
+        "persistence": {
+          "$ref": "#/$defs/PersistencePlan"
+        },
+        "primitive_sequence": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveTrajectoryStage"
+          },
+          "title": "Primitive Sequence",
+          "type": "array"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "sandbox_constraints": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Sandbox Constraints",
+          "type": "array"
+        },
+        "target_security_property": {
+          "title": "Target Security Property",
+          "type": "string"
+        },
+        "trigger": {
+          "$ref": "#/$defs/TriggerPlan"
+        }
+      },
+      "required": [
+        "attack_family",
+        "benign_objective",
+        "target_security_property",
+        "primitive_sequence",
+        "attack_entry_stage_id",
+        "intermediate_state_refs",
+        "persistence",
+        "objective_trajectory",
+        "trigger",
+        "expected_final_effect",
+        "observable_evidence",
+        "judge_condition",
+        "sandbox_constraints",
+        "rationale",
+        "control_cases"
+      ],
+      "title": "LongHorizonAdversarialTrajectory",
+      "type": "object"
+    },
+    "LongHorizonAttackFamily": {
+      "enum": [
+        "objective_drifting",
+        "intent_hijacking",
+        "persistent_state_poisoning",
+        "trigger_based",
+        "compound_hybrid"
+      ],
+      "title": "LongHorizonAttackFamily",
+      "type": "string"
+    },
+    "ObjectiveTrajectoryPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "objective": {
+          "title": "Objective",
+          "type": "string"
+        },
+        "stage_id": {
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "transition_basis": {
+          "title": "Transition Basis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage_id",
+        "objective",
+        "transition_basis"
+      ],
+      "title": "ObjectiveTrajectoryPoint",
+      "type": "object"
+    },
+    "PersistencePlan": {
+      "additionalProperties": false,
+      "properties": {
+        "dormant_between_stages": {
+          "title": "Dormant Between Stages",
+          "type": "boolean"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "retrieval_stage_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Retrieval Stage Id"
+        },
+        "storage_stage_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Storage Stage Id"
+        },
+        "stored_state_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Stored State Ref"
+        }
+      },
+      "required": [
+        "enabled",
+        "stored_state_ref",
+        "storage_stage_id",
+        "retrieval_stage_id",
+        "dormant_between_stages"
+      ],
+      "title": "PersistencePlan",
+      "type": "object"
+    },
+    "PlannerControlCase": {
+      "additionalProperties": false,
+      "properties": {
+        "control_id": {
+          "title": "Control Id",
+          "type": "string"
+        },
+        "expected_observation": {
+          "title": "Expected Observation",
+          "type": "string"
+        },
+        "intervention": {
+          "enum": [
+            "remove_poisoning",
+            "remove_trigger",
+            "break_primitive_dependency",
+            "replace_with_benign_state",
+            "truncate_before_activation"
+          ],
+          "title": "Intervention",
+          "type": "string"
+        }
+      },
+      "required": [
+        "control_id",
+        "intervention",
+        "expected_observation"
+      ],
+      "title": "PlannerControlCase",
       "type": "object"
     },
     "PlannerSelectionEvidence": {
@@ -316,6 +546,119 @@
       ],
       "title": "PlannerSelectionEvidence",
       "type": "object"
+    },
+    "PrimitiveTrajectoryStage": {
+      "additionalProperties": false,
+      "properties": {
+        "activation_condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activation Condition"
+        },
+        "adversarial_role": {
+          "enum": [
+            "entry",
+            "propagation",
+            "persistence",
+            "dormant",
+            "activation",
+            "effect",
+            "control"
+          ],
+          "title": "Adversarial Role",
+          "type": "string"
+        },
+        "carried_state_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Carried State Refs",
+          "type": "array"
+        },
+        "input_state_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input State Refs",
+          "type": "array"
+        },
+        "macro_ref": {
+          "title": "Macro Ref",
+          "type": "string"
+        },
+        "output_state_ref": {
+          "title": "Output State Ref",
+          "type": "string"
+        },
+        "primary_family": {
+          "$ref": "#/$defs/CorePrimitiveFamily"
+        },
+        "stage_id": {
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "trust_boundary_crossing": {
+          "default": false,
+          "title": "Trust Boundary Crossing",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stage_id",
+        "macro_ref",
+        "primary_family",
+        "input_state_refs",
+        "output_state_ref",
+        "carried_state_refs",
+        "adversarial_role"
+      ],
+      "title": "PrimitiveTrajectoryStage",
+      "type": "object"
+    },
+    "TriggerPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "activation_stage_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Activation Stage Id"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Condition"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "condition",
+        "activation_stage_id"
+      ],
+      "title": "TriggerPlan",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -338,6 +681,17 @@
       ],
       "default": null,
       "title": "Abstain Reason"
+    },
+    "adversarial_trajectory": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LongHorizonAdversarialTrajectory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "baseline_binding": {
       "anyOf": [

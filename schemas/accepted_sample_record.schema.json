@@ -1,0 +1,109 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "acquisition_mode": {
+      "const": "adversarial_trace",
+      "title": "Acquisition Mode",
+      "type": "string"
+    },
+    "chain_hash": {
+      "title": "Chain Hash",
+      "type": "string"
+    },
+    "chain_id": {
+      "title": "Chain Id",
+      "type": "string"
+    },
+    "construction_pipeline_version": {
+      "title": "Construction Pipeline Version",
+      "type": "string"
+    },
+    "dataset_version": {
+      "title": "Dataset Version",
+      "type": "string"
+    },
+    "execution_view_hash": {
+      "title": "Execution View Hash",
+      "type": "string"
+    },
+    "observation_schema_version": {
+      "title": "Observation Schema Version",
+      "type": "string"
+    },
+    "planner_view_hash": {
+      "title": "Planner View Hash",
+      "type": "string"
+    },
+    "private_evidence_hash": {
+      "title": "Private Evidence Hash",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "registry_version": {
+      "title": "Registry Version",
+      "type": "string"
+    },
+    "sample_hash": {
+      "title": "Sample Hash",
+      "type": "string"
+    },
+    "sample_id": {
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "sample_version": {
+      "title": "Sample Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "2.1",
+      "default": "2.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_split": {
+      "title": "Source Split",
+      "type": "string"
+    },
+    "source_task_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Task Ids",
+      "type": "array"
+    },
+    "validation_hash": {
+      "title": "Validation Hash",
+      "type": "string"
+    },
+    "validation_level": {
+      "title": "Validation Level",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sample_id",
+    "sample_version",
+    "dataset_version",
+    "chain_id",
+    "chain_hash",
+    "sample_hash",
+    "registry_version",
+    "registry_hash",
+    "observation_schema_version",
+    "construction_pipeline_version",
+    "acquisition_mode",
+    "validation_level",
+    "validation_hash",
+    "planner_view_hash",
+    "execution_view_hash",
+    "private_evidence_hash",
+    "source_split",
+    "source_task_ids"
+  ],
+  "title": "AcceptedSampleRecord",
+  "type": "object"
+}

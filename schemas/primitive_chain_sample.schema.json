@@ -501,6 +501,7 @@
         "error",
         "timeout",
         "abstained",
+        "stopped",
         "not_observable"
       ],
       "title": "PrimitiveOutcome",
@@ -645,6 +646,11 @@
   },
   "additionalProperties": false,
   "properties": {
+    "acquisition_mode": {
+      "const": "adversarial_trace",
+      "title": "Acquisition Mode",
+      "type": "string"
+    },
     "chain_hash": {
       "title": "Chain Hash",
       "type": "string"
@@ -726,6 +732,7 @@
     "registry_hash",
     "observation_schema_version",
     "construction_pipeline_version",
+    "acquisition_mode",
     "planner_view",
     "execution_view",
     "private_evidence_view",
