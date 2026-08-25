@@ -27,6 +27,7 @@ class SafeClawPreflightConfig(StrictModel):
     target_base_url_env: str
     target_api_key_env: str
     embedding_policy: Literal["required_endpoint", "disabled_semantic_memory", "exclude_tasks"]
+    embedding_provider: Literal["openai"] | None = None
     embedding_model_env: str | None = None
     embedding_base_url_env: str | None = None
     embedding_api_key_env: str | None = None
@@ -135,6 +136,7 @@ def run_safeclaw_preflight(
         )
         if not all(
             (
+                config.embedding_provider,
                 config.embedding_model_env,
                 config.embedding_base_url_env,
                 config.embedding_api_key_env,

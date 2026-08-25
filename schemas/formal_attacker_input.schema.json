@@ -185,6 +185,49 @@
       "title": "BenchmarkBinding",
       "type": "object"
     },
+    "BenchmarkPublicPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "prompt_hash": {
+          "title": "Prompt Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/PublicBenchmarkSessionPrompt"
+          },
+          "title": "Sessions",
+          "type": "array"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "title",
+        "description",
+        "sessions",
+        "prompt_hash"
+      ],
+      "title": "BenchmarkPublicPrompt",
+      "type": "object"
+    },
     "BindingAssignment": {
       "additionalProperties": false,
       "properties": {
@@ -227,6 +270,76 @@
         "CONTROL"
       ],
       "title": "CorePrimitiveFamily",
+      "type": "string"
+    },
+    "DependencyAblationPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "expected_observation": {
+          "const": "target_dependency_absent",
+          "default": "target_dependency_absent",
+          "title": "Expected Observation",
+          "type": "string"
+        },
+        "intervention_id": {
+          "title": "Intervention Id",
+          "type": "string"
+        },
+        "materialization_slot_id": {
+          "title": "Materialization Slot Id",
+          "type": "string"
+        },
+        "replacement_source": {
+          "const": "baseline.task_set",
+          "default": "baseline.task_set",
+          "title": "Replacement Source",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "source_stage_id": {
+          "title": "Source Stage Id",
+          "type": "string"
+        },
+        "target_edge_id": {
+          "title": "Target Edge Id",
+          "type": "string"
+        },
+        "target_stage_id": {
+          "title": "Target Stage Id",
+          "type": "string"
+        },
+        "trajectory_hash": {
+          "title": "Trajectory Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intervention_id",
+        "sample_id",
+        "target_edge_id",
+        "source_stage_id",
+        "target_stage_id",
+        "edge_type",
+        "materialization_slot_id",
+        "trajectory_hash"
+      ],
+      "title": "DependencyAblationPlan",
+      "type": "object"
+    },
+    "DependencyType": {
+      "enum": [
+        "data",
+        "state",
+        "control",
+        "authorization"
+      ],
+      "title": "DependencyType",
       "type": "string"
     },
     "ExecutionBindingView": {
@@ -404,6 +517,17 @@
         "condition": {
           "title": "Condition",
           "type": "string"
+        },
+        "dependency_ablation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DependencyAblationPlan"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "expected_public_stage_effects": {
           "additionalProperties": {
@@ -719,6 +843,7 @@
         },
         "decision_source": {
           "enum": [
+            "scheduler_assigned",
             "deterministic",
             "random_compatible",
             "llm_tiebreak",
@@ -801,6 +926,10 @@
           "title": "Carried State Refs",
           "type": "array"
         },
+        "core_node_ref": {
+          "title": "Core Node Ref",
+          "type": "string"
+        },
         "input_state_refs": {
           "items": {
             "type": "string"
@@ -831,6 +960,7 @@
       },
       "required": [
         "stage_id",
+        "core_node_ref",
         "macro_ref",
         "primary_family",
         "input_state_refs",
@@ -839,6 +969,43 @@
         "adversarial_role"
       ],
       "title": "PrimitiveTrajectoryStage",
+      "type": "object"
+    },
+    "PublicBenchmarkSessionPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "instruction_context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction Context"
+        },
+        "sequence_no": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "user_instruction": {
+          "title": "User Instruction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "sequence_no",
+        "user_instruction"
+      ],
+      "title": "PublicBenchmarkSessionPrompt",
       "type": "object"
     },
     "SafeClawBindingSlot": {
@@ -1054,6 +1221,9 @@
       "title": "Attacker Input Id",
       "type": "string"
     },
+    "benchmark_public_prompt": {
+      "$ref": "#/$defs/BenchmarkPublicPrompt"
+    },
     "execution_view": {
       "$ref": "#/$defs/ExecutionBindingView"
     },
@@ -1088,6 +1258,7 @@
     "attacker_input_id",
     "public_task",
     "execution_view",
+    "benchmark_public_prompt",
     "validated_plan",
     "remaining_budget"
   ],

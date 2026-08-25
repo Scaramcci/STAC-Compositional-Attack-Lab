@@ -41,11 +41,10 @@ def _plan(tmp_path: Path) -> tuple[object, object, PrimitiveChainLibrary]:
     library = _library(tmp_path)
     planner_input = FormalPlannerInput(
         planner_input_id="safeclaw-materializer-input",
-        library_id=library.manifest.library_id,
-        library_version=library.manifest.library_version,
-        library_hash=library.manifest.tree_hash,
-        public_samples=library.public_index(),
+        assignment_id="assignment-safeclaw-materializer",
         public_task=descriptor.public_view,
+        benchmark_public_prompt=descriptor.benchmark_public_prompt,
+        selected_sample=library.public_index()[0],
         budget=FormalBudget(
             max_sessions=3,
             max_turns=24,
@@ -178,11 +177,10 @@ def test_no_sample_uses_same_template_with_only_preregistered_content_delta(
     assert sample_plan.selected_sample_id is not None
     baseline_input = FormalPlannerInput(
         planner_input_id="safeclaw-baseline-input",
-        library_id=library.manifest.library_id,
-        library_version=library.manifest.library_version,
-        library_hash=library.manifest.tree_hash,
-        public_samples=library.public_index(),
+        assignment_id="assignment-safeclaw-baseline",
         public_task=descriptor.public_view,
+        benchmark_public_prompt=descriptor.benchmark_public_prompt,
+        selected_sample=None,
         budget=sample_plan.budget,
         condition="no_sample",
         seed=31,
@@ -253,3 +251,83 @@ def test_materializer_rejects_unbound_extra_value(tmp_path: Path) -> None:
             values,
             tmp_path / "invalid-extra-value",
         )
+
+
+def test_dependency_ablation_changes_exactly_one_preregistered_slot(
+    tmp_path: Path,
+) -> None:
+    descriptor, treatment_plan, library = _plan(tmp_path)
+    assert treatment_plan.selected_sample_id is not None
+    selected_sample = library.public_index()[0]
+    ablation_input = FormalPlannerInput(
+        planner_input_id="safeclaw-materializer-ablation-input",
+        assignment_id="assignment-safeclaw-materializer-ablation",
+        public_task=descriptor.public_view,
+        benchmark_public_prompt=descriptor.benchmark_public_prompt,
+        selected_sample=selected_sample,
+        budget=treatment_plan.budget,
+        condition="dependency_ablation",
+        seed=31,
+    )
+    ablation_plan = RuleBasedFormalPlanner().plan(ablation_input)
+    intervention = ablation_plan.dependency_ablation
+    assert intervention is not None
+
+    treatment_values = _slot_values()
+    ablation_values = dict(treatment_values)
+    ablation_values[intervention.materialization_slot_id] = _baseline_slot_values()[
+        intervention.materialization_slot_id
+    ]
+    execution_view = library.execution_view(treatment_plan.selected_sample_id)
+    treatment = materialize_safeclaw_task(
+        TASK,
+        descriptor,
+        treatment_plan,
+        execution_view,
+        treatment_values,
+        tmp_path / "dependency-treatment",
+    )
+    ablation = materialize_safeclaw_task(
+        TASK,
+        descriptor,
+        ablation_plan,
+        execution_view,
+        ablation_values,
+        tmp_path / "dependency-ablation",
+    )
+    treatment_task = json.loads(treatment.path.read_text(encoding="utf-8"))
+    ablation_task = json.loads(ablation.path.read_text(encoding="utf-8"))
+
+    def pointer_value(document: object, pointer: str) -> object:
+        current = document
+        for part in pointer.removeprefix("/").split("/"):
+            if isinstance(current, list):
+                current = current[int(part)]
+            else:
+                assert isinstance(current, dict)
+                current = current[part]
+        return current
+
+    slot_pointers = {
+        slot.slot_id: slot.json_pointer for slot in descriptor.public_view.bindable_slots
+    }
+    differing_pointers = [
+        pointer
+        for pointer in slot_pointers.values()
+        if pointer_value(treatment_task, pointer) != pointer_value(ablation_task, pointer)
+    ]
+    selected_pointer = slot_pointers[intervention.materialization_slot_id]
+    assert differing_pointers == [selected_pointer]
+    assert (
+        pointer_value(ablation_task, selected_pointer)
+        == _baseline_slot_values()[intervention.materialization_slot_id]
+    )
+
+    manifest = json.loads(
+        (ablation.path.parent / ablation.reference.binding_manifest_ref).read_text(encoding="utf-8")
+    )
+    assert manifest["dependency_ablation"]["intervention_id"] == intervention.intervention_id
+    assert manifest["dependency_ablation"]["replacement_applied"] is True
+    assert manifest["dependency_ablation"]["applied_value_hash"] == stable_hash(
+        ablation_values[intervention.materialization_slot_id]
+    )

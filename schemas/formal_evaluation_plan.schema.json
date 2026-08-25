@@ -229,6 +229,76 @@
       "title": "CorePrimitiveFamily",
       "type": "string"
     },
+    "DependencyAblationPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "expected_observation": {
+          "const": "target_dependency_absent",
+          "default": "target_dependency_absent",
+          "title": "Expected Observation",
+          "type": "string"
+        },
+        "intervention_id": {
+          "title": "Intervention Id",
+          "type": "string"
+        },
+        "materialization_slot_id": {
+          "title": "Materialization Slot Id",
+          "type": "string"
+        },
+        "replacement_source": {
+          "const": "baseline.task_set",
+          "default": "baseline.task_set",
+          "title": "Replacement Source",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "source_stage_id": {
+          "title": "Source Stage Id",
+          "type": "string"
+        },
+        "target_edge_id": {
+          "title": "Target Edge Id",
+          "type": "string"
+        },
+        "target_stage_id": {
+          "title": "Target Stage Id",
+          "type": "string"
+        },
+        "trajectory_hash": {
+          "title": "Trajectory Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intervention_id",
+        "sample_id",
+        "target_edge_id",
+        "source_stage_id",
+        "target_stage_id",
+        "edge_type",
+        "materialization_slot_id",
+        "trajectory_hash"
+      ],
+      "title": "DependencyAblationPlan",
+      "type": "object"
+    },
+    "DependencyType": {
+      "enum": [
+        "data",
+        "state",
+        "control",
+        "authorization"
+      ],
+      "title": "DependencyType",
+      "type": "string"
+    },
     "FormalBudget": {
       "additionalProperties": false,
       "properties": {
@@ -500,6 +570,7 @@
         },
         "decision_source": {
           "enum": [
+            "scheduler_assigned",
             "deterministic",
             "random_compatible",
             "llm_tiebreak",
@@ -582,6 +653,10 @@
           "title": "Carried State Refs",
           "type": "array"
         },
+        "core_node_ref": {
+          "title": "Core Node Ref",
+          "type": "string"
+        },
         "input_state_refs": {
           "items": {
             "type": "string"
@@ -612,6 +687,7 @@
       },
       "required": [
         "stage_id",
+        "core_node_ref",
         "macro_ref",
         "primary_family",
         "input_state_refs",
@@ -720,6 +796,17 @@
     "condition": {
       "title": "Condition",
       "type": "string"
+    },
+    "dependency_ablation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DependencyAblationPlan"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "expected_public_stage_effects": {
       "additionalProperties": {

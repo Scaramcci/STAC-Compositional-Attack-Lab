@@ -10,6 +10,7 @@ from stac_attack_lab.environments.safeclaw.contracts import (
     MaterializedTaskReference,
 )
 from stac_attack_lab.environments.safeclaw.materializer import MaterializedTask
+from stac_attack_lab.environments.safeclaw.model_config import SafeClawEmbeddingRuntime
 from stac_attack_lab.environments.safeclaw.redaction import redact_value, scan_tree
 from stac_attack_lab.environments.safeclaw.runner import SafeClawRunner
 from stac_attack_lab.environments.safeclaw.task_adapter import parse_safeclaw_task
@@ -19,11 +20,13 @@ ROOT = Path(__file__).resolve().parents[2]
 TASK = ROOT / "tests/fixtures/safeclaw/compositional_task.json"
 PATCH = ROOT / "integrations/safeclaw/patches/a11f5cce-safety.patch"
 API_KEY = "sk-formal-test-secret-123456789"
+EMBEDDING_KEY = "sk-embedding-test-secret-987654321"
 
 
 class _FakeJudgeInvoker:
     def __init__(self) -> None:
         self.commands: list[list[str]] = []
+        self.model_configs: list[dict[str, str]] = []
 
     def __call__(
         self, command: list[str], cwd: Path, timeout: int
@@ -33,6 +36,8 @@ class _FakeJudgeInvoker:
         if command[:2] == ["git", "apply"] or command[:3] == ["git", "apply", "--check"]:
             return subprocess.CompletedProcess(command, 0, "", "")
         output = Path(command[command.index("--output") + 1])
+        model_config = Path(command[command.index("--model-config") + 1])
+        self.model_configs.append(json.loads(model_config.read_text(encoding="utf-8")))
         task_path = Path(command[2])
         task = json.loads(task_path.read_text(encoding="utf-8"))
         task_id = str(task["metadata"]["task_id"])
@@ -146,7 +151,10 @@ def test_whole_episode_runner_redacts_before_promotion_and_resumes(tmp_path: Pat
         upstream_root=upstream,
         safety_patch=PATCH,
         output_root=tmp_path / "runs",
-        environment={"SAFECLAW_TEST_KEY": API_KEY},
+        environment={
+            "SAFECLAW_TEST_KEY": API_KEY,
+            "SAFECLAW_EMBEDDING_KEY": EMBEDDING_KEY,
+        },
         invoker=invoker,
     )
     materialized = _materialized(tmp_path)
@@ -156,6 +164,12 @@ def test_whole_episode_runner_redacts_before_promotion_and_resumes(tmp_path: Pat
         target_model_id="synthetic-model",
         target_base_url="http://127.0.0.1:9999/v1",
         target_api_key_env="SAFECLAW_TEST_KEY",
+        embedding=SafeClawEmbeddingRuntime(
+            provider="openai",
+            model_id="synthetic-embedding",
+            base_url="http://127.0.0.1:9998",
+            api_key_env="SAFECLAW_EMBEDDING_KEY",
+        ),
         timeout_seconds=30,
         max_attempts=2,
         output_root=str(tmp_path / "runs"),
@@ -170,6 +184,17 @@ def test_whole_episode_runner_redacts_before_promotion_and_resumes(tmp_path: Pat
     assert result.secret_scan_passed is True
     assert resumed == result
     assert len(invoker.commands) == command_count
+    assert invoker.model_configs == [
+        {
+            "model": "synthetic-model",
+            "api_base_url": "http://127.0.0.1:9999",
+            "api_key": API_KEY,
+            "embedding_provider": "openai",
+            "embedding_model": "synthetic-embedding",
+            "embedding_api_base_url": "http://127.0.0.1:9998/v1",
+            "embedding_api_key": EMBEDDING_KEY,
+        }
+    ]
     case_root = tmp_path / "runs/case-001"
     assert scan_tree(case_root, [API_KEY]) == []
     payload = (case_root / "sanitized_result.json").read_text(encoding="utf-8")
@@ -220,6 +245,104 @@ def test_safeclaw_trajectory_preserves_pairing_and_session_boundary(tmp_path: Pa
         if event.session_id == "s2" and event.event_type.value != "lifecycle"
     ]
     assert second_session_times and lifecycle_time < min(second_session_times)
+    assert not any(link.reason_code == "missing_request_event" for link in graph.unresolved_links)
+
+
+def test_safeclaw_trajectory_joins_formal_action_journal_lineage(tmp_path: Path) -> None:
+    upstream = tmp_path / "upstream"
+    (upstream / "scripts").mkdir(parents=True)
+    (upstream / "scripts/judge.py").write_text("# fake judge\n", encoding="utf-8")
+    runner = SafeClawRunner(
+        upstream_root=upstream,
+        safety_patch=PATCH,
+        output_root=tmp_path / "runs",
+        environment={"SAFECLAW_TEST_KEY": API_KEY},
+        invoker=_FakeJudgeInvoker(),
+    )
+    materialized = _materialized(tmp_path)
+    request = EpisodeRequest(
+        case_id="case-formal-lineage",
+        task_ref=materialized.reference,
+        target_model_id="synthetic-model",
+        target_base_url="http://127.0.0.1:9999/v1",
+        target_api_key_env="SAFECLAW_TEST_KEY",
+        timeout_seconds=30,
+        max_attempts=1,
+        output_root=str(tmp_path / "runs"),
+        seed=1,
+        condition="contract_test",
+    )
+    episode = runner.run_episode(request, materialized).model_copy(
+        update={"canonical_trajectory_ref": "formal_action_journal.jsonl"}
+    )
+    sanitized = json.loads(
+        (tmp_path / "runs/case-formal-lineage/sanitized_result.json").read_text(encoding="utf-8")
+    )
+    action = {
+        "attacker_call_id": "attacker-call-1",
+        "attacker_action_id": "attacker-action-1",
+        "plan_id": "plan-1",
+        "benchmark_session_id": "s1",
+        "stage_id": "core-stage-1",
+        "macro_ref": "macro.ingest@2",
+        "action_type": "victim_message",
+        "benchmark_surface": "safeclaw.user_message",
+        "victim_visible_content": "Store the authorized synthetic marker.",
+        "public_slot_refs": [],
+        "expected_public_predicate": "stage-completed",
+        "rationale_summary": "Synthetic lineage fixture.",
+    }
+    observation = {
+        "schema_version": "1.0",
+        "observation_id": "observation-1",
+        "plan_id": "plan-1",
+        "plan_stage_id": "core-stage-1",
+        "attacker_call_id": "attacker-call-1",
+        "attacker_action_id": "attacker-action-1",
+        "victim_request_event_id": "victim-request-1",
+        "victim_response_event_id": "victim-response-1",
+        "tool_event_ids": ["victim-tool-1"],
+        "input_artifact_refs": ["public_slot:instruction"],
+        "input_state_refs": ["plan_stage:core-stage-1:input"],
+        "output_artifact_refs": ["victim_response:victim-response-1"],
+        "output_state_refs": ["public_state:memory_present:changed"],
+        "verifier_evidence_refs": ["safeclaw_bridge:victim-response-1"],
+        "benchmark_session_id": "s1",
+        "public_response_text": "Stored.",
+        "public_tool_calls": [{"name": "gmail.read_synthetic"}],
+        "public_state_delta": {"memory_present": {"before": False, "after": True}},
+        "status": "completed",
+        "observation_hash": "not-consumed-by-normalizer",
+    }
+    journal = [
+        {
+            "kind": "victim_request",
+            "plan_id": "plan-1",
+            "plan_stage_id": "core-stage-1",
+            "attacker_call_id": "attacker-call-1",
+            "attacker_action_id": "attacker-action-1",
+            "victim_request_event_id": "victim-request-1",
+            "action": action,
+        },
+        {
+            "kind": "victim_response",
+            "attacker_action_id": "attacker-action-1",
+            "victim_response_event_id": "victim-response-1",
+            "observation": observation,
+        },
+    ]
+    descriptor = parse_safeclaw_task(TASK, upstream_root=ROOT)
+    graph, audit = normalize_safeclaw_episode(
+        episode, descriptor, sanitized, action_journal_records=journal
+    )
+
+    by_id = {event.event_id: event for event in graph.events}
+    assert {"victim-request-1", "victim-response-1", "victim-tool-1"} <= set(by_id)
+    linked = [event for event in graph.events if event.attacker_action_id == "attacker-action-1"]
+    assert linked
+    assert all(event.plan_stage_id == "core-stage-1" for event in linked)
+    assert by_id["victim-tool-1"].action_journal_ref == "formal_action_journal.jsonl#L2"
+    assert "formal_action_journal_missing" not in audit.instrumentation_gaps
     assert not any(link.reason_code == "missing_request_event" for link in graph.unresolved_links)
 
 

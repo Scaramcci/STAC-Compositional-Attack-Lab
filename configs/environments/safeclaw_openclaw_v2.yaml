@@ -1,0 +1,25 @@
+{
+  "schema_version": "2.0",
+  "upstream_dir": "integrations/safeclaw/upstream/SafeClawArena",
+  "pinned_commit": "a11f5cceaba0676be721021f8d232638fd111305",
+  "image_tag": "openclaw-env:2026.3.12",
+  "required_files": [
+    "scripts/judge.py",
+    "scripts/reset_env.sh",
+    "Dockerfile"
+  ],
+  "patch_path": "integrations/safeclaw/patches/a11f5cce-safety.patch",
+  "require_docker": true,
+  "target_model_env": "SAFECLAW_MODEL",
+  "allowed_target_models": [
+    "gpt-5.5"
+  ],
+  "target_base_url_env": "OPENAI_BASE_URL",
+  "target_api_key_env": "OPENAI_API_KEY",
+  "embedding_policy": "required_endpoint",
+  "embedding_provider": "openai",
+  "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",
+  "embedding_base_url_env": "OPENAI_BASE_URL",
+  "embedding_api_key_env": "OPENAI_API_KEY",
+  "minimum_free_disk_gb": 20
+}

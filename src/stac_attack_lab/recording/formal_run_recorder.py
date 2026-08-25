@@ -14,6 +14,7 @@ from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.environments.safeclaw.redaction import scan_for_secrets, scan_tree
 from stac_attack_lab.hashing import file_hash
 from stac_attack_lab.recording.events import append_jsonl, read_jsonl
+from stac_attack_lab.recording.model_calls import validate_model_call_event
 from stac_attack_lab.verification.formal_models import FormalRunResult
 
 
@@ -326,6 +327,52 @@ class FormalRunRecorder:
                     findings.append(
                         f"artifact_hash_mismatch:{case.case_id}:{artifact.artifact_name}"
                     )
+            model_call_path = self.run_root / "cases" / case.case_id / "model_calls.jsonl"
+            if model_call_path.exists():
+                checked += 1
+                try:
+                    model_call_events = [
+                        validate_model_call_event(item) for item in read_jsonl(model_call_path)
+                    ]
+                except Exception:
+                    findings.append(f"model_call_schema_invalid:{case.case_id}")
+                    continue
+                request_ids = [
+                    event.call_id
+                    for event in model_call_events
+                    if event.kind == "model_call_request"
+                ]
+                if len(request_ids) != len(set(request_ids)):
+                    findings.append(f"duplicate_model_call_request:{case.case_id}")
+                request_id_set = set(request_ids)
+                terminal_counts = {call_id: 0 for call_id in request_ids}
+                response_ids: set[str] = set()
+                validation_counts = {call_id: 0 for call_id in request_ids}
+                for event in model_call_events:
+                    if event.case_id != case.case_id:
+                        findings.append(f"model_call_case_mismatch:{case.case_id}")
+                    if event.kind in {"model_call_response", "model_call_error"}:
+                        if event.call_id not in request_id_set:
+                            findings.append(f"model_call_terminal_without_request:{case.case_id}")
+                            continue
+                        terminal_counts[event.call_id] += 1
+                        if event.kind == "model_call_response":
+                            response_ids.add(event.call_id)
+                    elif event.kind == "model_call_semantic_validation":
+                        if event.call_id not in request_id_set:
+                            findings.append(f"model_call_validation_without_request:{case.case_id}")
+                            continue
+                        validation_counts[event.call_id] += 1
+                if any(count != 1 for count in terminal_counts.values()):
+                    findings.append(f"model_call_terminal_pairing_invalid:{case.case_id}")
+                if any(validation_counts[call_id] != 1 for call_id in response_ids):
+                    findings.append(f"model_call_semantic_validation_missing:{case.case_id}")
+                if any(
+                    count != 0
+                    for call_id, count in validation_counts.items()
+                    if call_id not in response_ids
+                ):
+                    findings.append(f"model_call_error_has_validation:{case.case_id}")
         results: list[FormalRunResult] = []
         try:
             results = [

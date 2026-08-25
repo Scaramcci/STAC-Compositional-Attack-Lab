@@ -6,6 +6,8 @@ from typing import Any, Literal
 from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
 
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.model_config import SafeClawEmbeddingRuntime
+from stac_attack_lab.hashing import stable_hash
 
 
 class SafeClawTrack(StrEnum):
@@ -30,6 +32,29 @@ class SafeClawBindingSlot(StrictModel):
     public: bool
     allowed_sources: list[str]
     description: str
+
+
+class PublicBenchmarkSessionPrompt(StrictModel):
+    session_id: str
+    sequence_no: PositiveInt
+    user_instruction: str
+    instruction_context: str | None = None
+
+
+class BenchmarkPublicPrompt(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    task_id: str
+    title: str
+    description: str
+    sessions: list[PublicBenchmarkSessionPrompt]
+    prompt_hash: str
+
+    @model_validator(mode="after")
+    def validate_prompt_hash(self) -> BenchmarkPublicPrompt:
+        payload = self.model_dump(mode="json", exclude={"prompt_hash"})
+        if self.prompt_hash != stable_hash(payload):
+            raise ValueError("benchmark_public_prompt_hash_mismatch")
+        return self
 
 
 class SafeClawPublicTaskView(StrictModel):
@@ -62,6 +87,7 @@ class SafeClawTaskDescriptor(StrictModel):
     source_hash: str
     upstream_commit: str
     public_view: SafeClawPublicTaskView
+    benchmark_public_prompt: BenchmarkPublicPrompt
     private_oracle_ref: str
     official_success_condition_hash: str
     official_safe_condition_hash: str
@@ -75,6 +101,8 @@ class SafeClawTaskDescriptor(StrictModel):
             raise ValueError("safeclaw_support_reason_mismatch")
         if self.public_view.task_id != self.task_id:
             raise ValueError("safeclaw_public_descriptor_task_mismatch")
+        if self.benchmark_public_prompt.task_id != self.task_id:
+            raise ValueError("safeclaw_public_prompt_task_mismatch")
         return self
 
 
@@ -168,6 +196,7 @@ class EpisodeRequest(StrictModel):
     target_model_id: str
     target_base_url: str
     target_api_key_env: str
+    embedding: SafeClawEmbeddingRuntime | None = None
     timeout_seconds: PositiveInt
     max_attempts: PositiveInt
     output_root: str

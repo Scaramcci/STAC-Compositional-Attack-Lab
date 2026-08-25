@@ -39,7 +39,8 @@ def select_compatible_samples(planner_input: FormalPlannerInput) -> SampleSelect
     rejected: dict[str, list[str]] = {}
     task_capabilities = set(task.public_capabilities)
     task_roles = set(task.component_roles)
-    for sample in planner_input.public_samples:
+    assigned_samples = [planner_input.selected_sample] if planner_input.selected_sample else []
+    for sample in assigned_samples:
         errors: list[str] = []
         missing_capabilities = set(sample.planner_view.required_capabilities) - task_capabilities
         errors.extend(

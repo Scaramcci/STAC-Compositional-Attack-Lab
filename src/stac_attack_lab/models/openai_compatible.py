@@ -14,6 +14,8 @@ from stac_attack_lab.models.base import ModelCallError
 
 
 class OpenAICompatibleClient:
+    provider_id = "openai_compatible"
+
     def __init__(
         self,
         model_id: str,
@@ -27,6 +29,9 @@ class OpenAICompatibleClient:
         self.base_url = os.environ.get("OPENAI_BASE_URL")
         self._api_key = os.environ.get("OPENAI_API_KEY")
         self.last_raw_response: str | None = None
+        self.last_usage: dict[str, Any] | None = None
+        self.last_request_id: str | None = None
+        self.last_retry_count = 0
 
     @property
     def endpoint_host(self) -> str:
@@ -39,6 +44,9 @@ class OpenAICompatibleClient:
         seed: int,
         timeout: int,
     ) -> BaseModel:
+        self.last_raw_response = None
+        self.last_usage = None
+        self.last_request_id = None
         if not self.base_url or not self._api_key:
             raise ModelCallError("missing_openai_env")
         url = self.base_url.rstrip("/") + "/chat/completions"
@@ -66,6 +74,10 @@ class OpenAICompatibleClient:
             data = _post_json(url, payload, self._api_key, timeout)
             choices = cast(list[dict[str, Any]], data["choices"])
             content = cast(str, choices[0]["message"]["content"])
+            usage = data.get("usage")
+            self.last_usage = dict(usage) if isinstance(usage, dict) else None
+            request_id = data.get("id")
+            self.last_request_id = str(request_id) if request_id is not None else None
             self.last_raw_response = content
             return response_schema.model_validate(json.loads(_extract_json(content)))
         except urllib.error.HTTPError as exc:

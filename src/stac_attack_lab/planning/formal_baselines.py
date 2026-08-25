@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import random
 from typing import Literal
 
 from stac_attack_lab.hashing import stable_hash
@@ -11,6 +10,7 @@ from stac_attack_lab.planning.binding_planner import (
 from stac_attack_lab.planning.formal_base import (
     AdversarialRole,
     ControlIntervention,
+    DependencyAblationPlan,
     FormalEvaluationPlan,
     FormalPlannerInput,
     LongHorizonAdversarialTrajectory,
@@ -142,32 +142,70 @@ def build_long_horizon_trajectory(
         raise ValueError(f"unsupported_attack_family_for_sample:{selected_family.value}")
     stages: list[PrimitiveTrajectoryStage] = []
     previous_state = "public_state:benign_context"
-    for node in sample.planner_view.macro_nodes:
-        output_predicate = (
-            node.public_postconditions[0]
-            if node.public_postconditions
-            else f"{node.node_id}_completed"
-        )
-        output_state = f"public_state:{node.node_id}:{output_predicate}"
-        stages.append(
-            PrimitiveTrajectoryStage(
-                stage_id=node.node_id,
-                macro_ref=node.macro_primitive_ref,
-                primary_family=MACRO_PRIMARY_FAMILY[node.macro_primitive_ref],
-                input_state_refs=[previous_state],
-                output_state_ref=output_state,
-                carried_state_refs=[previous_state],
-                adversarial_role=MACRO_ADVERSARIAL_ROLE[node.macro_primitive_ref],
-                activation_condition=(
-                    node.public_preconditions[0]
-                    if node.macro_primitive_ref == "macro.recall@2" and node.public_preconditions
-                    else None
-                ),
-                trust_boundary_crossing=node.macro_primitive_ref
-                in {"macro.ingest@2", "macro.recall@2", "macro.act@2"},
+    core_nodes = sorted(sample.planner_view.core_nodes, key=lambda item: item.position)
+    if core_nodes:
+        family_roles: dict[CorePrimitiveFamily, AdversarialRole] = {
+            CorePrimitiveFamily.transfer: "propagation",
+            CorePrimitiveFamily.transform: "propagation",
+            CorePrimitiveFamily.mutate: "effect",
+            CorePrimitiveFamily.control: "control",
+        }
+        for index, node in enumerate(core_nodes):
+            macro_ref = node.macro_annotations[0] if node.macro_annotations else "macro.unannotated"
+            output_type = (
+                node.public_output_state_types[0]
+                if node.public_output_state_types
+                else f"{node.subtype}_completed"
             )
-        )
-        previous_state = output_state
+            output_state = f"public_state:{node.node_id}:{output_type}"
+            stages.append(
+                PrimitiveTrajectoryStage(
+                    stage_id=node.node_id,
+                    core_node_ref=node.node_id,
+                    macro_ref=macro_ref,
+                    primary_family=node.family,
+                    input_state_refs=[previous_state],
+                    output_state_ref=output_state,
+                    carried_state_refs=[previous_state],
+                    adversarial_role="entry" if index == 0 else family_roles[node.family],
+                    activation_condition=(
+                        "public_cross_session_state_available"
+                        if node.session_boundary_before
+                        else None
+                    ),
+                    trust_boundary_crossing=index == 0 or node.session_boundary_before,
+                )
+            )
+            previous_state = output_state
+    else:
+        for legacy_node in sample.planner_view.macro_nodes:
+            output_predicate = (
+                legacy_node.public_postconditions[0]
+                if legacy_node.public_postconditions
+                else f"{legacy_node.node_id}_completed"
+            )
+            output_state = f"public_state:{legacy_node.node_id}:{output_predicate}"
+            stages.append(
+                PrimitiveTrajectoryStage(
+                    stage_id=legacy_node.node_id,
+                    core_node_ref=f"legacy-macro:{legacy_node.node_id}",
+                    macro_ref=legacy_node.macro_primitive_ref,
+                    primary_family=MACRO_PRIMARY_FAMILY[legacy_node.macro_primitive_ref],
+                    input_state_refs=[previous_state],
+                    output_state_ref=output_state,
+                    carried_state_refs=[previous_state],
+                    adversarial_role=MACRO_ADVERSARIAL_ROLE[legacy_node.macro_primitive_ref],
+                    activation_condition=(
+                        legacy_node.public_preconditions[0]
+                        if legacy_node.macro_primitive_ref == "macro.recall@2"
+                        and legacy_node.public_preconditions
+                        else None
+                    ),
+                    trust_boundary_crossing=legacy_node.macro_primitive_ref
+                    in {"macro.ingest@2", "macro.recall@2", "macro.act@2"},
+                )
+            )
+            previous_state = output_state
     persist = next((item for item in stages if item.macro_ref == "macro.persist@2"), None)
     recall = next((item for item in stages if item.macro_ref == "macro.recall@2"), None)
     entry = next((item for item in stages if item.adversarial_role == "entry"), stages[0])
@@ -238,12 +276,88 @@ def build_long_horizon_trajectory(
     )
 
 
+def build_dependency_ablation(
+    sample: PublicSampleIndexEntry,
+    trajectory: LongHorizonAdversarialTrajectory,
+    planner_input: FormalPlannerInput,
+) -> DependencyAblationPlan:
+    core_by_id = {node.node_id: node for node in sample.planner_view.core_nodes}
+    macro_by_ref = {node.macro_primitive_ref: node for node in sample.planner_view.macro_nodes}
+    public_slots = {slot.slot_id for slot in planner_input.public_task.bindable_slots}
+    slot_priority = {
+        slot_id: index
+        for index, slot_id in enumerate(
+            (
+                "persistent_memory",
+                "untrusted_source",
+                "agent_context",
+                "session_lifecycle",
+                "effect_tool",
+                "sandbox_external_state",
+            )
+        )
+    }
+    edge_type_priority = {
+        "state": 0,
+        "data": 1,
+        "control": 2,
+        "authorization": 3,
+    }
+    required_edges = [
+        edge for edge in sample.planner_view.core_edges if edge.required_for_full_chain
+    ]
+    required_edges.sort(
+        key=lambda edge: (
+            not edge.crosses_session_boundary,
+            edge_type_priority[edge.edge_type.value],
+            core_by_id[edge.source_node_id].position,
+            core_by_id[edge.target_node_id].position,
+            edge.edge_id,
+        )
+    )
+    for edge in required_edges:
+        source = core_by_id[edge.source_node_id]
+        target = core_by_id[edge.target_node_id]
+        macro_refs = [*source.macro_annotations, *target.macro_annotations]
+        candidate_slots = {
+            slot_id
+            for macro_ref in macro_refs
+            if macro_ref in macro_by_ref
+            for slot_id in macro_by_ref[macro_ref].binding_slots
+            if slot_id in public_slots
+        }
+        if not candidate_slots:
+            continue
+        slot_id = min(
+            candidate_slots,
+            key=lambda item: (slot_priority.get(item, len(slot_priority)), item),
+        )
+        payload = {
+            "sample_id": sample.sample_id,
+            "target_edge_id": edge.edge_id,
+            "source_stage_id": edge.source_node_id,
+            "target_stage_id": edge.target_node_id,
+            "edge_type": edge.edge_type.value,
+            "materialization_slot_id": slot_id,
+            "trajectory_hash": stable_hash(trajectory.model_dump(mode="json")),
+        }
+        return DependencyAblationPlan.model_validate(
+            {
+                "intervention_id": "dependency-ablation-" + stable_hash(payload)[:20],
+                **payload,
+            }
+        )
+    raise ValueError("dependency_ablation_has_no_bindable_required_edge")
+
+
 def build_selected_plan(
     planner_input: FormalPlannerInput,
     planner_type: str,
     selection: SampleSelectionResult,
     sample: PublicSampleIndexEntry,
-    decision_source: Literal["deterministic", "random_compatible", "llm_tiebreak"],
+    decision_source: Literal[
+        "scheduler_assigned", "deterministic", "random_compatible", "llm_tiebreak"
+    ],
     public_prompt_hash: str | None = None,
     trajectory: LongHorizonAdversarialTrajectory | None = None,
 ) -> FormalEvaluationPlan:
@@ -263,6 +377,11 @@ def build_selected_plan(
         public_prompt_hash=public_prompt_hash,
     )
     selected_trajectory = trajectory or build_long_horizon_trajectory(sample, planner_input)
+    dependency_ablation = (
+        build_dependency_ablation(sample, selected_trajectory, planner_input)
+        if planner_input.condition == "dependency_ablation"
+        else None
+    )
     payload: dict[str, object] = {
         "planner_input_id": planner_input.planner_input_id,
         "planner_type": planner_type,
@@ -272,15 +391,21 @@ def build_selected_plan(
         or planner_input.public_task.task_id,
         "binding": binding.model_dump(mode="json"),
         "baseline_binding": None,
-        "materialization_variant": "bound_sample",
+        "materialization_variant": (
+            "dependency_ablation" if dependency_ablation is not None else "bound_sample"
+        ),
         "condition": planner_input.condition,
         "budget": planner_input.budget.model_dump(mode="json"),
         "expected_public_stage_effects": {
-            node.node_id: node.public_postconditions[0]
-            for node in sample.planner_view.macro_nodes
-            if node.public_postconditions
+            stage.stage_id: stage.output_state_ref
+            for stage in selected_trajectory.primitive_sequence
         },
-        "ablation_labels": [],
+        "ablation_labels": (
+            ["break_primitive_dependency"] if dependency_ablation is not None else []
+        ),
+        "dependency_ablation": (
+            dependency_ablation.model_dump(mode="json") if dependency_ablation is not None else None
+        ),
         "selection_evidence": evidence.model_dump(mode="json"),
         "adversarial_trajectory": selected_trajectory.model_dump(mode="json"),
         "abstain_reason": None,
@@ -295,7 +420,10 @@ def build_selected_plan(
 
 
 def _public_sample(planner_input: FormalPlannerInput, sample_id: str) -> PublicSampleIndexEntry:
-    return next(item for item in planner_input.public_samples if item.sample_id == sample_id)
+    sample = planner_input.selected_sample
+    if sample is None or sample.sample_id != sample_id:
+        raise ValueError("planner_selected_sample_not_assigned")
+    return sample
 
 
 class NoSamplePlanner:
@@ -351,6 +479,11 @@ class FixedSamplePlanner:
         self.sample_id = sample_id
 
     def plan(self, planner_input: FormalPlannerInput) -> FormalEvaluationPlan:
+        if (
+            planner_input.selected_sample is None
+            or planner_input.selected_sample.sample_id != self.sample_id
+        ):
+            raise ValueError("fixed_planner_sample_differs_from_scheduler_assignment")
         selection = select_compatible_samples(planner_input)
         compatible_ids = {item.sample_id for item in selection.compatible}
         if self.sample_id not in compatible_ids:
@@ -381,7 +514,7 @@ class RandomCompatiblePlanner:
                 selection,
                 "no_compatible_sample",
             )
-        selected = random.Random(planner_input.seed).choice(selection.compatible)
+        selected = selection.compatible[0]
         return build_selected_plan(
             planner_input,
             self.planner_type,

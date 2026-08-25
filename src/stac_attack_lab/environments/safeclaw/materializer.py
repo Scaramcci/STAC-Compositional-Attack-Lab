@@ -136,6 +136,16 @@ def materialize_safeclaw_task(
     task_path.write_text(json.dumps(materialized, indent=2, sort_keys=True), encoding="utf-8")
     os.chmod(task_path, 0o600)
     binding_manifest_path = temporary_root / f"{plan.plan_id}-binding.json"
+    dependency_ablation = None
+    if plan.dependency_ablation is not None:
+        slot_id = plan.dependency_ablation.materialization_slot_id
+        if slot_id not in slot_values:
+            raise ValueError("dependency_ablation_materialized_slot_missing")
+        dependency_ablation = {
+            **plan.dependency_ablation.model_dump(mode="json"),
+            "applied_value_hash": stable_hash(slot_values[slot_id]),
+            "replacement_applied": True,
+        }
     binding_manifest = {
         "plan_id": plan.plan_id,
         "binding_id": active_binding.binding_id,
@@ -145,6 +155,7 @@ def materialize_safeclaw_task(
         "materialized_task_hash": materialized_hash,
         "changed_pointers": sorted(changed_pointers),
         "official_evaluation_hash": protected_before,
+        "dependency_ablation": dependency_ablation,
     }
     binding_manifest_path.write_text(
         json.dumps(binding_manifest, indent=2, sort_keys=True), encoding="utf-8"

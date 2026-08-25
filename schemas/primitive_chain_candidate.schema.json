@@ -288,6 +288,16 @@
       "title": "ConstructionManifest",
       "type": "object"
     },
+    "CorePrimitiveFamily": {
+      "enum": [
+        "TRANSFER",
+        "TRANSFORM",
+        "MUTATE",
+        "CONTROL"
+      ],
+      "title": "CorePrimitiveFamily",
+      "type": "string"
+    },
     "DependencyType": {
       "enum": [
         "data",
@@ -380,6 +390,158 @@
       ],
       "title": "PrimitiveOutcome",
       "type": "string"
+    },
+    "PublicCoreEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "crosses_session_boundary": {
+          "default": false,
+          "title": "Crosses Session Boundary",
+          "type": "boolean"
+        },
+        "edge_id": {
+          "title": "Edge Id",
+          "type": "string"
+        },
+        "edge_type": {
+          "$ref": "#/$defs/DependencyType"
+        },
+        "join_k": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Join K"
+        },
+        "join_semantics": {
+          "$ref": "#/$defs/JoinSemantics",
+          "default": "ALL"
+        },
+        "public_artifact_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Public Artifact Type"
+        },
+        "public_state_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Public State Type"
+        },
+        "required_for_full_chain": {
+          "default": true,
+          "title": "Required For Full Chain",
+          "type": "boolean"
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "edge_id",
+        "source_node_id",
+        "target_node_id",
+        "edge_type"
+      ],
+      "title": "PublicCoreEdge",
+      "type": "object"
+    },
+    "PublicCoreNode": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/CorePrimitiveFamily"
+        },
+        "macro_annotations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Macro Annotations",
+          "type": "array"
+        },
+        "multiplicity": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Multiplicity",
+          "type": "integer"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "optional": {
+          "default": false,
+          "title": "Optional",
+          "type": "boolean"
+        },
+        "position": {
+          "minimum": 0,
+          "title": "Position",
+          "type": "integer"
+        },
+        "public_input_state_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Input State Types",
+          "type": "array"
+        },
+        "public_output_state_types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Output State Types",
+          "type": "array"
+        },
+        "session_boundary_before": {
+          "default": false,
+          "title": "Session Boundary Before",
+          "type": "boolean"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "subtype": {
+          "title": "Subtype",
+          "type": "string"
+        }
+      },
+      "required": [
+        "node_id",
+        "position",
+        "family",
+        "subtype",
+        "public_input_state_types",
+        "public_output_state_types",
+        "session_id"
+      ],
+      "title": "PublicCoreNode",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -409,6 +571,30 @@
         }
       ],
       "default": null
+    },
+    "core_edges": {
+      "items": {
+        "$ref": "#/$defs/PublicCoreEdge"
+      },
+      "title": "Core Edges",
+      "type": "array"
+    },
+    "core_nodes": {
+      "items": {
+        "$ref": "#/$defs/PublicCoreNode"
+      },
+      "title": "Core Nodes",
+      "type": "array"
+    },
+    "duplicate_provenance_paths": {
+      "items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Duplicate Provenance Paths",
+      "type": "array"
     },
     "edges": {
       "items": {
@@ -489,8 +675,12 @@
       "enum": [
         "observed",
         "hypothesized",
+        "partial",
         "blocked",
-        "failed"
+        "rejected",
+        "error",
+        "timeout",
+        "not_observable"
       ],
       "title": "Terminal Relation",
       "type": "string"

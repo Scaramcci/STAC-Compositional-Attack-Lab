@@ -1,31 +1,59 @@
-diff --git a/scripts/judge.py b/scripts/judge.py
-index 466b14e..9e19a55 100755
 --- a/scripts/judge.py
 +++ b/scripts/judge.py
-@@ -458,7 +458,7 @@ def _apply_model_config(config_path: str):
-             f"json.dump(c,open('{cfg_path}','w'),indent=2)"
-             f"\""
-         )
+@@ -431,0 +432,12 @@
++    embedding_provider = mc.get("embedding_provider")
++    embedding_model = mc.get("embedding_model")
++    embedding_api_base_url = mc.get("embedding_api_base_url")
++    embedding_api_key = mc.get("embedding_api_key")
++    embedding_values = (
++        embedding_provider,
++        embedding_model,
++        embedding_api_base_url,
++        embedding_api_key,
++    )
++    if any(embedding_values) and not all(embedding_values):
++        raise ValueError("incomplete_embedding_model_config")
+@@ -461 +473 @@
 -        print(f"  Provider override (Seclaw): ...{api_key[-6:]} -> {api_base_url or 'default'}")
 +        print(f"  Provider override (Seclaw): credential redacted -> {api_base_url or 'default'}")
-         return {"model": model_id, "api_base_url": api_base_url}
- 
-     # Write provider config to openclaw.json (models.providers.openai)
-@@ -498,7 +498,7 @@ def _apply_model_config(config_path: str):
-             # Copy modified config back (requires root for NemoClaw)
-             dexec(f"cp /tmp/_openclaw_config.json {OPENCLAW_HOME}/openclaw.json")
-             dexec(f"chmod 444 {OPENCLAW_HOME}/openclaw.json")
+@@ -496,0 +509,26 @@
++        if embedding_provider:
++            memory_search = {
++                "enabled": True,
++                "provider": embedding_provider,
++                "model": embedding_model,
++                "fallback": "none",
++                "remote": {
++                    "baseUrl": embedding_api_base_url,
++                    "apiKey": embedding_api_key,
++                },
++            }
++            memory_tmp = "/tmp/_memory_search.json"
++            subprocess.run(
++                ["docker", "exec", "-i", CONTAINER, "bash", "-c", f"cat > {memory_tmp}"],
++                input=json.dumps(memory_search).encode(),
++                capture_output=True,
++            )
++            dexec(
++                f"python3 -c \""
++                f"import json; "
++                f"m=json.load(open('{memory_tmp}')); "
++                f"c=json.load(open('{config_path}')); "
++                f"c['agents']['defaults']['memorySearch']=m; "
++                f"json.dump(c,open('{config_path}','w'),indent=2)"
++                f"\""
++            )
+@@ -501 +539 @@
 -        print(f"  Provider override: ...{api_key[-6:]} -> {api_base_url}")
 +        print(f"  Provider override: credential redacted -> {api_base_url}")
- 
-     # Also update auth-profiles key (gateway may prefer this over provider apiKey)
-     if api_key:
-@@ -537,7 +537,27 @@ def _apply_model_config(config_path: str):
-     print(f"  Gateway restarted — config: {validate.strip()}")
- 
-     # Return applied config so it can be saved in the report
+@@ -540 +578,26 @@
 -    return {"model": model_id, "api_base_url": api_base_url or "", "api_key_suffix": api_key[-6:] if api_key else ""}
-+    return {"model": model_id, "api_base_url": api_base_url or ""}
++    return {
++        "model": model_id,
++        "api_base_url": api_base_url or "",
++        "embedding_model": embedding_model or "",
++        "embedding_configured": bool(embedding_provider),
++    }
 +
 +
 +def _safe_auth_profile_structure(raw: str):
@@ -46,17 +74,8 @@ index 466b14e..9e19a55 100755
 +            "credential": "***REDACTED***",
 +        })
 +    return {"available": bool(raw), "profiles": profiles}
- 
- 
- def remove_container():
-@@ -1489,7 +1509,9 @@ class Evaluator:
-                 "skills_deployed": self.pre_state.get("skills_deployed", []),
-                 "plugins_deployed": self.pre_state.get("plugins_deployed", []),
-             },
+@@ -1492 +1555,3 @@
 -            "auth_profiles": self.post_state.get("auth_profiles_content", ""),
 +            "auth_profiles": _safe_auth_profile_structure(
 +                self.post_state.get("auth_profiles_content", "")
 +            ),
-         }
- 
-     def _check_skill_loaded(self) -> dict:

@@ -1,5 +1,85 @@
 {
   "$defs": {
+    "BenchmarkPublicPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "prompt_hash": {
+          "title": "Prompt Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/PublicBenchmarkSessionPrompt"
+          },
+          "title": "Sessions",
+          "type": "array"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "title",
+        "description",
+        "sessions",
+        "prompt_hash"
+      ],
+      "title": "BenchmarkPublicPrompt",
+      "type": "object"
+    },
+    "PublicBenchmarkSessionPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "instruction_context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction Context"
+        },
+        "sequence_no": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "user_instruction": {
+          "title": "User Instruction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "sequence_no",
+        "user_instruction"
+      ],
+      "title": "PublicBenchmarkSessionPrompt",
+      "type": "object"
+    },
     "SafeClawBindingSlot": {
       "additionalProperties": false,
       "properties": {
@@ -171,6 +251,9 @@
   },
   "additionalProperties": false,
   "properties": {
+    "benchmark_public_prompt": {
+      "$ref": "#/$defs/BenchmarkPublicPrompt"
+    },
     "category": {
       "title": "Category",
       "type": "string"
@@ -268,6 +351,7 @@
     "source_hash",
     "upstream_commit",
     "public_view",
+    "benchmark_public_prompt",
     "private_oracle_ref",
     "official_success_condition_hash",
     "official_safe_condition_hash",

@@ -12,6 +12,7 @@ from stac_attack_lab.datasets.primitive_chain import (
 from stac_attack_lab.environments.safeclaw.contracts import (
     BaselineBinding,
     BenchmarkBinding,
+    BenchmarkPublicPrompt,
     SafeClawEpisodeResult,
     SafeClawPublicTaskView,
     SafeClawTaskDescriptor,
@@ -19,6 +20,11 @@ from stac_attack_lab.environments.safeclaw.contracts import (
 from stac_attack_lab.execution.formal_attacker import (
     FormalAttackerInput,
     FormalAttackRealization,
+)
+from stac_attack_lab.execution.sample_generation import (
+    SampleCollectionStageManifest,
+    SampleLibraryAuditReport,
+    SampleMiningStageManifest,
 )
 from stac_attack_lab.execution.sample_preflight import SampleCollectionPreflightReport
 from stac_attack_lab.interactions.construction import (
@@ -31,7 +37,12 @@ from stac_attack_lab.interactions.models import (
     PrimitiveOccurrence,
     RawInteractionTrajectory,
 )
-from stac_attack_lab.planning.formal_base import FormalEvaluationPlan, FormalPlannerInput
+from stac_attack_lab.planning.formal_base import (
+    FormalCaseAssignment,
+    FormalEvaluationPlan,
+    FormalPlannerInput,
+    SingleSamplePlannerInput,
+)
 from stac_attack_lab.primitives.core import CorePrimitiveSpec
 from stac_attack_lab.primitives.macros import AttackMacroSpec
 from stac_attack_lab.verification.formal_aggregate import FormalRunResult
@@ -49,6 +60,9 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "sample_library_manifest": SampleLibraryManifest,
     "safeclaw_task_descriptor": SafeClawTaskDescriptor,
     "safeclaw_public_task_view": SafeClawPublicTaskView,
+    "benchmark_public_prompt": BenchmarkPublicPrompt,
+    "formal_case_assignment": FormalCaseAssignment,
+    "single_sample_planner_input": SingleSamplePlannerInput,
     "baseline_binding": BaselineBinding,
     "benchmark_binding": BenchmarkBinding,
     "formal_planner_input": FormalPlannerInput,
@@ -60,6 +74,9 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "formal_attacker_input": FormalAttackerInput,
     "formal_attack_realization": FormalAttackRealization,
     "sample_collection_preflight_report": SampleCollectionPreflightReport,
+    "sample_collection_stage_manifest": SampleCollectionStageManifest,
+    "sample_mining_stage_manifest": SampleMiningStageManifest,
+    "sample_library_audit_report": SampleLibraryAuditReport,
 }
 
 

@@ -131,6 +131,11 @@ def normalize_source_events(
                 lifecycle_id=raw.get("lifecycle_id"),
                 public_payload=dict(raw.get("public_payload", {})),
                 evidence_ref_ids=[str(item) for item in raw.get("evidence_ref_ids", [])],
+                plan_id=raw.get("plan_id"),
+                plan_stage_id=raw.get("plan_stage_id"),
+                attacker_call_id=raw.get("attacker_call_id"),
+                attacker_action_id=raw.get("attacker_action_id"),
+                action_journal_ref=raw.get("action_journal_ref"),
                 source_event_ref=str(raw.get("source_event_ref", event_id)),
             )
         )

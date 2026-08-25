@@ -182,9 +182,45 @@
     "InteractionEvent": {
       "additionalProperties": false,
       "properties": {
+        "action_journal_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action Journal Ref"
+        },
         "actor_role": {
           "title": "Actor Role",
           "type": "string"
+        },
+        "attacker_action_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attacker Action Id"
+        },
+        "attacker_call_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attacker Call Id"
         },
         "component_role": {
           "title": "Component Role",
@@ -242,6 +278,30 @@
           },
           "title": "Output Artifact Ids",
           "type": "array"
+        },
+        "plan_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Id"
+        },
+        "plan_stage_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Stage Id"
         },
         "post_state_ref": {
           "anyOf": [

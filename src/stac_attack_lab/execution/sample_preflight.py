@@ -205,9 +205,24 @@ def run_sample_collection_preflight(
             config.victim_model_env,
             config.victim_base_url_env,
             config.victim_api_key_env,
+            config.embedding_model_env,
+            config.embedding_base_url_env,
+            config.embedding_api_key_env,
         )
         if name
     ]
+    embedding_configured = (
+        config.embedding_provider == "openai"
+        and config.embedding_model_env is not None
+        and config.embedding_base_url_env is not None
+        and config.embedding_api_key_env is not None
+    )
+    add(
+        "embedding_configuration",
+        embedding_configured,
+        "sample_collection_embedding_configuration_complete",
+        "sample_collection_embedding_configuration_incomplete",
+    )
     if attacker_model is not None:
         if attacker_model.provider == "openai_compatible":
             required_env.extend(["OPENAI_BASE_URL", "OPENAI_API_KEY"])
@@ -216,7 +231,7 @@ def run_sample_collection_preflight(
     missing_env = sorted({name for name in required_env if not env.get(name)})
     add(
         "model_environment",
-        not missing_env and len(required_env) >= 3,
+        not missing_env and len(required_env) >= 6,
         "sample_collection_model_environment_present",
         "sample_collection_model_environment_missing",
         {"missing_variable_names": ",".join(missing_env)},
@@ -255,7 +270,9 @@ def run_sample_collection_preflight(
     if upstream is not None and config.safety_patch_path:
         patch = project_root / config.safety_patch_path
         if upstream.is_dir() and patch.is_file():
-            patch_check = command_runner(["git", "apply", "--check", str(patch)], upstream)
+            patch_check = command_runner(
+                ["git", "apply", "--unidiff-zero", "--check", str(patch)], upstream
+            )
             patch_ok = patch_check.returncode == 0
     add(
         "safety_patch",

@@ -54,14 +54,27 @@ def build_primitive_chain_sample(
             }
         )[:20]
     )
+    core_specs = [
+        registry.core_by_id(occurrence_by_id[occurrence_id].primitive_ref)
+        for occurrence_id in candidate.occurrence_ids
+    ]
+    crosses_session_boundary = any(
+        node.session_boundary_before for node in candidate.core_nodes
+    ) or any(edge.crosses_session_boundary for edge in candidate.core_edges)
     capabilities = sorted(
         {
             capability
             for node in candidate.nodes
             for capability in registry.resolve_macro(node.macro_primitive_ref).required_capabilities
         }
+        | {capability for spec in core_specs for capability in spec.required_capabilities}
+        | ({"lifecycle_boundary"} if crosses_session_boundary else set())
     )
-    component_roles = sorted({slot for node in candidate.nodes for slot in node.binding_slots})
+    component_roles = sorted(
+        {slot for node in candidate.nodes for slot in node.binding_slots}
+        | {role for spec in core_specs for role in [*spec.source_roles, *spec.target_roles]}
+        | ({"session_lifecycle"} if crosses_session_boundary else set())
+    )
     binding_slots = [
         BindingSlot(
             slot_id=role,
@@ -72,7 +85,15 @@ def build_primitive_chain_sample(
         )
         for role in component_roles
     ]
-    public_nodes = [node.model_copy(update={"core_occurrence_ids": []}) for node in candidate.nodes]
+    public_nodes = [
+        node.model_copy(
+            update={
+                "core_occurrence_ids": [],
+                "required_edge_inputs": [],
+            }
+        )
+        for node in candidate.nodes
+    ]
     public_edges = [
         edge.model_copy(
             update={
@@ -90,6 +111,8 @@ def build_primitive_chain_sample(
             "Authorized benchmark chain: untrusted ingress, persistent state, explicit "
             "lifecycle boundary, delayed retrieval, and sandbox effect."
         ),
+        core_nodes=candidate.core_nodes,
+        core_edges=candidate.core_edges,
         macro_nodes=public_nodes,
         macro_edges=public_edges,
         applicability_predicates=[
@@ -113,11 +136,10 @@ def build_primitive_chain_sample(
     execution_view = ExecutionBindingView(
         sample_id=sample_id,
         core_pattern_refs={
-            node.node_id: [
-                occurrence_by_id[occurrence_id].primitive_ref
-                for occurrence_id in node.core_occurrence_ids
-            ]
-            for node in candidate.nodes
+            node.node_id: [occurrence_by_id[occurrence_id].primitive_ref]
+            for occurrence_id, node in zip(
+                candidate.occurrence_ids, candidate.core_nodes, strict=True
+            )
         },
         allowed_benchmark_surfaces=[
             "safeclaw.sim_google",

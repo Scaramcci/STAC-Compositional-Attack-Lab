@@ -62,6 +62,7 @@ def test_preflight_passes_with_pinned_synthetic_checkout(tmp_path: Path) -> None
         target_base_url_env="OPENAI_BASE_URL",
         target_api_key_env="OPENAI_API_KEY",
         embedding_policy="required_endpoint",
+        embedding_provider="openai",
         embedding_model_env="SAFECLAW_EMBEDDING_MODEL",
         embedding_base_url_env="OPENAI_BASE_URL",
         embedding_api_key_env="OPENAI_API_KEY",

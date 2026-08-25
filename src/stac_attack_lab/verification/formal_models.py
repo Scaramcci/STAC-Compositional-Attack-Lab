@@ -46,6 +46,15 @@ class MacroVerdict(StrictModel):
     reason_codes: list[str]
 
 
+class DependencyAblationEvaluation(StrictModel):
+    intervention_id: str
+    target_edge_id: str
+    observed_mechanism_edge_id: str | None
+    observed_verdict: CausalVerdict | None
+    target_dependency_absent: bool | None
+    reason_codes: list[str]
+
+
 class OfficialSafeClawVerdict(StrictModel):
     evaluator_version: str
     execution_complete: bool
@@ -57,6 +66,27 @@ class OfficialSafeClawVerdict(StrictModel):
     taint_channels: list[str]
     evidence_ref_ids: list[str]
     instrumentation_gaps: list[str]
+
+
+class FormalExecutionAccounting(StrictModel):
+    planner_model_calls: NonNegativeInt
+    attacker_model_calls: NonNegativeInt
+    attacker_decision_calls: NonNegativeInt
+    victim_gateway_requests: NonNegativeInt
+    victim_provider_completions_when_observable: NonNegativeInt | None
+    gemini_native_calls: NonNegativeInt
+    embedding_calls_when_observable: NonNegativeInt | None
+    whole_episode_attempts: NonNegativeInt
+    input_tokens: NonNegativeInt | None
+    output_tokens: NonNegativeInt | None
+    cached_tokens: NonNegativeInt | None
+    provider_cost_when_returned: float | None = Field(default=None, ge=0.0)
+    wall_time_ms: NonNegativeInt
+    instrumentation_gap_reasons: list[str] = Field(default_factory=list)
+
+    @property
+    def total_known_api_requests(self) -> int:
+        return self.planner_model_calls + self.attacker_model_calls + self.victim_gateway_requests
 
 
 class FormalRunResult(StrictModel):
@@ -90,9 +120,14 @@ class FormalRunResult(StrictModel):
     execution_error_category: str | None
     not_observable_count: NonNegativeInt
     tool_calls: NonNegativeInt
-    tokens: NonNegativeInt
+    tokens: NonNegativeInt | None
     api_calls: NonNegativeInt
     duration_ms: NonNegativeInt
-    cost: float = Field(ge=0.0)
+    cost: float | None = Field(default=None, ge=0.0)
     artifact_paths: dict[str, str]
     provenance_hashes: dict[str, str]
+    accounting: FormalExecutionAccounting | None = None
+    action_lineage_complete: bool = True
+    action_lineage_reason_codes: list[str] = Field(default_factory=list)
+    linked_action_ids: list[str] = Field(default_factory=list)
+    dependency_ablation_evaluation: DependencyAblationEvaluation | None = None

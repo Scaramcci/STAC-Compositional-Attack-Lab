@@ -11,6 +11,68 @@
       "title": "CausalVerdict",
       "type": "string"
     },
+    "DependencyAblationEvaluation": {
+      "additionalProperties": false,
+      "properties": {
+        "intervention_id": {
+          "title": "Intervention Id",
+          "type": "string"
+        },
+        "observed_mechanism_edge_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Observed Mechanism Edge Id"
+        },
+        "observed_verdict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CausalVerdict"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "target_dependency_absent": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Target Dependency Absent"
+        },
+        "target_edge_id": {
+          "title": "Target Edge Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intervention_id",
+        "target_edge_id",
+        "observed_mechanism_edge_id",
+        "observed_verdict",
+        "target_dependency_absent",
+        "reason_codes"
+      ],
+      "title": "DependencyAblationEvaluation",
+      "type": "object"
+    },
     "EdgeVerdict": {
       "additionalProperties": false,
       "properties": {
@@ -64,6 +126,142 @@
       ],
       "title": "EvidenceGrade",
       "type": "string"
+    },
+    "FormalExecutionAccounting": {
+      "additionalProperties": false,
+      "properties": {
+        "attacker_decision_calls": {
+          "minimum": 0,
+          "title": "Attacker Decision Calls",
+          "type": "integer"
+        },
+        "attacker_model_calls": {
+          "minimum": 0,
+          "title": "Attacker Model Calls",
+          "type": "integer"
+        },
+        "cached_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Cached Tokens"
+        },
+        "embedding_calls_when_observable": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Embedding Calls When Observable"
+        },
+        "gemini_native_calls": {
+          "minimum": 0,
+          "title": "Gemini Native Calls",
+          "type": "integer"
+        },
+        "input_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Input Tokens"
+        },
+        "instrumentation_gap_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Instrumentation Gap Reasons",
+          "type": "array"
+        },
+        "output_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Output Tokens"
+        },
+        "planner_model_calls": {
+          "minimum": 0,
+          "title": "Planner Model Calls",
+          "type": "integer"
+        },
+        "provider_cost_when_returned": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Cost When Returned"
+        },
+        "victim_gateway_requests": {
+          "minimum": 0,
+          "title": "Victim Gateway Requests",
+          "type": "integer"
+        },
+        "victim_provider_completions_when_observable": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Victim Provider Completions When Observable"
+        },
+        "wall_time_ms": {
+          "minimum": 0,
+          "title": "Wall Time Ms",
+          "type": "integer"
+        },
+        "whole_episode_attempts": {
+          "minimum": 0,
+          "title": "Whole Episode Attempts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "planner_model_calls",
+        "attacker_model_calls",
+        "attacker_decision_calls",
+        "victim_gateway_requests",
+        "victim_provider_completions_when_observable",
+        "gemini_native_calls",
+        "embedding_calls_when_observable",
+        "whole_episode_attempts",
+        "input_tokens",
+        "output_tokens",
+        "cached_tokens",
+        "wall_time_ms"
+      ],
+      "title": "FormalExecutionAccounting",
+      "type": "object"
     },
     "MacroVerdict": {
       "additionalProperties": false,
@@ -300,6 +498,29 @@
   },
   "additionalProperties": false,
   "properties": {
+    "accounting": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FormalExecutionAccounting"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "action_lineage_complete": {
+      "default": true,
+      "title": "Action Lineage Complete",
+      "type": "boolean"
+    },
+    "action_lineage_reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Action Lineage Reason Codes",
+      "type": "array"
+    },
     "all_required_edges_passed": {
       "title": "All Required Edges Passed",
       "type": "boolean"
@@ -355,9 +576,28 @@
       "type": "string"
     },
     "cost": {
-      "minimum": 0.0,
-      "title": "Cost",
-      "type": "number"
+      "anyOf": [
+        {
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cost"
+    },
+    "dependency_ablation_evaluation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DependencyAblationEvaluation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "duration_ms": {
       "minimum": 0,
@@ -397,6 +637,13 @@
     "library_version": {
       "title": "Library Version",
       "type": "string"
+    },
+    "linked_action_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Linked Action Ids",
+      "type": "array"
     },
     "macro_verdicts": {
       "items": {
@@ -481,9 +728,16 @@
       "type": "boolean"
     },
     "tokens": {
-      "minimum": 0,
-      "title": "Tokens",
-      "type": "integer"
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Tokens"
     },
     "tool_calls": {
       "minimum": 0,
@@ -524,7 +778,6 @@
     "tokens",
     "api_calls",
     "duration_ms",
-    "cost",
     "artifact_paths",
     "provenance_hashes"
   ],

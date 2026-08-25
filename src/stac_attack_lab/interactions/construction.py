@@ -19,11 +19,17 @@ class ConstructionObservation(StrictModel):
 
     task_id: str
     session_index: int
+    action_index: int
     public_transcript: list[dict[str, str]] = Field(default_factory=list)
     public_component_inventory: dict[str, list[str]] = Field(default_factory=dict)
     public_capabilities: list[str] = Field(default_factory=list)
     public_stage_status: dict[str, str] = Field(default_factory=dict)
     remaining_sessions: int
+    remaining_turns: int
+    remaining_actions: int
+    remaining_tool_calls: int
+    remaining_tokens: int
+    elapsed_wall_time_ms: int
     remaining_events: int
     legal_retry_ids: list[str] = Field(default_factory=list)
     legal_reroute_ids: list[str] = Field(default_factory=list)
@@ -186,7 +192,7 @@ class ModelConstructionAttacker:
                     {"role": "user", "content": json.dumps(payload, sort_keys=True)},
                 ],
                 ConstructionAttackerAction,
-                seed=seed + observation.session_index,
+                seed=seed + observation.action_index,
                 timeout=60,
             )
         except ModelCallError:
@@ -208,8 +214,7 @@ class ModelConstructionAttacker:
             raise ValueError("construction_attacker_used_illegal_reroute")
         if (
             value.expected_public_predicate_id is not None
-            and value.expected_public_predicate_id
-            not in manifest.public_terminal_predicate_ids
+            and value.expected_public_predicate_id not in manifest.public_terminal_predicate_ids
         ):
             raise ValueError("construction_attacker_referenced_unknown_public_predicate")
         return value

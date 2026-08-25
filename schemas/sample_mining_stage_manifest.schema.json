@@ -1,0 +1,88 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "accepted_count": {
+      "title": "Accepted Count",
+      "type": "integer"
+    },
+    "attempt_outcome_counts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Attempt Outcome Counts",
+      "type": "object"
+    },
+    "candidate_count": {
+      "title": "Candidate Count",
+      "type": "integer"
+    },
+    "collection_tree_hash": {
+      "title": "Collection Tree Hash",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "library_tree_hash": {
+      "title": "Library Tree Hash",
+      "type": "string"
+    },
+    "negative_count": {
+      "title": "Negative Count",
+      "type": "integer"
+    },
+    "output_content_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Output Content Hashes",
+      "type": "object"
+    },
+    "output_tree_hash": {
+      "title": "Output Tree Hash",
+      "type": "string"
+    },
+    "pipeline_id": {
+      "title": "Pipeline Id",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage": {
+      "const": "mining",
+      "default": "mining",
+      "title": "Stage",
+      "type": "string"
+    },
+    "target_accepted_samples": {
+      "exclusiveMinimum": 0,
+      "title": "Target Accepted Samples",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "pipeline_id",
+    "config_hash",
+    "registry_hash",
+    "collection_tree_hash",
+    "library_tree_hash",
+    "candidate_count",
+    "accepted_count",
+    "target_accepted_samples",
+    "negative_count",
+    "attempt_outcome_counts",
+    "output_content_hashes",
+    "output_tree_hash"
+  ],
+  "title": "SampleMiningStageManifest",
+  "type": "object"
+}

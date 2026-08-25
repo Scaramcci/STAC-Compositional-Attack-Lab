@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from itertools import product
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,7 +30,8 @@ class InteractionCollectionPlan(StrictModel):
     source_task_ids: list[str]
     allowed_source_splits: list[str] = Field(default_factory=lambda: ["train", "dev", "synthetic"])
     formal_excluded_task_ids: list[str] = Field(default_factory=list)
-    seed: int
+    seed: int | None = None
+    seeds: list[int] = Field(default_factory=list)
     budget: CollectionBudget = Field(default_factory=CollectionBudget)
 
     @model_validator(mode="after")
@@ -41,7 +43,21 @@ class InteractionCollectionPlan(StrictModel):
             raise ValueError("formal_excluded_task_requested:" + ",".join(sorted(overlap)))
         if len(self.source_task_ids) != len(set(self.source_task_ids)):
             raise ValueError("duplicate_source_task_id")
+        if self.seed is not None and self.seeds:
+            raise ValueError("collection_seed_and_seeds_are_mutually_exclusive")
+        if self.seed is None and not self.seeds:
+            raise ValueError("collection_requires_seed_or_seeds")
+        if len(self.seeds) != len(set(self.seeds)):
+            raise ValueError("duplicate_collection_seed")
         return self
+
+    @property
+    def effective_seeds(self) -> list[int]:
+        if self.seeds:
+            return list(self.seeds)
+        if self.seed is None:
+            raise ValueError("collection_requires_seed_or_seeds")
+        return [self.seed]
 
 
 @dataclass(frozen=True)
@@ -173,16 +189,16 @@ def collect_interactions(
     trajectory_paths: list[Path] = []
     skipped: list[str] = []
     failures: list[dict[str, str]] = []
-    for source_task_id in plan.source_task_ids:
+    for source_task_id, seed in product(plan.source_task_ids, plan.effective_seeds):
         task = inventory[source_task_id]
         if task.source_split not in plan.allowed_source_splits:
             raise ValueError(f"source_split_not_allowed:{task.source_task_id}:{task.source_split}")
         construction_manifest = (
-            construction_attacker.prepare(task, seed=plan.seed)
+            construction_attacker.prepare(task, seed=seed)
             if construction_attacker is not None
             else None
         )
-        trajectory_id = _trajectory_id(adapter, task, plan.seed, construction_manifest)
+        trajectory_id = _trajectory_id(adapter, task, seed, construction_manifest)
         existing = root / "trajectories" / trajectory_id / "raw_trajectory.json"
         if existing.is_file():
             RawInteractionTrajectory.model_validate_json(existing.read_text(encoding="utf-8"))
@@ -198,11 +214,11 @@ def collect_interactions(
                     task,
                     construction_manifest,
                     construction_attacker,
-                    seed=plan.seed,
+                    seed=seed,
                     budget=plan.budget,
                 )
             else:
-                collected = adapter.collect(task, seed=plan.seed, budget=plan.budget)
+                collected = adapter.collect(task, seed=seed, budget=plan.budget)
             if len(collected.source_events) > plan.budget.max_events:
                 raise ValueError("source_event_budget_exceeded")
             path = _write_collected(
@@ -210,7 +226,7 @@ def collect_interactions(
                 adapter,
                 collected,
                 trajectory_id,
-                plan.seed,
+                seed,
                 construction_manifest,
             )
             trajectory_paths.append(path)
@@ -258,7 +274,7 @@ def collect_interactions(
                 adapter,
                 error_collected,
                 trajectory_id,
-                plan.seed,
+                seed,
                 construction_manifest,
             )
             trajectory_paths.append(path)

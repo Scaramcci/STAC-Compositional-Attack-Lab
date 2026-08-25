@@ -8,11 +8,13 @@ from stac_attack_lab.environments.safeclaw.contracts import (
     SafeClawExecutionStatus,
 )
 from stac_attack_lab.environments.safeclaw.task_adapter import parse_safeclaw_task
+from stac_attack_lab.execution.formal_attacker import FormalVictimObservation
 from stac_attack_lab.execution.sample_generation import (
     build_sample_library,
     load_sample_generation_config,
 )
 from stac_attack_lab.extraction.occurrences import extract_primitive_occurrences
+from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.collector import (
     InteractionCollectionPlan,
     collect_interactions,
@@ -69,11 +71,10 @@ def _plan_and_views(tmp_path: Path):  # type: ignore[no-untyped-def]
     public = library.public_index()[0]
     planner_input = FormalPlannerInput(
         planner_input_id="formal-verifier-input",
-        library_id=library.manifest.library_id,
-        library_version=library.manifest.library_version,
-        library_hash=library.manifest.tree_hash,
-        public_samples=[public],
+        assignment_id="assignment-formal-verifier",
         public_task=descriptor.public_view,
+        benchmark_public_prompt=descriptor.benchmark_public_prompt,
+        selected_sample=public,
         budget=FormalBudget(
             max_sessions=3,
             max_turns=24,
@@ -153,13 +154,105 @@ def test_formal_mechanism_verifies_all_required_layers(tmp_path: Path) -> None:
         official_terminal_success=True,
     )
 
-    assert len(mechanism.occurrence_verdicts) == 8
-    assert len(mechanism.edge_verdicts) == 7
-    assert len(mechanism.macro_verdicts) == 5
+    assert len(mechanism.occurrence_verdicts) == len(planner_view.core_nodes) == 7
+    assert len(mechanism.edge_verdicts) == len(planner_view.core_edges) == 6
+    assert len(mechanism.macro_verdicts) == len(planner_view.macro_nodes)
     assert all(item.outcome == PrimitiveOutcome.passed for item in mechanism.occurrence_verdicts)
     assert all(item.verdict == CausalVerdict.causal_pass for item in mechanism.edge_verdicts)
     assert all(item.outcome == PrimitiveOutcome.passed for item in mechanism.macro_verdicts)
     assert mechanism.forbidden_shortcut is False
+
+
+def test_formal_mechanism_requires_selected_occurrence_action_lineage(
+    tmp_path: Path,
+) -> None:
+    graph = _graph(tmp_path)
+    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    occurrences = extract_primitive_occurrences(graph, registry).occurrences
+    _, planner_view, execution_view = _plan_and_views(tmp_path)
+    occurrence_by_ref = {
+        occurrence.primitive_ref: occurrence
+        for occurrence in occurrences
+        if occurrence.outcome == PrimitiveOutcome.passed
+    }
+    lineage_by_event: dict[str, tuple[str, str]] = {}
+    observations: list[FormalVictimObservation] = []
+    for node in planner_view.core_nodes:
+        if node.optional:
+            continue
+        primitive_ref = execution_view.core_pattern_refs[node.node_id][0]
+        occurrence = occurrence_by_ref[primitive_ref]
+        source_event_id = occurrence.source_event_ids[0]
+        action_id = f"action-{node.node_id}"
+        lineage_by_event[source_event_id] = (node.node_id, action_id)
+        payload = {
+            "schema_version": "1.0",
+            "observation_id": f"observation-{node.node_id}",
+            "plan_id": "plan-lineage",
+            "plan_stage_id": node.node_id,
+            "attacker_call_id": f"call-{node.node_id}",
+            "attacker_action_id": action_id,
+            "victim_request_event_id": source_event_id,
+            "victim_response_event_id": source_event_id,
+            "tool_event_ids": [],
+            "input_artifact_refs": ["artifact:input"],
+            "input_state_refs": ["state:before"],
+            "output_artifact_refs": ["artifact:output"],
+            "output_state_refs": ["state:after"],
+            "verifier_evidence_refs": [f"event:{source_event_id}"],
+            "benchmark_session_id": "s1",
+            "public_response_text": "observed",
+            "public_tool_calls": [],
+            "public_state_delta": {},
+            "status": "completed",
+        }
+        observations.append(
+            FormalVictimObservation.model_validate(
+                {**payload, "observation_hash": stable_hash(payload)}
+            )
+        )
+    linked_graph = graph.model_copy(
+        update={
+            "events": [
+                event.model_copy(
+                    update={
+                        "plan_id": "plan-lineage",
+                        "plan_stage_id": lineage_by_event[event.event_id][0],
+                        "attacker_call_id": f"call-{lineage_by_event[event.event_id][0]}",
+                        "attacker_action_id": lineage_by_event[event.event_id][1],
+                        "action_journal_ref": "formal_action_journal.jsonl#L1",
+                    }
+                )
+                if event.event_id in lineage_by_event
+                else event
+                for event in graph.events
+            ]
+        }
+    )
+    passed = evaluate_formal_mechanism(
+        planner_view=planner_view,
+        execution_view=execution_view,
+        occurrences=occurrences,
+        graph=linked_graph,
+        registry=registry,
+        official_terminal_success=True,
+        action_observations=observations,
+    )
+    assert passed.action_lineage_complete is True
+    assert passed.linked_action_ids == sorted(item.attacker_action_id for item in observations)
+
+    missing_event_graph = linked_graph.model_copy(update={"events": linked_graph.events[1:]})
+    failed = evaluate_formal_mechanism(
+        planner_view=planner_view,
+        execution_view=execution_view,
+        occurrences=occurrences,
+        graph=missing_event_graph,
+        registry=registry,
+        official_terminal_success=True,
+        action_observations=observations,
+    )
+    assert failed.action_lineage_complete is False
+    assert any("formal_action_event_missing" in item for item in failed.action_lineage_reason_codes)
 
 
 def test_occurrence_missing_state_diff_is_not_observable(tmp_path: Path) -> None:

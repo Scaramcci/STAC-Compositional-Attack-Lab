@@ -47,6 +47,54 @@ def _observable_state(raw: dict[str, Any]) -> dict[str, Any]:
     return {key: raw.get(key) for key in keys}
 
 
+def _nonnegative_int(value: Any) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+        return None
+    return int(value)
+
+
+def _observable_usage(raw: Any) -> dict[str, int] | None:
+    """Return token counts only; never retain raw provider response metadata."""
+    if isinstance(raw, list):
+        for value in raw:
+            nested = _observable_usage(value)
+            if nested is not None:
+                return nested
+        return None
+    if not isinstance(raw, dict):
+        return None
+    aliases = {
+        "input_tokens": ("input_tokens", "prompt_tokens", "promptTokenCount"),
+        "output_tokens": ("output_tokens", "completion_tokens", "candidatesTokenCount"),
+        "total_tokens": ("total_tokens", "totalTokenCount"),
+    }
+    projected: dict[str, int] = {}
+    for canonical, candidates in aliases.items():
+        for candidate in candidates:
+            value = _nonnegative_int(raw.get(candidate))
+            if value is not None:
+                projected[canonical] = value
+                break
+    if projected:
+        if "total_tokens" not in projected and {
+            "input_tokens",
+            "output_tokens",
+        } <= set(projected):
+            projected["total_tokens"] = projected["input_tokens"] + projected["output_tokens"]
+        return projected
+    priority_keys = ("usage", "usageMetadata", "result", "payload", "data", "response")
+    for key in priority_keys:
+        nested = _observable_usage(raw.get(key))
+        if nested is not None:
+            return nested
+    for value in raw.values():
+        if isinstance(value, (dict, list)):
+            nested = _observable_usage(value)
+            if nested is not None:
+                return nested
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--upstream", required=True)
@@ -115,8 +163,9 @@ def main() -> int:
                 )
                 public_post_state = _observable_state(runner.capture_post_state())
             current_key = result.pop("_session_key")
+            raw_api_response = result.pop("raw_api_response", None)
+            result["provider_usage"] = _observable_usage(raw_api_response)
             pending_restart = False
-            result.pop("raw_api_response", None)
             runner.session_results.append(result)
             _emit(
                 {

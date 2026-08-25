@@ -42,16 +42,17 @@ PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample attack-build \
 
 Phase A synthetic construction 已完成并保留为历史 frozen fixture。真实 adaptive Construction Attacker、完整 SafeClaw Victim driver、primitive-aware trajectory planner 和 independent Formal Attacker 已实现；materializer 与官方 evaluator 仍不是 Attacker。尚未启动真实模型 Sample Collection，也未进行正式 ASR/迁移性实验。
 
-真实 Sample Collection 的配置为 `configs/sample_generation/safeclaw_adversarial_v1.yaml`。按顺序先运行只读 preflight，确认全部检查通过后再运行 collection：
+真实 Sample Collection 使用 v2 pilot-first 流程。先显式导出 `SAFECLAW_MODEL` 和提供方确认可用于 `/v1/embeddings` 的 `SAFECLAW_EMBEDDING_MODEL`，再启动有锁、可恢复的 pilot launcher：
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample collect-preflight \
-  --config configs/sample_generation/safeclaw_adversarial_v1.yaml
-PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample collect \
-  --config configs/sample_generation/safeclaw_adversarial_v1.yaml
+export SAFECLAW_MODEL=gpt-5.5
+: "${SAFECLAW_EMBEDDING_MODEL:?export a provider-verified embedding model id first}"
+export SAFECLAW_EMBEDDING_MODEL
+bash scripts/run_safeclaw_sample_collection.sh \
+  --config configs/sample_generation/safeclaw_adversarial_v2_pilot.yaml
 ```
 
-`collect-preflight` 不启动 Victim、Attacker 或 Docker task；`collect` 才开始真实模型调用。每个 source task 独立原子落盘并按稳定 trajectory id 恢复。
+launcher 先运行 `collect-preflight`；该阶段不启动 Victim、Attacker 或 Docker task。只有 preflight 全部通过后才进入真实 collection。pilot 审计、主 campaign、确定性 mine/audit/freeze 与正式 evaluation 的 tmux 命令见 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md)。历史 `safeclaw_adversarial_v1.yaml` 和 `scripts/run_sample_collection.sh` 不属于该 v2 正式流程。
 
 ## 对话数据在哪里
 
@@ -143,16 +144,4 @@ make smoke-report
 
 Fake profile 不需要 API key 或网络。真实模型配置和运行命令见 [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)。凭证只从本地环境变量读取，不写入代码、配置、文档或日志。
 
-正式样本采集与 SafeClaw 评估统一通过以下入口启动；两个入口都支持
-`--help` 和 `--print-output-dir`，并使用稳定 run id、文件锁和持久日志：
-
-```bash
-bash scripts/run_sample_collection.sh
-bash scripts/run_formal_evaluation.sh
-```
-
-样本默认写入配置 hash 派生的 `data/generated/<run-id>/`。SafeClaw formal
-默认写入 `experiments/safeclaw_runs/safeclaw-formal-v1-main/`。
-
-SafeClaw formal 配置已在授权后切换为 ready；启动入口仍会依次执行官方
-PSE smoke、Docker/image/model preflight，并只接受配置 allowlist 中的 target model。
+`scripts/run_sample_collection.sh` 是通用 STAC offline/GPT-Gemini legacy 入口，输出到 `data/generated/<run-id>/`，不生成本实验的 SafeClaw primitive library。SafeClaw v2 collection 必须使用 `scripts/run_safeclaw_sample_collection.sh`，正式 evaluation 使用带 v2 参数的 `scripts/run_formal_evaluation.sh`。两者的 pilot-first 顺序、tmux 命令、输出目录、mine/audit/freeze 门禁和恢复方法以 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md) 为准。

@@ -82,7 +82,12 @@ def test_formal_registry_is_frozen_and_legacy_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(FORMAL_SCHEMA_MODELS) == 23
+    assert len(FORMAL_SCHEMA_MODELS) == 29
+    assert {
+        "sample_collection_stage_manifest",
+        "sample_mining_stage_manifest",
+        "sample_library_audit_report",
+    } <= set(FORMAL_SCHEMA_MODELS)
     for model in FORMAL_SCHEMA_MODELS.values():
         schema = model.model_json_schema()
         assert schema["type"] == "object"

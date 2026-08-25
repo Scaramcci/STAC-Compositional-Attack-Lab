@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from stac_attack_lab.environments.safeclaw.contracts import (
+    BenchmarkPublicPrompt,
+    PublicBenchmarkSessionPrompt,
     SafeClawBindingSlot,
     SafeClawPublicTaskView,
     SafeClawTaskDescriptor,
@@ -84,6 +86,36 @@ def _parse_bindable_slots(formal: dict[str, Any]) -> tuple[list[SafeClawBindingS
     return slots, errors
 
 
+def build_benchmark_public_prompt(task: dict[str, Any]) -> BenchmarkPublicPrompt:
+    metadata = task.get("metadata")
+    sessions = task.get("sessions")
+    if not isinstance(metadata, dict) or not isinstance(sessions, list) or not sessions:
+        raise ValueError("safeclaw_public_prompt_missing_metadata_or_sessions")
+    public_sessions: list[PublicBenchmarkSessionPrompt] = []
+    for index, session in enumerate(sessions, start=1):
+        if not isinstance(session, dict) or not isinstance(session.get("user_instruction"), str):
+            raise ValueError("safeclaw_public_prompt_invalid_session")
+        context = session.get("instruction_context")
+        if context is not None and not isinstance(context, str):
+            raise ValueError("safeclaw_public_prompt_invalid_instruction_context")
+        public_sessions.append(
+            PublicBenchmarkSessionPrompt(
+                session_id=str(session.get("session_id", f"session-{index}")),
+                sequence_no=index,
+                user_instruction=str(session["user_instruction"]),
+                instruction_context=context,
+            )
+        )
+    payload = {
+        "schema_version": "1.0",
+        "task_id": str(metadata["task_id"]),
+        "title": str(metadata["title"]),
+        "description": str(metadata.get("description", "")),
+        "sessions": [item.model_dump(mode="json") for item in public_sessions],
+    }
+    return BenchmarkPublicPrompt.model_validate({**payload, "prompt_hash": stable_hash(payload)})
+
+
 def parse_safeclaw_task(
     path: Path,
     *,
@@ -143,6 +175,7 @@ def parse_safeclaw_task(
         ),
         task_source_hash=source_hash,
     )
+    benchmark_public_prompt = build_benchmark_public_prompt(task)
     supported = not slot_errors and (
         track == SafeClawTrack.conformance
         or bool(formal_mapping.get("materialization_template_id"))
@@ -165,6 +198,7 @@ def parse_safeclaw_task(
         source_hash=source_hash,
         upstream_commit=upstream_commit,
         public_view=public_view,
+        benchmark_public_prompt=benchmark_public_prompt,
         private_oracle_ref=f"{relative_path}#/evaluation",
         official_success_condition_hash=stable_hash(evaluation.get("success_condition")),
         official_safe_condition_hash=stable_hash(evaluation.get("safe_condition")),

@@ -8,7 +8,6 @@ from stac_attack_lab.datasets.primitive_chain import (
     FilterGate,
     PrimitiveChainCandidate,
 )
-from stac_attack_lab.extraction.chains import CANONICAL_REQUIRED_CORE_EDGES
 from stac_attack_lab.interactions.models import InteractionGraph, PrimitiveOccurrence
 from stac_attack_lab.primitives.core import EvidenceGrade, PrimitiveOutcome
 from stac_attack_lab.primitives.formal_registry import FormalPrimitiveRegistry
@@ -37,18 +36,6 @@ class ChainFilteringResult(StrictModel):
     records: list[CandidateFilterRecord]
 
 
-REQUIRED_PRIMITIVE_REFS = {
-    "core.transfer.external_ingress@1",
-    "core.transform.extract@1",
-    "core.mutate.memory_write@1",
-    "core.control.restart@1",
-    "core.transfer.retrieve@1",
-    "core.transform.parameterize@1",
-    "core.transfer.request@1",
-    "core.mutate.external_effect@1",
-}
-
-
 def _decision(
     gate: FilterGate,
     passed: bool,
@@ -65,37 +52,41 @@ def _decision(
 
 
 def _required_edge_findings(
+    candidate: PrimitiveChainCandidate,
     graph: InteractionGraph,
     occurrences: list[PrimitiveOccurrence],
 ) -> tuple[list[str], list[str]]:
-    by_ref = {occurrence.primitive_ref: occurrence for occurrence in occurrences}
+    occurrence_by_id = {item.occurrence_id: item for item in occurrences}
+    occurrence_by_node = {
+        node.node_id: occurrence_by_id[occurrence_id]
+        for occurrence_id, node in zip(candidate.occurrence_ids, candidate.core_nodes, strict=True)
+        if occurrence_id in occurrence_by_id
+    }
+    graph_edges = {edge.edge_id: edge for edge in graph.edges}
     missing: list[str] = []
     evidence: list[str] = []
-    for source_ref, target_ref, edge_type in CANONICAL_REQUIRED_CORE_EDGES:
-        source = by_ref.get(source_ref)
-        target = by_ref.get(target_ref)
-        edge_label = f"{source_ref}->{target_ref}:{edge_type.value}"
-        if source is None or target is None:
-            missing.append("missing_occurrence_for_edge:" + edge_label)
-            continue
-        source_events = set(source.source_event_ids)
-        target_events = set(target.source_event_ids)
-        match = next(
-            (
-                edge
-                for edge in graph.edges
-                if edge.edge_type == edge_type
-                and edge.source_event_id in source_events
-                and edge.target_event_id in target_events
-                and edge.observable
-            ),
-            None,
+    if len(candidate.core_edges) != max(len(candidate.core_nodes) - 1, 0):
+        missing.append("core_chain_dependency_not_continuous")
+    for core_edge in candidate.core_edges:
+        source = occurrence_by_node.get(core_edge.source_node_id)
+        target = occurrence_by_node.get(core_edge.target_node_id)
+        graph_edge = graph_edges.get(core_edge.edge_id.removeprefix("core-"))
+        edge_label = (
+            f"{core_edge.source_node_id}->{core_edge.target_node_id}:{core_edge.edge_type.value}"
         )
-        if match is None:
+        if source is None or target is None or graph_edge is None:
             missing.append("missing_typed_causal_edge:" + edge_label)
-        else:
-            evidence.extend(match.evidence_ref_ids)
-    return missing, list(dict.fromkeys(evidence))
+            continue
+        if (
+            not graph_edge.observable
+            or graph_edge.edge_type != core_edge.edge_type
+            or graph_edge.source_event_id not in set(source.source_event_ids)
+            or graph_edge.target_event_id not in set(target.source_event_ids)
+        ):
+            missing.append("typed_causal_edge_mismatch:" + edge_label)
+            continue
+        evidence.extend(graph_edge.evidence_ref_ids)
+    return sorted(set(missing)), list(dict.fromkeys(evidence))
 
 
 def filter_chain_candidate(
@@ -119,22 +110,22 @@ def filter_chain_candidate(
         _decision(FilterGate.schema_type, not schema_errors, "schema_and_type_valid", schema_errors)
     )
 
-    by_ref = {occurrence.primitive_ref: occurrence for occurrence in occurrences}
+    occurrence_by_id = {occurrence.occurrence_id: occurrence for occurrence in occurrences}
     evidence_errors: list[str] = []
     evidence_refs: list[str] = []
-    for primitive_ref in sorted(REQUIRED_PRIMITIVE_REFS):
-        occurrence = by_ref.get(primitive_ref)
+    for occurrence_id in candidate.occurrence_ids:
+        occurrence = occurrence_by_id.get(occurrence_id)
         if occurrence is None:
-            evidence_errors.append(f"required_occurrence_missing:{primitive_ref}")
+            evidence_errors.append(f"candidate_occurrence_missing:{occurrence_id}")
             continue
         evidence_refs.extend(occurrence.evidence_ref_ids)
         if occurrence.outcome != PrimitiveOutcome.passed or not occurrence.hard_fact:
-            evidence_errors.append(f"required_occurrence_not_hard_pass:{primitive_ref}")
+            evidence_errors.append(f"candidate_occurrence_not_hard_pass:{occurrence_id}")
         if not set(occurrence.evidence_grades) & {
             EvidenceGrade.direct,
             EvidenceGrade.deterministic_derived,
         }:
-            evidence_errors.append(f"required_occurrence_missing_e1_e2:{primitive_ref}")
+            evidence_errors.append(f"candidate_occurrence_missing_e1_e2:{occurrence_id}")
     decisions.append(
         _decision(
             FilterGate.occurrence_evidence,
@@ -145,7 +136,7 @@ def filter_chain_candidate(
         )
     )
 
-    edge_errors, edge_evidence = _required_edge_findings(graph, occurrences)
+    edge_errors, edge_evidence = _required_edge_findings(candidate, graph, occurrences)
     decisions.append(
         _decision(
             FilterGate.causal_edge,
@@ -185,16 +176,15 @@ def filter_chain_candidate(
         )
     )
 
+    entry_event_ids = set(
+        occurrence_by_id[candidate.occurrence_ids[0]].source_event_ids
+        if candidate.occurrence_ids and candidate.occurrence_ids[0] in occurrence_by_id
+        else []
+    )
     tainted_ingress = any(
         "untrusted" in artifact.taint_labels
         for artifact in graph.artifacts
-        if artifact.producer_event_id
-        in {
-            event_id
-            for occurrence in occurrences
-            if occurrence.primitive_ref == "core.transfer.external_ingress@1"
-            for event_id in occurrence.source_event_ids
-        }
+        if artifact.producer_event_id in entry_event_ids
     )
     relevance_errors: list[str] = []
     manifest = candidate.construction_manifest

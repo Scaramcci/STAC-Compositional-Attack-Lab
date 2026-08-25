@@ -136,6 +136,11 @@ class InteractionEvent(StrictModel):
     status: PrimitiveOutcome
     input_artifact_ids: list[str]
     output_artifact_ids: list[str]
+    plan_id: str | None = None
+    plan_stage_id: str | None = None
+    attacker_call_id: str | None = None
+    attacker_action_id: str | None = None
+    action_journal_ref: str | None = None
     read_state_refs: list[str]
     write_state_refs: list[str]
     pre_state_ref: str | None = None

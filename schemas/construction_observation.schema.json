@@ -2,6 +2,14 @@
   "additionalProperties": false,
   "description": "Evaluator-free state exposed to the construction attacker.",
   "properties": {
+    "action_index": {
+      "title": "Action Index",
+      "type": "integer"
+    },
+    "elapsed_wall_time_ms": {
+      "title": "Elapsed Wall Time Ms",
+      "type": "integer"
+    },
     "legal_reroute_ids": {
       "items": {
         "type": "string"
@@ -50,12 +58,28 @@
       "title": "Public Transcript",
       "type": "array"
     },
+    "remaining_actions": {
+      "title": "Remaining Actions",
+      "type": "integer"
+    },
     "remaining_events": {
       "title": "Remaining Events",
       "type": "integer"
     },
     "remaining_sessions": {
       "title": "Remaining Sessions",
+      "type": "integer"
+    },
+    "remaining_tokens": {
+      "title": "Remaining Tokens",
+      "type": "integer"
+    },
+    "remaining_tool_calls": {
+      "title": "Remaining Tool Calls",
+      "type": "integer"
+    },
+    "remaining_turns": {
+      "title": "Remaining Turns",
       "type": "integer"
     },
     "session_index": {
@@ -70,7 +94,13 @@
   "required": [
     "task_id",
     "session_index",
+    "action_index",
     "remaining_sessions",
+    "remaining_turns",
+    "remaining_actions",
+    "remaining_tool_calls",
+    "remaining_tokens",
+    "elapsed_wall_time_ms",
     "remaining_events"
   ],
   "title": "ConstructionObservation",

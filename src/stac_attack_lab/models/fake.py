@@ -11,6 +11,7 @@ from stac_attack_lab.contracts import (
 
 
 class FakeModelClient:
+    provider_id = "fake"
     model_id = "fake-deterministic-v1"
 
     def __init__(self, mode: str = "ok") -> None:

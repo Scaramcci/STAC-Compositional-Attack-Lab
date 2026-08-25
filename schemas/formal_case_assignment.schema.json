@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "BenchmarkPublicPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "prompt_hash": {
+          "title": "Prompt Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "sessions": {
+          "items": {
+            "$ref": "#/$defs/PublicBenchmarkSessionPrompt"
+          },
+          "title": "Sessions",
+          "type": "array"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "title",
+        "description",
+        "sessions",
+        "prompt_hash"
+      ],
+      "title": "BenchmarkPublicPrompt",
+      "type": "object"
+    },
+    "FormalBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_sessions": {
+          "exclusiveMinimum": 0,
+          "title": "Max Sessions",
+          "type": "integer"
+        },
+        "max_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "exclusiveMinimum": 0,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "max_turns": {
+          "exclusiveMinimum": 0,
+          "title": "Max Turns",
+          "type": "integer"
+        },
+        "max_wall_time_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Max Wall Time Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_sessions",
+        "max_turns",
+        "max_tool_calls",
+        "max_tokens",
+        "max_wall_time_seconds"
+      ],
+      "title": "FormalBudget",
+      "type": "object"
+    },
+    "PublicBenchmarkSessionPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "instruction_context": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction Context"
+        },
+        "sequence_no": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "user_instruction": {
+          "title": "User Instruction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "sequence_no",
+        "user_instruction"
+      ],
+      "title": "PublicBenchmarkSessionPrompt",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "assignment_hash": {
+      "title": "Assignment Hash",
+      "type": "string"
+    },
+    "assignment_id": {
+      "title": "Assignment Id",
+      "type": "string"
+    },
+    "benchmark_public_prompt": {
+      "$ref": "#/$defs/BenchmarkPublicPrompt"
+    },
+    "benchmark_public_prompt_hash": {
+      "title": "Benchmark Public Prompt Hash",
+      "type": "string"
+    },
+    "benchmark_task_id": {
+      "title": "Benchmark Task Id",
+      "type": "string"
+    },
+    "budget": {
+      "$ref": "#/$defs/FormalBudget"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "condition": {
+      "title": "Condition",
+      "type": "string"
+    },
+    "library_hash": {
+      "title": "Library Hash",
+      "type": "string"
+    },
+    "pair_group": {
+      "title": "Pair Group",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "selected_sample_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Sample Hash"
+    },
+    "selected_sample_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Selected Sample Id"
+    },
+    "task_set_hash": {
+      "title": "Task Set Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "assignment_id",
+    "case_id",
+    "pair_group",
+    "benchmark_task_id",
+    "benchmark_public_prompt",
+    "benchmark_public_prompt_hash",
+    "selected_sample_id",
+    "selected_sample_hash",
+    "condition",
+    "seed",
+    "budget",
+    "task_set_hash",
+    "library_hash",
+    "registry_hash",
+    "assignment_hash"
+  ],
+  "title": "FormalCaseAssignment",
+  "type": "object"
+}

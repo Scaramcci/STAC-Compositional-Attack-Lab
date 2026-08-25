@@ -146,3 +146,47 @@ def test_collection_manifest_contains_no_fixture_payload(tmp_path: Path) -> None
     )
     assert "SYNTHETIC_MARKER" not in json.dumps(manifest)
     assert manifest["formal_exclusion_hash"]
+
+
+def test_collection_expands_and_resumes_the_task_seed_matrix(tmp_path: Path) -> None:
+    adapter = JsonlFixtureInteractionAdapter(FIXTURE)
+    plan = InteractionCollectionPlan(
+        collection_id="phase2-multi-seed",
+        source_task_ids=["construction-synthetic-001"],
+        formal_excluded_task_ids=["heldout-safeclaw-task"],
+        seeds=[17, 19],
+    )
+
+    first = collect_interactions(plan, adapter, tmp_path / "raw")
+    resumed = collect_interactions(plan, adapter, tmp_path / "raw")
+
+    assert len(first.trajectory_paths) == 2
+    assert len(resumed.skipped_trajectory_ids) == 2
+    trajectories = [
+        RawInteractionTrajectory.model_validate_json(path.read_text(encoding="utf-8"))
+        for path in first.trajectory_paths
+    ]
+    assert {trajectory.collection_seed for trajectory in trajectories} == {17, 19}
+    assert len({trajectory.trajectory_id for trajectory in trajectories}) == 2
+
+
+@pytest.mark.parametrize(
+    ("seed", "seeds", "reason"),
+    [
+        (None, [], "collection_requires_seed_or_seeds"),
+        (17, [19], "collection_seed_and_seeds_are_mutually_exclusive"),
+        (None, [17, 17], "duplicate_collection_seed"),
+    ],
+)
+def test_collection_rejects_ambiguous_or_invalid_seed_matrix(
+    seed: int | None,
+    seeds: list[int],
+    reason: str,
+) -> None:
+    with pytest.raises(ValueError, match=reason):
+        InteractionCollectionPlan(
+            collection_id="invalid-seeds",
+            source_task_ids=["construction-synthetic-001"],
+            seed=seed,
+            seeds=seeds,
+        )

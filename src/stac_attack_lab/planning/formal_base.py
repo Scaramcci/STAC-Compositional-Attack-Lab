@@ -10,8 +10,11 @@ from stac_attack_lab.datasets.primitive_chain import PlannerSampleView
 from stac_attack_lab.environments.safeclaw.contracts import (
     BaselineBinding,
     BenchmarkBinding,
+    BenchmarkPublicPrompt,
     SafeClawPublicTaskView,
 )
+from stac_attack_lab.hashing import stable_hash
+from stac_attack_lab.interactions.models import DependencyType
 from stac_attack_lab.primitives.core import CorePrimitiveFamily
 
 AdversarialRole = Literal[
@@ -40,25 +43,79 @@ class PublicSampleIndexEntry(StrictModel):
     planner_view: PlannerSampleView
 
 
-class FormalPlannerInput(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
-    planner_input_id: str
-    library_id: str
-    library_version: str
+class FormalCaseAssignment(StrictModel):
+    schema_version: Literal["3.0"] = "3.0"
+    assignment_id: str
+    case_id: str
+    pair_group: str
+    benchmark_task_id: str
+    benchmark_public_prompt: BenchmarkPublicPrompt
+    benchmark_public_prompt_hash: str
+    selected_sample_id: str | None
+    selected_sample_hash: str | None
+    condition: str
+    seed: int
+    budget: FormalBudget
+    task_set_hash: str
     library_hash: str
-    public_samples: list[PublicSampleIndexEntry]
+    registry_hash: str
+    assignment_hash: str
+
+    @model_validator(mode="after")
+    def validate_assignment(self) -> FormalCaseAssignment:
+        if self.benchmark_public_prompt.task_id != self.benchmark_task_id:
+            raise ValueError("assignment_public_prompt_task_mismatch")
+        if self.benchmark_public_prompt.prompt_hash != self.benchmark_public_prompt_hash:
+            raise ValueError("assignment_public_prompt_hash_mismatch")
+        if (self.selected_sample_id is None) != (self.selected_sample_hash is None):
+            raise ValueError("assignment_selected_sample_fields_mismatch")
+        if self.condition == "no_sample" and self.selected_sample_id is not None:
+            raise ValueError("no_sample_assignment_contains_sample")
+        payload = self.model_dump(mode="json", exclude={"assignment_hash"})
+        if self.assignment_hash != stable_hash(payload):
+            raise ValueError("formal_case_assignment_hash_mismatch")
+        return self
+
+
+class SingleSamplePlannerInput(StrictModel):
+    schema_version: Literal["3.0"] = "3.0"
+    planner_input_id: str
+    assignment_id: str
     public_task: SafeClawPublicTaskView
+    benchmark_public_prompt: BenchmarkPublicPrompt
+    selected_sample: PublicSampleIndexEntry | None
     budget: FormalBudget
     condition: str
     seed: int
     prior_public_session_status: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_single_sample_contract(self) -> SingleSamplePlannerInput:
+        if self.public_task.task_id != self.benchmark_public_prompt.task_id:
+            raise ValueError("planner_public_prompt_task_mismatch")
+        if self.condition == "no_sample" and self.selected_sample is not None:
+            raise ValueError("no_sample_planner_input_contains_sample")
+        if self.condition != "no_sample" and self.selected_sample is None:
+            raise ValueError("sample_condition_planner_input_missing_sample")
+        return self
+
+
+# Source compatibility only. The strict v3 schema rejects legacy `public_samples`
+# and library metadata, so this alias cannot expose the full library to a Planner.
+FormalPlannerInput = SingleSamplePlannerInput
 
 
 class PlannerSelectionEvidence(StrictModel):
     compatible_sample_ids: list[str]
     rejected_sample_reason_codes: dict[str, list[str]]
     rank_scores: dict[str, float]
-    decision_source: Literal["deterministic", "random_compatible", "llm_tiebreak", "abstain"]
+    decision_source: Literal[
+        "scheduler_assigned",
+        "deterministic",
+        "random_compatible",
+        "llm_tiebreak",
+        "abstain",
+    ]
     public_prompt_hash: str | None = None
 
 
@@ -72,6 +129,7 @@ class LongHorizonAttackFamily(StrEnum):
 
 class PrimitiveTrajectoryStage(StrictModel):
     stage_id: str
+    core_node_ref: str
     macro_ref: str
     primary_family: CorePrimitiveFamily
     input_state_refs: list[str]
@@ -106,6 +164,19 @@ class PlannerControlCase(StrictModel):
     control_id: str
     intervention: ControlIntervention
     expected_observation: str
+
+
+class DependencyAblationPlan(StrictModel):
+    intervention_id: str
+    sample_id: str
+    target_edge_id: str
+    source_stage_id: str
+    target_stage_id: str
+    edge_type: DependencyType
+    materialization_slot_id: str
+    replacement_source: Literal["baseline.task_set"] = "baseline.task_set"
+    expected_observation: Literal["target_dependency_absent"] = "target_dependency_absent"
+    trajectory_hash: str
 
 
 class LongHorizonAdversarialTrajectory(StrictModel):
@@ -183,6 +254,7 @@ class FormalEvaluationPlan(StrictModel):
     budget: FormalBudget
     expected_public_stage_effects: dict[str, str]
     ablation_labels: list[str]
+    dependency_ablation: DependencyAblationPlan | None = None
     selection_evidence: PlannerSelectionEvidence
     adversarial_trajectory: LongHorizonAdversarialTrajectory | None = None
     plan_hash: str
@@ -218,6 +290,18 @@ class FormalEvaluationPlan(StrictModel):
             or self.adversarial_trajectory is not None
         ):
             raise ValueError("formal_plan_abstention_fields_mismatch")
+        trajectory = self.adversarial_trajectory
+        if self.condition == "dependency_ablation":
+            if not selected or self.dependency_ablation is None or trajectory is None:
+                raise ValueError("dependency_ablation_plan_missing_intervention")
+            stage_ids = {stage.stage_id for stage in trajectory.primitive_sequence}
+            if (
+                self.dependency_ablation.source_stage_id not in stage_ids
+                or self.dependency_ablation.target_stage_id not in stage_ids
+            ):
+                raise ValueError("dependency_ablation_references_unknown_stage")
+        elif self.dependency_ablation is not None:
+            raise ValueError("non_ablation_plan_contains_dependency_intervention")
         return self
 
 

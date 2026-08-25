@@ -44,20 +44,41 @@ def build_benchmark_binding(
     node_component_mapping: dict[str, str] = {}
     node_session_mapping: dict[str, str] = {}
     assignment_by_slot = {item.sample_slot_id: item for item in assignments}
-    for index, node in enumerate(sample.macro_nodes, start=1):
+    macro_component_mapping: dict[str, str] = {}
+    for index, macro_node in enumerate(sample.macro_nodes, start=1):
         mapped = next(
             (
                 assignment_by_slot[slot].public_value_ref
-                for slot in node.binding_slots
+                for slot in macro_node.binding_slots
                 if slot in assignment_by_slot
             ),
             None,
         )
         if mapped is None:
-            reason_codes.append(f"node_has_no_component_binding:{node.node_id}")
+            reason_codes.append(f"node_has_no_component_binding:{macro_node.node_id}")
         else:
-            node_component_mapping[node.node_id] = mapped
-        node_session_mapping[node.node_id] = "session-1" if index <= 2 else "session-2"
+            node_component_mapping[macro_node.node_id] = mapped
+            macro_component_mapping[macro_node.macro_primitive_ref] = mapped
+        node_session_mapping[macro_node.node_id] = "session-1" if index <= 2 else "session-2"
+    session_ordinal = 1
+    for core_node in sorted(sample.core_nodes, key=lambda item: item.position):
+        if core_node.session_boundary_before:
+            session_ordinal += 1
+        node_session_mapping[core_node.node_id] = f"session-{session_ordinal}"
+        mapped = next(
+            (
+                macro_component_mapping[macro_ref]
+                for macro_ref in core_node.macro_annotations
+                if macro_ref in macro_component_mapping
+            ),
+            None,
+        )
+        if mapped is None:
+            mapped = next(iter(macro_component_mapping.values()), None)
+        if mapped is None:
+            reason_codes.append(f"core_node_has_no_component_binding:{core_node.node_id}")
+        else:
+            node_component_mapping[core_node.node_id] = mapped
     binding_id = (
         "binding-"
         + stable_hash(

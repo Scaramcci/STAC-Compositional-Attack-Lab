@@ -8,10 +8,6 @@ from pydantic import BaseModel
 
 from stac_attack_lab.config import StartupValidationError, load_experiment_config
 from stac_attack_lab.datasets.auditor import audit_dataset
-from stac_attack_lab.datasets.library import (
-    audit_primitive_library,
-    freeze_primitive_library,
-)
 from stac_attack_lab.datasets.manifest import freeze_dataset
 from stac_attack_lab.env_loader import load_project_env
 from stac_attack_lab.environments.agentdojo_adapter import smoke_available
@@ -30,9 +26,12 @@ from stac_attack_lab.execution.safeclaw_formal import (
     run_safeclaw_formal,
 )
 from stac_attack_lab.execution.sample_generation import (
+    audit_sample_library_stage,
     build_sample_library,
     collect_sample_interactions,
+    freeze_audited_sample_library,
     load_sample_generation_config,
+    mine_sample_collection,
 )
 from stac_attack_lab.execution.sample_preflight import run_sample_collection_preflight
 from stac_attack_lab.integration_smoke import smoke_models
@@ -71,6 +70,14 @@ def build_schemas(root: Path) -> None:
         )
 
 
+def _project_scoped_path(root: Path, value: str) -> Path:
+    resolved_root = root.resolve()
+    resolved = (root / value).resolve()
+    if resolved != resolved_root and resolved_root not in resolved.parents:
+        raise ValueError("path_outside_project_root")
+    return resolved
+
+
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="stac-attack-lab")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -102,6 +109,8 @@ def _main(argv: list[str] | None = None) -> int:
     sample_collect_preflight.add_argument("--config", required=True)
     sample_collect = sample_sub.add_parser("collect")
     sample_collect.add_argument("--config", required=True)
+    sample_mine = sample_sub.add_parser("mine")
+    sample_mine.add_argument("--collection", required=True)
     sample_audit = sample_sub.add_parser("audit")
     sample_audit.add_argument("--library", required=True)
     sample_freeze = sample_sub.add_parser("freeze")
@@ -200,16 +209,28 @@ def _main(argv: list[str] | None = None) -> int:
             return 1
         print(collect_sample_interactions(root, sample_config))
         return 0
+    if args.cmd == "sample" and args.sample_cmd == "mine":
+        collection_root = _project_scoped_path(root, args.collection)
+        print(mine_sample_collection(root, collection_root))
+        return 0
     if args.cmd == "sample" and args.sample_cmd == "audit":
-        errors = audit_primitive_library(root / args.library)
-        if errors:
-            for error in errors:
+        library_root = _project_scoped_path(root, args.library)
+        sample_audit_report = audit_sample_library_stage(library_root)
+        print(sample_audit_report.model_dump_json(indent=2))
+        if not sample_audit_report.passed:
+            for error in sample_audit_report.error_codes:
                 print(error)
             return 1
-        print("audit passed")
         return 0
     if args.cmd == "sample" and args.sample_cmd == "freeze":
-        print(freeze_primitive_library(root / args.library, args.version, root))
+        library_root = _project_scoped_path(root, args.library)
+        print(
+            freeze_audited_sample_library(
+                library_root,
+                args.version,
+                root,
+            )
+        )
         return 0
 
     if args.cmd == "safeclaw" and args.safeclaw_cmd == "inventory":

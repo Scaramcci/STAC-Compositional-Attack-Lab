@@ -7,6 +7,8 @@ from stac_attack_lab.models.openai_compatible import OpenAICompatibleClient
 
 
 class HuihuiLocalClient(OpenAICompatibleClient):
+    provider_id = "huihui_local"
+
     def __init__(self, model_id: str, max_output_tokens: int = 1200) -> None:
         resolved_model = os.environ.get("HUIHUI_MODEL") or model_id
         super().__init__(

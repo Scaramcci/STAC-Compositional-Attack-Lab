@@ -8,11 +8,16 @@ import sys
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
+from time import monotonic
 from typing import IO, Any, Literal, Protocol, cast
 
 from pydantic import Field, model_validator
 
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.model_config import (
+    SafeClawEmbeddingRuntime,
+    build_safeclaw_model_config,
+)
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.base import (
     CollectedInteraction,
@@ -72,6 +77,8 @@ class ConstructionVictimStep(StrictModel):
     public_stage_status: dict[str, str] = Field(default_factory=dict)
     status: Literal["complete", "partial", "blocked", "error"] = "complete"
     failure_category: str | None = None
+    tool_call_count: int = 0
+    token_count: int | None = None
 
 
 class ConstructionVictimResult(StrictModel):
@@ -160,9 +167,7 @@ class SafeClawConstructionInteractionAdapter:
         budget: CollectionBudget,
     ) -> CollectedInteraction:
         configured = self._tasks[task.source_task_id]
-        if not set(manifest.allowed_delivery_surfaces) <= set(
-            configured.allowed_delivery_surfaces
-        ):
+        if not set(manifest.allowed_delivery_surfaces) <= set(configured.allowed_delivery_surfaces):
             raise ValueError("construction_manifest_surface_not_supported")
         observation = self.driver.start(configured, seed=seed, budget=budget)
         all_events: list[dict[str, Any]] = []
@@ -170,46 +175,99 @@ class SafeClawConstructionInteractionAdapter:
         session_ids: list[str] = []
         last_status: Literal["complete", "partial", "blocked", "error"] = "partial"
         last_failure: str | None = None
+        action_count = 0
+        turn_count = 0
+        session_count = 0
+        tool_call_count = 0
+        token_count = 0
+        new_session_pending = True
+        stopped = False
+        started_at = monotonic()
         try:
-            for _ in range(budget.max_sessions):
-                if observation.remaining_events <= 0:
+            for _ in range(budget.max_actions):
+                elapsed_seconds = monotonic() - started_at
+                if elapsed_seconds >= budget.max_wall_time_seconds:
+                    last_failure = "construction_wall_time_budget_exhausted"
+                    break
+                if len(all_events) >= budget.max_events:
                     last_failure = "construction_event_budget_exhausted"
                     break
                 action = attacker.next_action(task, manifest, observation, seed=seed)
                 if action.action_type == "stop":
+                    stopped = True
+                    break
+                is_delivery = action.action_type == "deliver_message"
+                if is_delivery and turn_count >= budget.max_turns:
+                    last_failure = "construction_turn_budget_exhausted"
+                    break
+                if is_delivery and new_session_pending and session_count >= budget.max_sessions:
+                    last_failure = "construction_session_budget_exhausted"
                     break
                 step = self.driver.apply(action)
+                action_count += 1
+                if is_delivery:
+                    turn_count += 1
+                    if new_session_pending:
+                        session_count += 1
+                        new_session_pending = False
+                elif action.action_type == "start_new_session":
+                    new_session_pending = True
                 session_ids.append(step.session_id)
                 all_events.extend(step.source_events)
                 all_checkpoints.extend(step.checkpoints)
+                tool_call_count += step.tool_call_count
+                if step.token_count is not None:
+                    token_count += step.token_count
                 last_status = step.status
                 last_failure = step.failure_category
                 if len(all_events) > budget.max_events:
-                    raise ValueError("construction_event_budget_exceeded")
+                    last_failure = "construction_event_budget_exceeded"
+                elif tool_call_count > budget.max_tool_calls:
+                    last_failure = "construction_tool_call_budget_exceeded"
+                elif is_delivery and step.token_count is None:
+                    last_failure = "construction_token_usage_not_observable"
+                elif token_count > budget.max_tokens:
+                    last_failure = "construction_token_budget_exceeded"
+                elapsed_seconds = monotonic() - started_at
+                if elapsed_seconds >= budget.max_wall_time_seconds and last_failure is None:
+                    last_failure = "construction_wall_time_budget_exhausted"
                 observation = observation.model_copy(
                     update={
-                        "session_index": observation.session_index + 1,
+                        "session_index": session_count,
+                        "action_index": action_count,
                         "public_transcript": [
                             *observation.public_transcript,
                             *step.public_transcript_events,
                         ],
                         "public_stage_status": step.public_stage_status,
-                        "remaining_sessions": max(observation.remaining_sessions - 1, 0),
-                        "remaining_events": budget.max_events - len(all_events),
+                        "remaining_sessions": max(budget.max_sessions - session_count, 0),
+                        "remaining_turns": max(budget.max_turns - turn_count, 0),
+                        "remaining_actions": max(budget.max_actions - action_count, 0),
+                        "remaining_tool_calls": max(budget.max_tool_calls - tool_call_count, 0),
+                        "remaining_tokens": max(budget.max_tokens - token_count, 0),
+                        "remaining_events": max(budget.max_events - len(all_events), 0),
+                        "elapsed_wall_time_ms": int(elapsed_seconds * 1000),
                     }
                 )
-                if step.status in {"blocked", "error"}:
+                if last_failure is not None or step.status in {"blocked", "error"}:
                     break
+            if not stopped and action_count >= budget.max_actions and last_failure is None:
+                last_failure = "construction_action_budget_exhausted"
             result = self.driver.finish()
         except Exception:
             self.driver.abort()
             raise
         all_events.extend(result.source_events)
         all_checkpoints.extend(result.checkpoints)
-        if len(all_events) > budget.max_events:
-            raise ValueError("construction_final_event_budget_exceeded")
-        final_status = result.status if result.source_events or result.checkpoints else last_status
-        final_failure = result.failure_category or last_failure
+        if len(all_events) > budget.max_events and last_failure is None:
+            last_failure = "construction_final_event_budget_exceeded"
+        if last_failure is not None:
+            final_status: Literal["complete", "partial", "blocked", "error"] = "partial"
+        else:
+            final_status = (
+                result.status if result.source_events or result.checkpoints else last_status
+            )
+        final_failure = last_failure or result.failure_category
         return CollectedInteraction(
             source_task=task,
             episode_id=result.episode_id,
@@ -226,6 +284,13 @@ class SafeClawConstructionInteractionAdapter:
                 "driver_id": self.driver.driver_id,
                 "task_set_hash": file_hash(self.task_set_path),
                 "authorization_scope": "safeclaw_isolated_synthetic_construction",
+                "collection_budget_hash": stable_hash(budget.model_dump(mode="json")),
+                "collection_action_count": str(action_count),
+                "collection_turn_count": str(turn_count),
+                "collection_session_count": str(session_count),
+                "collection_tool_call_count": str(tool_call_count),
+                "collection_token_count": str(token_count),
+                "collection_wall_time_ms": str(int((monotonic() - started_at) * 1000)),
             },
         )
 
@@ -268,6 +333,7 @@ class SafeClawSubprocessVictimDriver:
         target_model_id: str,
         target_base_url: str,
         target_api_key_env: str,
+        embedding: SafeClawEmbeddingRuntime,
         model_hash: str,
         environment: Mapping[str, str] | None = None,
     ) -> None:
@@ -278,6 +344,7 @@ class SafeClawSubprocessVictimDriver:
         self.target_model_id = target_model_id
         self.target_base_url = target_base_url
         self.target_api_key_env = target_api_key_env
+        self.embedding = embedding
         self.model_hash = model_hash
         self.environment = environment if environment is not None else os.environ
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -286,6 +353,7 @@ class SafeClawSubprocessVictimDriver:
         self._task: SafeClawConstructionTask | None = None
         self._budget: CollectionBudget | None = None
         self._pre_state: dict[str, Any] = {}
+        self._started_at: float | None = None
         self._last_state: dict[str, Any] = {}
         self._new_session_pending = False
         self._event_sequence = 0
@@ -325,15 +393,20 @@ class SafeClawSubprocessVictimDriver:
     ) -> ConstructionObservation:
         if self._process is not None:
             raise RuntimeError("safeclaw_construction_driver_already_started")
-        api_key = self.environment.get(self.target_api_key_env)
-        if not api_key:
-            raise ValueError(f"missing_environment_variable:{self.target_api_key_env}")
+        model_config_payload, _ = build_safeclaw_model_config(
+            target_model_id=self.target_model_id,
+            target_base_url=self.target_base_url,
+            target_api_key_env=self.target_api_key_env,
+            environment=self.environment,
+            embedding=self.embedding,
+        )
+        self._started_at = monotonic()
         self._temporary = tempfile.TemporaryDirectory(prefix="safeclaw-construction-")
         temporary_root = Path(self._temporary.name)
         patched_upstream = temporary_root / "SafeClawArena"
         shutil.copytree(self.upstream_root, patched_upstream)
         check = subprocess.run(
-            ["git", "apply", "--check", str(self.safety_patch)],
+            ["git", "apply", "--unidiff-zero", "--check", str(self.safety_patch)],
             cwd=patched_upstream,
             text=True,
             capture_output=True,
@@ -342,7 +415,7 @@ class SafeClawSubprocessVictimDriver:
         if check.returncode != 0:
             raise ValueError("safeclaw_construction_patch_check_failed")
         applied = subprocess.run(
-            ["git", "apply", str(self.safety_patch)],
+            ["git", "apply", "--unidiff-zero", str(self.safety_patch)],
             cwd=patched_upstream,
             text=True,
             capture_output=True,
@@ -352,14 +425,7 @@ class SafeClawSubprocessVictimDriver:
             raise ValueError("safeclaw_construction_patch_apply_failed")
         model_config = temporary_root / "model-config.json"
         model_config.write_text(
-            json.dumps(
-                {
-                    "model": self.target_model_id,
-                    "api_base_url": self.target_base_url.removesuffix("/v1"),
-                    "api_key": api_key,
-                },
-                sort_keys=True,
-            ),
+            json.dumps(model_config_payload, sort_keys=True),
             encoding="utf-8",
         )
         os.chmod(model_config, 0o600)
@@ -395,9 +461,15 @@ class SafeClawSubprocessVictimDriver:
             task_id=task.source_task_id,
             session_index=0,
             public_component_inventory=task.public_component_inventory,
+            action_index=0,
             public_capabilities=task.public_capabilities,
             remaining_sessions=budget.max_sessions,
             remaining_events=budget.max_events,
+            remaining_turns=budget.max_turns,
+            remaining_actions=budget.max_actions,
+            remaining_tool_calls=budget.max_tool_calls,
+            remaining_tokens=budget.max_tokens,
+            elapsed_wall_time_ms=0,
             legal_retry_ids=task.legal_retry_ids,
             legal_reroute_ids=task.legal_reroute_ids,
         )
@@ -405,11 +477,19 @@ class SafeClawSubprocessVictimDriver:
     def apply(self, action: ConstructionAttackerAction) -> ConstructionVictimStep:
         if self._budget is None:
             raise RuntimeError("safeclaw_construction_driver_not_started")
+        if self._started_at is None:
+            raise RuntimeError("safeclaw_construction_wall_clock_not_started")
+        remaining_wall_time = self._budget.max_wall_time_seconds - (monotonic() - self._started_at)
+        if remaining_wall_time <= 0:
+            raise TimeoutError("construction_wall_time_budget_exhausted")
         response = self._send_bridge(
             {
                 "kind": "action",
                 "action": action.model_dump(mode="json"),
-                "timeout_seconds": self._budget.timeout_seconds,
+                "timeout_seconds": min(
+                    self._budget.timeout_seconds,
+                    max(1, int(remaining_wall_time)),
+                ),
             }
         )
         action_type = action.action_type
@@ -603,6 +683,10 @@ class SafeClawSubprocessVictimDriver:
             }
         )
         self._events.extend(source_events)
+        provider_usage = session.get("provider_usage")
+        token_count = (
+            provider_usage.get("total_tokens") if isinstance(provider_usage, dict) else None
+        )
         return ConstructionVictimStep(
             session_id=session_id,
             source_events=source_events,
@@ -611,6 +695,8 @@ class SafeClawSubprocessVictimDriver:
                 {"role": "victim", "content": response_text},
             ],
             public_stage_status={"victim_session": "completed"},
+            tool_call_count=len(tool_calls) if isinstance(tool_calls, list) else 0,
+            token_count=token_count if isinstance(token_count, int) else None,
         )
 
     def finish(self) -> ConstructionVictimResult:
@@ -644,9 +730,7 @@ class SafeClawSubprocessVictimDriver:
                         "evidence_ref_ids": [f"checkpoint:{name}:post"],
                     }
                 )
-            self._checkpoints.append(
-                {"checkpoint_id": "victim-post", "state_hash": post_hash}
-            )
+            self._checkpoints.append({"checkpoint_id": "victim-post", "state_hash": post_hash})
             self._process.wait(timeout=30)
             return ConstructionVictimResult(
                 episode_id=f"construction-episode-{self._task.source_task_id}",

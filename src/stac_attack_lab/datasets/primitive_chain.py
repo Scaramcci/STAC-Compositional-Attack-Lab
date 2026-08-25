@@ -7,7 +7,7 @@ from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.interactions.models import ConstructionManifest, DependencyType, JoinSemantics
-from stac_attack_lab.primitives.core import EvidenceGrade, PrimitiveOutcome
+from stac_attack_lab.primitives.core import CorePrimitiveFamily, EvidenceGrade, PrimitiveOutcome
 
 
 class CandidateAcquisitionMode(StrEnum):
@@ -73,6 +73,9 @@ class PrimitiveChainCandidate(StrictModel):
     registry_hash: str
     interaction_graph_id: str
     occurrence_ids: list[str]
+    core_nodes: list[PublicCoreNode] = Field(default_factory=list)
+    core_edges: list[PublicCoreEdge] = Field(default_factory=list)
+    duplicate_provenance_paths: list[list[str]] = Field(default_factory=list)
     nodes: list[ChainNode]
     edges: list[ChainEdge]
     entry_predicates: list[str]
@@ -82,7 +85,16 @@ class PrimitiveChainCandidate(StrictModel):
     source_trace_refs: list[str]
     source_task_id: str
     source_split: str
-    terminal_relation: Literal["observed", "hypothesized", "blocked", "failed"]
+    terminal_relation: Literal[
+        "observed",
+        "hypothesized",
+        "partial",
+        "blocked",
+        "rejected",
+        "error",
+        "timeout",
+        "not_observable",
+    ]
     forbidden_shortcut_detected: bool
     filter_decisions: list[FilterDecision] = Field(default_factory=list)
     candidate_hash: str
@@ -108,10 +120,39 @@ class BindingSlot(StrictModel):
     sensitive: Literal[False] = False
 
 
+class PublicCoreNode(StrictModel):
+    node_id: str
+    position: NonNegativeInt
+    family: CorePrimitiveFamily
+    subtype: str
+    public_input_state_types: list[str]
+    public_output_state_types: list[str]
+    multiplicity: PositiveInt = 1
+    session_id: str
+    session_boundary_before: bool = False
+    optional: bool = False
+    macro_annotations: list[str] = Field(default_factory=list)
+
+
+class PublicCoreEdge(StrictModel):
+    edge_id: str
+    source_node_id: str
+    target_node_id: str
+    edge_type: DependencyType
+    public_artifact_type: str | None = None
+    public_state_type: str | None = None
+    crosses_session_boundary: bool = False
+    required_for_full_chain: bool = True
+    join_semantics: JoinSemantics = JoinSemantics.all
+    join_k: int | None = Field(default=None, ge=1)
+
+
 class PlannerSampleView(StrictModel):
     sample_id: str
     sample_version: str
     public_summary: str
+    core_nodes: list[PublicCoreNode] = Field(default_factory=list)
+    core_edges: list[PublicCoreEdge] = Field(default_factory=list)
     macro_nodes: list[ChainNode]
     macro_edges: list[ChainEdge]
     applicability_predicates: list[str]
@@ -247,14 +288,15 @@ class SampleLibraryManifest(StrictModel):
     def validate_counts(self) -> SampleLibraryManifest:
         if self.accepted_count + self.negative_count > self.candidate_count:
             raise ValueError("library_pool_counts_exceed_candidates")
-        classified = (
-            self.accepted_count
-            + self.partial_count
+        # Candidate/sample cardinality is independent of collection-attempt
+        # cardinality: one completed interaction graph may mine several chains.
+        classified_attempts = (
+            self.partial_count
             + self.blocked_count
             + self.rejected_count
             + self.error_count
             + self.not_observable_count
         )
-        if classified > self.attempted_count:
+        if classified_attempts > self.attempted_count:
             raise ValueError("library_attempt_outcome_counts_exceed_attempts")
         return self

@@ -1,0 +1,486 @@
+{
+  "$defs": {
+    "SampleGenerationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "acquisition_mode": {
+          "const": "adversarial_trace",
+          "default": "adversarial_trace",
+          "title": "Acquisition Mode",
+          "type": "string"
+        },
+        "allowed_delivery_surfaces": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Delivery Surfaces",
+          "type": "array"
+        },
+        "allowed_source_splits": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Source Splits",
+          "type": "array"
+        },
+        "allowed_victim_models": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Victim Models",
+          "type": "array"
+        },
+        "attacker_stage_implemented": {
+          "default": false,
+          "title": "Attacker Stage Implemented",
+          "type": "boolean"
+        },
+        "available_capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Available Capabilities",
+          "type": "array"
+        },
+        "construction_attacker_model_config_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Construction Attacker Model Config Path"
+        },
+        "construction_attacker_model_hash": {
+          "title": "Construction Attacker Model Hash",
+          "type": "string"
+        },
+        "construction_attacker_prompt_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Construction Attacker Prompt Path"
+        },
+        "construction_bridge_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Construction Bridge Path"
+        },
+        "construction_objective_id": {
+          "title": "Construction Objective Id",
+          "type": "string"
+        },
+        "construction_prompt_hash": {
+          "title": "Construction Prompt Hash",
+          "type": "string"
+        },
+        "construction_task_set_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Construction Task Set Path"
+        },
+        "embedding_api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Api Key Env"
+        },
+        "embedding_base_url_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Base Url Env"
+        },
+        "embedding_model_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Model Env"
+        },
+        "embedding_provider": {
+          "anyOf": [
+            {
+              "const": "openai",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Embedding Provider"
+        },
+        "execution_enabled": {
+          "default": false,
+          "title": "Execution Enabled",
+          "type": "boolean"
+        },
+        "formal_excluded_task_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Formal Excluded Task Ids",
+          "type": "array"
+        },
+        "image_tag": {
+          "default": "openclaw-env:2026.3.12",
+          "title": "Image Tag",
+          "type": "string"
+        },
+        "library_id": {
+          "title": "Library Id",
+          "type": "string"
+        },
+        "library_version": {
+          "title": "Library Version",
+          "type": "string"
+        },
+        "max_actions": {
+          "default": 12,
+          "exclusiveMinimum": 0,
+          "title": "Max Actions",
+          "type": "integer"
+        },
+        "max_collection_trajectories": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Max Collection Trajectories",
+          "type": "integer"
+        },
+        "max_events": {
+          "default": 200,
+          "exclusiveMinimum": 0,
+          "title": "Max Events",
+          "type": "integer"
+        },
+        "max_sessions": {
+          "default": 4,
+          "exclusiveMinimum": 0,
+          "title": "Max Sessions",
+          "type": "integer"
+        },
+        "max_tokens": {
+          "default": 8192,
+          "exclusiveMinimum": 0,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "default": 16,
+          "exclusiveMinimum": 0,
+          "title": "Max Tool Calls",
+          "type": "integer"
+        },
+        "max_turns": {
+          "default": 8,
+          "exclusiveMinimum": 0,
+          "title": "Max Turns",
+          "type": "integer"
+        },
+        "max_wall_time_seconds": {
+          "default": 1200,
+          "exclusiveMinimum": 0,
+          "title": "Max Wall Time Seconds",
+          "type": "integer"
+        },
+        "minimum_free_disk_gb": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "title": "Minimum Free Disk Gb",
+          "type": "integer"
+        },
+        "output_root": {
+          "default": "data/primitive_libraries/generated",
+          "title": "Output Root",
+          "type": "string"
+        },
+        "pipeline_id": {
+          "title": "Pipeline Id",
+          "type": "string"
+        },
+        "public_attack_goal": {
+          "title": "Public Attack Goal",
+          "type": "string"
+        },
+        "public_terminal_predicate_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Terminal Predicate Ids",
+          "type": "array"
+        },
+        "registry_path": {
+          "title": "Registry Path",
+          "type": "string"
+        },
+        "required_trust_boundary_crossings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Trust Boundary Crossings",
+          "type": "array"
+        },
+        "safety_constraint_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Safety Constraint Ids",
+          "type": "array"
+        },
+        "safety_patch_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safety Patch Path"
+        },
+        "schema_version": {
+          "const": "2.1",
+          "default": "2.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "seeds": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Seeds",
+          "type": "array"
+        },
+        "source_adapter": {
+          "enum": [
+            "jsonl_authorized_fixture",
+            "safeclaw_adaptive_construction"
+          ],
+          "title": "Source Adapter",
+          "type": "string"
+        },
+        "source_fixture_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Fixture Path"
+        },
+        "source_task_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Task Ids",
+          "type": "array"
+        },
+        "target_accepted_samples": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Target Accepted Samples",
+          "type": "integer"
+        },
+        "timeout_seconds": {
+          "default": 1200,
+          "exclusiveMinimum": 0,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "upstream_dir": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Upstream Dir"
+        },
+        "victim_api_key_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victim Api Key Env"
+        },
+        "victim_base_url_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victim Base Url Env"
+        },
+        "victim_model_env": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victim Model Env"
+        },
+        "victim_model_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victim Model Hash"
+        }
+      },
+      "required": [
+        "pipeline_id",
+        "library_id",
+        "library_version",
+        "registry_path",
+        "source_adapter",
+        "source_task_ids",
+        "construction_objective_id",
+        "public_attack_goal",
+        "allowed_delivery_surfaces",
+        "required_trust_boundary_crossings",
+        "public_terminal_predicate_ids",
+        "safety_constraint_ids",
+        "construction_attacker_model_hash",
+        "construction_prompt_hash",
+        "formal_excluded_task_ids",
+        "available_capabilities"
+      ],
+      "title": "SampleGenerationConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "collection_content_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Collection Content Hashes",
+      "type": "object"
+    },
+    "collection_manifest_hash": {
+      "title": "Collection Manifest Hash",
+      "type": "string"
+    },
+    "collection_tree_hash": {
+      "title": "Collection Tree Hash",
+      "type": "string"
+    },
+    "config": {
+      "$ref": "#/$defs/SampleGenerationConfig"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "pipeline_id": {
+      "title": "Pipeline Id",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage": {
+      "const": "collection",
+      "default": "collection",
+      "title": "Stage",
+      "type": "string"
+    }
+  },
+  "required": [
+    "pipeline_id",
+    "config",
+    "config_hash",
+    "registry_hash",
+    "collection_manifest_hash",
+    "collection_content_hashes",
+    "collection_tree_hash"
+  ],
+  "title": "SampleCollectionStageManifest",
+  "type": "object"
+}

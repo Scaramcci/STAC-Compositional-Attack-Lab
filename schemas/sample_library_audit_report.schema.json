@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "error_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Error Codes",
+      "type": "array"
+    },
+    "library_tree_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Library Tree Hash"
+    },
+    "mining_manifest_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Mining Manifest Hash"
+    },
+    "passed": {
+      "title": "Passed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage": {
+      "const": "audit",
+      "default": "audit",
+      "title": "Stage",
+      "type": "string"
+    }
+  },
+  "required": [
+    "library_tree_hash",
+    "mining_manifest_hash",
+    "passed"
+  ],
+  "title": "SampleLibraryAuditReport",
+  "type": "object"
+}

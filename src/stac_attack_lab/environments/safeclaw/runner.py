@@ -18,6 +18,7 @@ from stac_attack_lab.environments.safeclaw.contracts import (
     SanitizedSessionResult,
 )
 from stac_attack_lab.environments.safeclaw.materializer import MaterializedTask
+from stac_attack_lab.environments.safeclaw.model_config import build_safeclaw_model_config
 from stac_attack_lab.environments.safeclaw.redaction import redact_value, scan_tree
 from stac_attack_lab.hashing import file_hash
 
@@ -46,11 +47,6 @@ def _atomic_json(path: Path, value: object) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True), encoding="utf-8")
     temporary.replace(path)
-
-
-def _upstream_provider_root(base_url: str) -> str:
-    normalized = base_url.rstrip("/")
-    return normalized[:-3] if normalized.endswith("/v1") else normalized
 
 
 def _classify_failure(log: str, timed_out: bool) -> tuple[SafeClawExecutionStatus, bool, str]:
@@ -102,9 +98,13 @@ class SafeClawRunner:
         case_root.mkdir(parents=True, exist_ok=True)
         if resume and (cached := self._cached(case_root, request)) is not None:
             return cached
-        api_key = self.environment.get(request.target_api_key_env)
-        if not api_key:
-            raise ValueError(f"missing_environment_variable:{request.target_api_key_env}")
+        model_config_payload, exact_secrets = build_safeclaw_model_config(
+            target_model_id=request.target_model_id,
+            target_base_url=request.target_base_url,
+            target_api_key_env=request.target_api_key_env,
+            environment=self.environment,
+            embedding=request.embedding,
+        )
         started_at = _now()
         started_monotonic = time.monotonic()
         final_status = SafeClawExecutionStatus.environment_error
@@ -116,12 +116,14 @@ class SafeClawRunner:
             patched_upstream = temporary_root / "SafeClawArena"
             shutil.copytree(self.upstream_root, patched_upstream)
             check = self.invoker(
-                ["git", "apply", "--check", str(self.safety_patch)], patched_upstream, 60
+                ["git", "apply", "--unidiff-zero", "--check", str(self.safety_patch)],
+                patched_upstream,
+                60,
             )
             if check.returncode != 0:
                 raise ValueError("safeclaw_safety_patch_check_failed")
             apply_result = self.invoker(
-                ["git", "apply", str(self.safety_patch)], patched_upstream, 60
+                ["git", "apply", "--unidiff-zero", str(self.safety_patch)], patched_upstream, 60
             )
             if apply_result.returncode != 0:
                 raise ValueError("safeclaw_safety_patch_apply_failed")
@@ -129,14 +131,7 @@ class SafeClawRunner:
             task_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(materialized_task.path, task_path)
             model_config = temporary_root / "model-config.json"
-            _atomic_json(
-                model_config,
-                {
-                    "model": request.target_model_id,
-                    "api_base_url": _upstream_provider_root(request.target_base_url),
-                    "api_key": api_key,
-                },
-            )
+            _atomic_json(model_config, model_config_payload)
             os.chmod(model_config, 0o600)
             for attempt in range(1, request.max_attempts + 1):
                 attempt_count = attempt
@@ -164,14 +159,14 @@ class SafeClawRunner:
                     timed_out = True
                     process = subprocess.CompletedProcess([], 124, "", str(exc))
                     combined_log = str(exc)
-                sanitized_log = redact_value(combined_log, [api_key]).sanitized
+                sanitized_log = redact_value(combined_log, exact_secrets).sanitized
                 (case_root / f"attempt-{attempt:02d}.log").write_text(
                     str(sanitized_log), encoding="utf-8"
                 )
                 staged_result = stage_root / f"{request.task_ref.task_id}.json"
                 if process.returncode == 0 and staged_result.is_file():
                     raw_result = json.loads(staged_result.read_text(encoding="utf-8"))
-                    sanitized = redact_value(raw_result, [api_key]).sanitized
+                    sanitized = redact_value(raw_result, exact_secrets).sanitized
                     if not isinstance(sanitized, dict):
                         raise ValueError("safeclaw_result_root_not_mapping")
                     sanitized_result = sanitized
@@ -205,7 +200,7 @@ class SafeClawRunner:
                     )
                 )
             official_checks_ref = f"{sanitized_ref}#/checks"
-        scan_findings = scan_tree(case_root, [api_key])
+        scan_findings = scan_tree(case_root, exact_secrets)
         if scan_findings:
             final_status = SafeClawExecutionStatus.environment_error
             final_error = "secret_scan_failed"
