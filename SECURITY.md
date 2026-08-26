@@ -31,7 +31,7 @@ If a real secret or unsafe payload is accidentally written into this project, st
 
 ## Transcript and checkpoint controls
 
-All observable messages are filtered against configured secret values before serialization or hashing. Every conversation event records that the filter ran. Transcript audit flags sequence gaps, role/model mismatches, missing request events, absent redaction proof, and Victim-visible experiment metadata. `EXPERIMENT_PROGRESS.md` contains status only, never full messages.
+All observable messages are filtered against configured secret values before serialization or hashing. Every conversation event records that the filter ran. Transcript audit flags sequence gaps, role/model mismatches, missing request events, absent redaction proof, and Victim-visible experiment metadata. `FORMAL_EXPERIMENT_PROGRESS_20260824.md` contains status only, never full messages.
 
 A real-profile configuration error fails before execution and reports variable names or a generic model-configuration category. Provider errors are categorized without response headers, endpoint query strings, key fragments, or secret fingerprints.
 

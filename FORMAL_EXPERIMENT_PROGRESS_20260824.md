@@ -1,6 +1,6 @@
 # Formal Experiment Progress 2026-08-24
 
-This ledger records only non-secret execution state for the formal primitive-chain experiment defined by `SERVER_CODEX_FORMAL_EXPERIMENT_PLAN_20260824_154707.md`.
+This ledger records only non-secret execution state for the formal primitive-chain experiment continued by `SERVER_CODEX_FORMAL_EXPERIMENT_PLAN_20260826_154014.md`.
 
 ## Gate 0 - Baseline and prerequisites
 
