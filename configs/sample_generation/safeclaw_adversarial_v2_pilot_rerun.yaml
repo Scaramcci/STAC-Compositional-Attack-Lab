@@ -1,8 +1,8 @@
 {
   "schema_version": "2.1",
-  "pipeline_id": "safeclaw-adversarial-construction-v2-pilot",
+  "pipeline_id": "safeclaw-adversarial-construction-v2-pilot-rerun",
   "library_id": "stac-formal-primitive-library",
-  "library_version": "safeclaw-adversarial-v2-pilot",
+  "library_version": "safeclaw-adversarial-v2-pilot-rerun",
   "registry_path": "configs/primitives/formal_v1.yaml",
   "source_adapter": "safeclaw_adaptive_construction",
   "construction_task_set_path": "configs/task_sets/safeclaw_construction_v2.yaml",

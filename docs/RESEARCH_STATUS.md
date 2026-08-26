@@ -136,3 +136,10 @@ jq -c 'select(.event_type == "model_response") |
 6. 最后接入 AgentDojo 与 SHADE_Arena，验证合成环境中发现的传播规律是否具有外部有效性。
 
 因此，目前仓库已经完成“单一组合攻击链的可复现执行与完整记录基础设施”，尚未完成“多入口、多传播机制、多重组方式、多危害和多防御的系统研究”。
+
+## 2026-08-26 SafeClaw v2 continuation status
+
+- Qwen/Qwen3-Embedding-4B was pinned to revision `5cf2132abc99cad020ac570b19d031efec650f2b`, served privately by vLLM 0.26.0 on the Docker bridge, and verified from both host and Docker paths at stable dimension 2560.
+- The v2 embedding endpoint/key are isolated from the third-party Victim/Attacker endpoint variables. Deterministic verification remains green: 138 tests, lint, typecheck, schemas, and diff check.
+- A real four-trajectory pilot rerun completed collection and deterministic mining, but audit accepted zero of two required pilot samples (`error=2`, `partial=2`, `negative=2`). Therefore no main collection, frozen real library, or formal 15-case result exists from this continuation.
+- This status is an execution boundary, not an attack-effectiveness claim. Existing synthetic and historical artifacts remain separate from the failed real pilot.

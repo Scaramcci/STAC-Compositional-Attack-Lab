@@ -44,8 +44,8 @@ def test_v2_collection_campaign_is_bounded_disjoint_and_hash_pinned() -> None:
     assert pilot.target_accepted_samples == 2
     assert main.embedding_provider == "openai"
     assert main.embedding_model_env == "SAFECLAW_EMBEDDING_MODEL"
-    assert main.embedding_base_url_env == "OPENAI_BASE_URL"
-    assert main.embedding_api_key_env == "OPENAI_API_KEY"
+    assert main.embedding_base_url_env == "SAFECLAW_EMBEDDING_BASE_URL"
+    assert main.embedding_api_key_env == "SAFECLAW_EMBEDDING_API_KEY"
     assert set(pilot.source_task_ids) < set(main.source_task_ids)
     assert set(main.source_task_ids) == {task.source_task_id for task in task_set.tasks}
     assert not set(main.source_task_ids) & set(task_set.formal_excluded_task_ids)
@@ -101,6 +101,8 @@ def test_v2_formal_matrix_is_three_condition_and_coverage_limited() -> None:
     assert environment.embedding_policy == "required_endpoint"
     assert environment.embedding_provider == "openai"
     assert environment.embedding_model_env == "SAFECLAW_EMBEDDING_MODEL"
+    assert environment.embedding_base_url_env == "SAFECLAW_EMBEDDING_BASE_URL"
+    assert environment.embedding_api_key_env == "SAFECLAW_EMBEDDING_API_KEY"
     assert task_set.task_set_id.endswith("coverage-limited")
     assert [task.task_id for task in task_set.tasks] == ["pse-2.1-001"]
     for task in task_set.tasks:

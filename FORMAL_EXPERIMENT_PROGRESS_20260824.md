@@ -305,3 +305,28 @@ This ledger records only non-secret execution state for the formal primitive-cha
 - If the shared gateway fails this probe, the existing runtime can use a separate embedding
   base URL and API-key environment variable; the versioned v2 configs must then be updated and
   their hashes/provenance regenerated before collection.
+
+
+## Gate E1-E5 - Qwen embedding deployment, probes and v2 isolation
+
+- Status: passed at `2026-08-26T10:15:00+02:00` (server time; non-secret summary).
+- Checkout: `master`, clean before Gate E4; current changes are limited to v2 embedding variable isolation, `.env.example`, tests, schema output and provenance.
+- Model: `Qwen/Qwen3-Embedding-4B`, immutable revision `5cf2132abc99cad020ac570b19d031efec650f2b`; provenance manifest: `data/provenance/qwen3_embedding_4b_provenance.json`; 14 files, 8,059,521,975 bytes.
+- Service: vLLM 0.26.0, pooling runner, FP16 (vLLM cast from model BF16), max model length 8192, private Docker-bridge bind `172.17.0.1:8001`, tmux session `stac-qwen3-embedding`.
+- E3 host probe: passed; two HTTP 200 responses, expected model, finite numeric vectors, stable dimension 2560. Docker bridge probe: passed with the same checks and dimension 2560.
+- E4: v2 collection and OpenClaw configs now use `SAFECLAW_EMBEDDING_BASE_URL` and `SAFECLAW_EMBEDDING_API_KEY`; third-party `OPENAI_*` remain for Victim/Attacker. `.env.example` contains placeholders only.
+- E5 pilot collection preflight: passed, `execution_started=false`; Docker image and pinned SafeClaw commit checks passed; free disk reported 129 GB.
+- Verification after change: schemas built, lint passed (164 files formatted), mypy passed (108 source files), pytest passed (138 tests), `git diff --check` passed.
+- Next action: run Gate A four-trajectory pilot with the fixed model revision, endpoint and dimension.
+
+## Gate A - Real SafeClaw pilot executed and stopped at audit
+
+- Status: blocked by pilot audit at `2026-08-26T10:40:00+02:00`; this is the plan-defined stop condition.
+- Collection launcher: `scripts/run_safeclaw_sample_collection.sh` with the v2 pilot config and fixed Qwen embedding service. The first attempt failed closed before execution because the tmux child shell lacked the local embedding key; no trajectory was started. A separate immutable rerun config/output tree was used after fixing the environment injection.
+- Immutable outputs: original pilot at `data/primitive_libraries/generated/safeclaw-adversarial-v2-pilot/`; corrected rerun at `data/primitive_libraries/generated/safeclaw-adversarial-v2-pilot-rerun/`. Both collection trees retain failure records and stage manifests.
+- Rerun collection exited `status=0` with four expected trajectory directories. Deterministic mining completed at `.../safeclaw-adversarial-v2-pilot-rerun/library`.
+- Pilot audit result: `passed=false`, `accepted_count=0`, `target_accepted_samples=2`, `candidate_count=2`, `negative_count=2`, attempt outcomes `error=2` and `partial=2`; error code `accepted_sample_target_not_met:0:2`.
+- During mining of the first pilot tree, duplicate retry event IDs exposed a driver defect. The driver now adds a local per-attempt nonce to action-derived event, artifact and request IDs; related tests pass. The malformed original tree was not edited or reused.
+- Gate result: `E1-E5 passed`; `A collection completed`, `A audit failed`. Main 120-trajectory collection and formal 15-case evaluation were not started, as required by the stop condition.
+- Final verification after the fix: schemas built, lint passed, mypy passed, pytest `138 passed`, and `git diff --check` passed.
+- Next action requires a protocol-level decision or additional authorized pilot budget to obtain accepted real samples; no threshold was lowered and no synthetic result was substituted.

@@ -492,11 +492,13 @@ class SafeClawSubprocessVictimDriver:
                 ),
             }
         )
+        # Model action IDs may repeat across retries; bind every attempt to a local nonce.
+        action_nonce = self._event_sequence + 1
         action_type = action.action_type
         if action_type == "start_new_session":
             self._new_session_pending = True
             event = {
-                "event_id": f"lifecycle-{action.action_id}",
+                "event_id": f"lifecycle-{action.action_id}-{action_nonce}",
                 "session_id": f"construction-lifecycle-{self._next_sequence()}",
                 "sequence_no": self._event_sequence,
                 "actor_role": "environment",
@@ -516,7 +518,7 @@ class SafeClawSubprocessVictimDriver:
             )
         if action_type in {"retry", "reroute"}:
             event = {
-                "event_id": f"control-{action.action_id}",
+                "event_id": f"control-{action.action_id}-{action_nonce}",
                 "session_id": "construction-control",
                 "sequence_no": self._next_sequence(),
                 "actor_role": "construction_attacker",
@@ -537,8 +539,9 @@ class SafeClawSubprocessVictimDriver:
         session = cast(dict[str, Any], response.get("session", {}))
         post_state = cast(dict[str, Any], response.get("post_state", {}))
         session_id = str(session.get("session_id", f"construction-{action.action_id}"))
-        message_id = f"artifact-message-{stable_hash(action.public_message or '')[:16]}"
-        delivery_event_id = f"delivery-{action.action_id}"
+        message_hash = stable_hash(action.public_message or "")[:16]
+        message_id = f"artifact-message-{message_hash}-{action_nonce}"
+        delivery_event_id = f"delivery-{action.action_id}-{action_nonce}"
         source_events: list[dict[str, Any]] = [
             {
                 "event_id": delivery_event_id,
@@ -568,7 +571,7 @@ class SafeClawSubprocessVictimDriver:
         if self._new_session_pending and post_state.get("memory_content"):
             source_events.append(
                 {
-                    "event_id": f"state-read-memory-{action.action_id}",
+                    "event_id": f"state-read-memory-{action.action_id}-{action_nonce}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "actor_role": "victim_system",
@@ -593,10 +596,10 @@ class SafeClawSubprocessVictimDriver:
             )
         self._new_session_pending = False
         response_text = str(session.get("agent_response", ""))
-        response_artifact_id = f"artifact-response-{stable_hash(response_text)[:16]}"
+        response_artifact_id = f"artifact-response-{stable_hash(response_text)[:16]}-{action_nonce}"
         source_events.append(
             {
-                "event_id": f"response-{action.action_id}",
+                "event_id": f"response-{action.action_id}-{action_nonce}",
                 "session_id": session_id,
                 "sequence_no": self._next_sequence(),
                 "actor_role": "victim_agent",
@@ -625,7 +628,7 @@ class SafeClawSubprocessVictimDriver:
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
             source_events.append(
                 {
-                    "event_id": f"tool-call-{action.action_id}-{index}",
+                    "event_id": f"tool-call-{action.action_id}-{action_nonce}-{index}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "actor_role": "victim_agent",
@@ -656,7 +659,7 @@ class SafeClawSubprocessVictimDriver:
             state_ref = f"safeclaw_state:{name}"
             source_events.append(
                 {
-                    "event_id": f"state-write-{name}-{action.action_id}",
+                    "event_id": f"state-write-{name}-{action.action_id}-{action_nonce}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "actor_role": "victim_system",
@@ -668,7 +671,7 @@ class SafeClawSubprocessVictimDriver:
                     "post_state_ref": f"{state_ref}:{after}",
                     "write_state_refs": [state_ref],
                     "request_event_id": (
-                        f"tool-call-{action.action_id}-{len(tool_calls) - 1}"
+                        f"tool-call-{action.action_id}-{action_nonce}-{len(tool_calls) - 1}"
                         if name == "external" and tool_calls
                         else None
                     ),
