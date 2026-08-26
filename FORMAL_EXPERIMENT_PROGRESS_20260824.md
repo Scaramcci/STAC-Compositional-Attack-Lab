@@ -200,8 +200,7 @@ This ledger records only non-secret execution state for the formal primitive-cha
 ## Gate 7 - Versioned v2 configs, launchers and final deterministic acceptance
 
 - Status: passed at `2026-08-24T16:37:01+02:00` for all deterministic gates.
-  Real pilot preflight is intentionally blocked until the operator selects a verified
-  embedding model id.
+  The operator embedding selector was supplied and validated by Gate 7d below.
 - Added a four-topology construction task set with 12 hash-pinned train tasks, disjoint from
   all formal exclusions. The main matrix is 12 tasks x 10 seeds = 120 trajectories with a
   target of 30 accepted samples; the pilot is 2 tasks x 2 seeds = 4 trajectories with a
@@ -216,10 +215,8 @@ This ledger records only non-secret execution state for the formal primitive-cha
 - Added `scripts/run_safeclaw_sample_collection.sh` with deterministic preflight, a
   per-library lock, stable logging, exact resume paths and no automatic mining/freezing.
 - An earlier presence-only pilot/main preflight passed before the embedding runtime path was
-  audited. That result is superseded by Gate 7b. The current pilot preflight reports
-  `execution_started=false` and fails only because `SAFECLAW_EMBEDDING_MODEL` is unset;
-  Docker, image, pinned upstream, safety patch, task hashes, model availability, disk and
-  resumability checks pass.
+  audited. That result is superseded by Gate 7b. The pre-selection pilot preflight failed only because `SAFECLAW_EMBEDDING_MODEL` was unset;
+  Gate 7d records the passing rerun.
 - Config SHA256 values:
   - main collection: `cdc5283bedd5d0ee78d0f677799faa53c45fa5e837a5617dc27e33a80778f13f`
   - pilot collection: `7f40c3b7005f8bcdb7217106b649f73b20b2cc5887f5114a4967edd885809004`
@@ -231,16 +228,15 @@ This ledger records only non-secret execution state for the formal primitive-cha
 - Final verification after Gate 7b: schemas regenerated; Ruff passed for 166 files; mypy
   passed for 108 source files; all 138 tests passed in 2.48 seconds;
   `git diff --check` passed.
-- Remaining before real pilot: the operator exports `SAFECLAW_MODEL=gpt-5.5` and a
-  provider-valid `SAFECLAW_EMBEDDING_MODEL`, then requires pilot preflight to pass.
-  Remaining before formal evaluation: the main library must pass the 30-sample audit and
-  freeze gate. No embedding model id has been guessed or silently substituted.
+- Remaining before real pilot: run the pilot collection with the validated selectors, inspect
+  its logs and audit the resulting pilot library. Remaining before formal evaluation: the main
+  library must pass the 30-sample audit and freeze gate.
 
 
 ## Gate 7b - Runtime-bound embedding configuration
 
-- Status: implementation passed at `2026-08-24T16:37:01+02:00`; operator model selection
-  remains pending.
+- Status: implementation passed at `2026-08-24T16:37:01+02:00`; operator model selection was
+  pending until Gate 7d.
 - Audit found that the prior environment policy checked `SAFECLAW_EMBEDDING_MODEL` presence
   but did not pass it to SafeClaw. Added one shared model-config builder used by collection,
   whole-episode formal execution and interactive formal execution.
@@ -263,9 +259,9 @@ This ledger records only non-secret execution state for the formal primitive-cha
   execution of the patched `_apply_model_config`, runner payload projection, key redaction
   and missing-key failure. Full verification: 138 tests, Ruff 166 files, mypy 108 source
   files, regenerated schemas and `git diff --check` all passed.
-- Current no-execution pilot preflight result: failed only
+- Previous no-execution pilot preflight result: failed only
   `sample_collection_model_environment_missing` with
-  `missing_variable_names=SAFECLAW_EMBEDDING_MODEL`; all other checks passed.
+  `missing_variable_names=SAFECLAW_EMBEDDING_MODEL`; this was cleared by Gate 7d.
 
 
 ## Gate 7c - Operator entrypoint documentation closure
@@ -278,3 +274,34 @@ This ledger records only non-secret execution state for the formal primitive-cha
   variable.
 - The legacy `scripts/run_sample_collection.sh` and historical v1 config are explicitly
   excluded from the v2 formal workflow.
+
+
+## Gate 7d - Embedding selector supplied and pilot preflight rerun
+
+- Status: passed at `2026-08-25` with `SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small`.
+- The selector was supplied by the operator and paired with `SAFECLAW_MODEL=gpt-5.5` for the
+  no-execution pilot preflight. No API key or endpoint value was written to this progress file.
+- Pilot preflight result: `passed=true`, `execution_started=false`. All checks passed,
+  including embedding configuration, model environment, allowlisted victim model, pinned
+  upstream commit, safety patch, Docker image, disk capacity and resumable output state.
+- The embedding endpoint/model capability is provider-dependent; the preflight verifies the
+  configured selector is present and complete but does not make a real embedding request.
+- Next operator action: run the pilot collection tmux command in the handoff, review its output,
+  then run the main 30-sample collection. Formal evaluation remains gated on main-library audit
+  and freeze.
+
+
+
+
+
+## Gate 7e - Endpoint capability verification pending
+
+- Status: diagnostic pending at `2026-08-25`. The local configured model inventory contains five
+  model IDs and zero IDs that look like embedding models. This is a warning, not proof of failure.
+- No network embedding request was made by the diagnostic; API keys and endpoint values remain
+  excluded from the progress file.
+- The required proof is one authenticated `POST /v1/embeddings` request that returns a non-empty
+  numeric vector for `text-embedding-3-small`.
+- If the shared gateway fails this probe, the existing runtime can use a separate embedding
+  base URL and API-key environment variable; the versioned v2 configs must then be updated and
+  their hashes/provenance regenerated before collection.

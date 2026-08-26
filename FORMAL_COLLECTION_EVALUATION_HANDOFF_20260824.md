@@ -20,22 +20,22 @@ Evidence:
 - typecheck: 108 source files passed;
 - tests: 138 passed;
 - `git diff --check`: passed;
-- pilot preflight: `execution_started=false`, with only
-  `SAFECLAW_EMBEDDING_MODEL` still missing.
+- pilot preflight: `passed=true`, `execution_started=false`; all deterministic checks pass
+  with the selected embedding model below.
 
 ## 2. What remains before collection
 
-There is no remaining code gate before the bounded pilot. One environment selection remains:
-choose an embedding model id that the configured OpenAI-compatible endpoint actually serves
-through `/v1/embeddings`. Then export both selectors:
+There is no remaining code gate before the bounded pilot. The selected embedding model is
+`text-embedding-3-small`; confirm that the configured endpoint serves it through `/v1/embeddings`.
+Export both selectors:
 
 ```bash
 export SAFECLAW_MODEL=gpt-5.5
-export SAFECLAW_EMBEDDING_MODEL='<provider-verified-embedding-model-id>'
+export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-Do not run the placeholder literally. The current no-execution pilot preflight fails only
-because `SAFECLAW_EMBEDDING_MODEL` is unset; all other checks pass.
+The no-execution pilot preflight now passes. It verifies selector presence and configuration
+completeness but does not make a real embedding request.
 
 The provider URL/key variables are already loaded by the CLI from the project `.env`;
 do not source, print or place them in tmux commands.
@@ -86,7 +86,7 @@ Run from an interactive shell:
 ```bash
 export STAC_ROOT=/home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab
 export SAFECLAW_MODEL=gpt-5.5
-: "${SAFECLAW_EMBEDDING_MODEL:?export a provider-verified embedding model id first}"
+export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
 export SAFECLAW_EMBEDDING_MODEL
 cd "$STAC_ROOT"
 
@@ -130,7 +130,7 @@ After pilot review:
 ```bash
 export STAC_ROOT=/home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab
 export SAFECLAW_MODEL=gpt-5.5
-: "${SAFECLAW_EMBEDDING_MODEL:?export a provider-verified embedding model id first}"
+export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
 export SAFECLAW_EMBEDDING_MODEL
 cd "$STAC_ROOT"
 
@@ -204,7 +204,7 @@ After selecting a provider-valid embedding model in the interactive shell:
 ```bash
 export STAC_ROOT=/home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab
 export SAFECLAW_MODEL=gpt-5.5
-: "${SAFECLAW_EMBEDDING_MODEL:?export a provider-verified embedding model id first}"
+export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
 export SAFECLAW_EMBEDDING_MODEL
 cd "$STAC_ROOT"
 
