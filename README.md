@@ -52,7 +52,7 @@ bash scripts/run_safeclaw_sample_collection.sh \
   --config configs/sample_generation/safeclaw_adversarial_v2_pilot.yaml
 ```
 
-launcher 先运行 `collect-preflight`；该阶段不启动 Victim、Attacker 或 Docker task。只有 preflight 全部通过后才进入真实 collection。pilot 审计、主 campaign、确定性 mine/audit/freeze 与正式 evaluation 的 tmux 命令见 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md)。历史 `safeclaw_adversarial_v1.yaml` 和 `scripts/run_sample_collection.sh` 不属于该 v2 正式流程。
+launcher 先运行 `collect-preflight`；该阶段不启动 Victim、Attacker 或 Docker task。只有 preflight 全部通过后才进入真实 collection。pilot 审计、主 campaign、确定性 mine/audit/freeze 与正式 evaluation 的 tmux 命令见 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md)。历史 `safeclaw_adversarial_v1.yaml` 和 `scripts/run_sample_collection.sh` 不属于该 v2 正式流程。
 
 ## 对话数据在哪里
 
@@ -144,4 +144,4 @@ make smoke-report
 
 Fake profile 不需要 API key 或网络。真实模型配置和运行命令见 [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)。凭证只从本地环境变量读取，不写入代码、配置、文档或日志。
 
-`scripts/run_sample_collection.sh` 是通用 STAC offline/GPT-Gemini legacy 入口，输出到 `data/generated/<run-id>/`，不生成本实验的 SafeClaw primitive library。SafeClaw v2 collection 必须使用 `scripts/run_safeclaw_sample_collection.sh`，正式 evaluation 使用带 v2 参数的 `scripts/run_formal_evaluation.sh`。两者的 pilot-first 顺序、tmux 命令、输出目录、mine/audit/freeze 门禁和恢复方法以 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260824.md) 为准。
+`scripts/run_sample_collection.sh` 是通用 STAC offline/GPT-Gemini legacy 入口，输出到 `data/generated/<run-id>/`，不生成本实验的 SafeClaw primitive library。SafeClaw v2 collection 必须使用 `scripts/run_safeclaw_sample_collection.sh`，正式 evaluation 使用带 v2 参数的 `scripts/run_formal_evaluation.sh`。两者的 pilot-first 顺序、tmux 命令、输出目录、mine/audit/freeze 门禁和恢复方法以 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md) 为准。

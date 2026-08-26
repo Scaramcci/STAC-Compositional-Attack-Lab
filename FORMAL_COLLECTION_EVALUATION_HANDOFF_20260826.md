@@ -1,6 +1,6 @@
 # Formal Collection And Evaluation Handoff
 
-Updated: 2026-08-24T16:37:01+02:00 (Europe/Berlin)
+Updated: 2026-08-26 (Europe/Berlin)
 
 ## 1. Current boundary
 
@@ -25,17 +25,10 @@ Evidence:
 
 ## 2. What remains before collection
 
-There is no remaining code gate before the bounded pilot. The selected embedding model is
-`text-embedding-3-small`; confirm that the configured endpoint serves it through `/v1/embeddings`.
-Export both selectors:
-
-```bash
-export SAFECLAW_MODEL=gpt-5.5
-export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
-```
-
-The no-execution pilot preflight now passes. It verifies selector presence and configuration
-completeness but does not make a real embedding request.
+There is no remaining code gate before the bounded pilot, but the embedding endpoint capability
+must be verified before any real collection. `SAFECLAW_EMBEDDING_MODEL` is currently set to
+`text-embedding-3-small` for preflight. The deterministic preflight only checks that the selector
+and endpoint/key variables are present; it does not call `/v1/embeddings`.
 
 The provider URL/key variables are already loaded by the CLI from the project `.env`;
 do not source, print or place them in tmux commands.
@@ -187,9 +180,8 @@ Required before starting:
 
 1. The main audit and freeze commands above pass.
 2. `SAFECLAW_MODEL=gpt-5.5` remains exported.
-3. `SAFECLAW_EMBEDDING_MODEL` remains set to an embedding model id verified against
-   the configured provider endpoint. No id is currently selected, and the code does not
-   guess or silently substitute one.
+3. `SAFECLAW_EMBEDDING_MODEL` remains set to the embedding model ID verified by the Section 9 probe.
+   The endpoint/model pair and any separate embedding variables must remain unchanged.
 4. The formal preflight passes with the frozen library present.
 
 The preregistered matrix is one PSE 2.1 formal task, three matched conditions and five seeds,
@@ -245,3 +237,81 @@ official-result audits.
 
 Synthetic fixtures, deterministic tests, the pilot alone, or a partially completed run are
 not research results.
+
+
+## 9. Embedding endpoint verification and fallback
+
+The deterministic preflight checks only that the embedding selector, endpoint and key variables are
+present. It does not call the provider. Before any real collection, prove the following contract:
+
+- `POST <base-url>/v1/embeddings`;
+- request JSON contains `model` and `input`;
+- response contains a non-empty numeric `data[0].embedding` vector;
+- the selected model is actually served by the endpoint, not merely listed by `/models`.
+
+Run this one-request probe locally. It prints only a classification and vector dimension; do not
+paste the key, endpoint, response body or full error response into chat:
+
+```bash
+cd /home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab
+export SAFECLAW_EMBEDDING_MODEL=text-embedding-3-small
+PYTHONPATH=src .venv/bin/python - <<'PY'
+import json
+import os
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+from stac_attack_lab.env_loader import load_project_env
+load_project_env(Path.cwd())
+base = os.environ["OPENAI_BASE_URL"].rstrip("/")
+if not base.endswith("/v1"):
+    base += "/v1"
+key = os.environ["OPENAI_API_KEY"]
+request = Request(base + "/embeddings", data=json.dumps({
+    "model": os.environ["SAFECLAW_EMBEDDING_MODEL"],
+    "input": "stac embedding capability probe",
+}).encode(), headers={
+    "Authorization": f"Bearer {key}",
+    "Content-Type": "application/json",
+    "User-Agent": "stac-attack-lab-embedding-probe/1.0",
+}, method="POST")
+try:
+    with urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode())
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    vector = rows[0].get("embedding") if isinstance(rows, list) and rows else None
+    if not isinstance(vector, list) or not vector:
+        raise ValueError("invalid_response_shape")
+    print(f"embedding_ok dimensions={len(vector)}")
+except HTTPError as exc:
+    print(f"embedding_failed http_status={exc.code}")
+except URLError as exc:
+    print(f"embedding_failed network_error={type(exc.reason).__name__}")
+except (TimeoutError, ValueError, KeyError, TypeError, IndexError) as exc:
+    print(f"embedding_failed error={type(exc).__name__}")
+PY
+```
+
+Interpretation: `embedding_ok` is usable; `400` means model/request mismatch; `404` means no
+embeddings route; `401` or `403` means credentials/permissions; `429` means quota/rate limiting;
+network errors mean reachability problems. A Docker container cannot use a host loopback address
+unless its network is explicitly configured for that case.
+
+The local configured model inventory contains five IDs and none looks like an embedding model.
+This is a warning, not proof; the authenticated probe is authoritative.
+
+If the shared gateway lacks embeddings, use a provider that implements this OpenAI-compatible
+contract, ask the gateway operator to expose one, or use a separate embedding service. The runtime
+already supports separate endpoint variables; the versioned v2 configs must then use:
+
+```yaml
+embedding_base_url_env: SAFECLAW_EMBEDDING_BASE_URL
+embedding_api_key_env: SAFECLAW_EMBEDDING_API_KEY
+```
+
+Set those variables locally, then regenerate config hashes/provenance and rerun every preflight.
+OpenAI documents `text-embedding-3-small` and `text-embedding-3-large` ([embeddings guide](https://developers.openai.com/api/docs/guides/embeddings)); vLLM documents an
+OpenAI-compatible `/v1/embeddings` server ([server docs](https://docs.vllm.ai/en/latest/serving/openai_compatible_server/)). These are compatible API examples, not a claim that the
+current gateway serves either model. Do not substitute `gpt-5.5`, a text-generation endpoint or a
+fake embedding in the real experiment. The vector model, endpoint and configuration hash are
+experiment provenance.
