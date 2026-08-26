@@ -182,6 +182,7 @@ class SafeClawConstructionInteractionAdapter:
         token_count = 0
         new_session_pending = True
         stopped = False
+        consecutive_retries = 0
         started_at = monotonic()
         try:
             for _ in range(budget.max_actions):
@@ -197,6 +198,10 @@ class SafeClawConstructionInteractionAdapter:
                     stopped = True
                     break
                 is_delivery = action.action_type == "deliver_message"
+                if action.action_type == "retry":
+                    consecutive_retries += 1
+                else:
+                    consecutive_retries = 0
                 if is_delivery and turn_count >= budget.max_turns:
                     last_failure = "construction_turn_budget_exhausted"
                     break
@@ -228,6 +233,11 @@ class SafeClawConstructionInteractionAdapter:
                     last_failure = "construction_token_usage_not_observable"
                 elif token_count > budget.max_tokens:
                     last_failure = "construction_token_budget_exceeded"
+                elif (
+                    budget.max_consecutive_retries is not None
+                    and consecutive_retries > budget.max_consecutive_retries
+                ):
+                    last_failure = "construction_consecutive_retry_guard_exhausted"
                 elapsed_seconds = monotonic() - started_at
                 if elapsed_seconds >= budget.max_wall_time_seconds and last_failure is None:
                     last_failure = "construction_wall_time_budget_exhausted"

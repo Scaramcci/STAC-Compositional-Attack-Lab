@@ -82,7 +82,7 @@ def test_prompt_contracts_and_legal_examples_parse() -> None:
         "FormalAttackRealization": FormalAttackRealization,
     }
     prompts = list((ROOT / "prompts").glob("**/*.md"))
-    assert len(prompts) == 15
+    assert len(prompts) == 16
     victim_hashes = set()
     for path in prompts:
         asset = load_prompt(path)

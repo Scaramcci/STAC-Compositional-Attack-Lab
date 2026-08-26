@@ -188,6 +188,19 @@
           "title": "Max Collection Trajectories",
           "type": "integer"
         },
+        "max_consecutive_retries": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Consecutive Retries"
+        },
         "max_events": {
           "default": 200,
           "exclusiveMinimum": 0,

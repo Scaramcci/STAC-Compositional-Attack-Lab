@@ -24,6 +24,7 @@ class CollectionBudget(StrictModel):
     max_sessions: PositiveInt = 4
     max_turns: PositiveInt = 8
     max_actions: PositiveInt = 12
+    max_consecutive_retries: PositiveInt | None = None
     max_tool_calls: PositiveInt = 16
     max_tokens: PositiveInt = 8192
     max_wall_time_seconds: PositiveInt = 1200

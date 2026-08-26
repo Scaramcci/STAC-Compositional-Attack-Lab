@@ -94,6 +94,7 @@ class SampleGenerationConfig(StrictModel):
     max_sessions: PositiveInt = 4
     max_turns: PositiveInt = 8
     max_actions: PositiveInt = 12
+    max_consecutive_retries: PositiveInt | None = None
     max_tool_calls: PositiveInt = 16
     max_tokens: PositiveInt = 8192
     max_wall_time_seconds: PositiveInt = 1200
@@ -110,6 +111,7 @@ class SampleGenerationConfig(StrictModel):
             max_sessions=self.max_sessions,
             max_turns=self.max_turns,
             max_actions=self.max_actions,
+            max_consecutive_retries=self.max_consecutive_retries,
             max_tool_calls=self.max_tool_calls,
             max_tokens=self.max_tokens,
             max_wall_time_seconds=self.max_wall_time_seconds,
@@ -478,6 +480,7 @@ def collect_sample_interactions(
             max_sessions=config.max_sessions,
             max_turns=config.max_turns,
             max_actions=config.max_actions,
+            max_consecutive_retries=config.max_consecutive_retries,
             max_tool_calls=config.max_tool_calls,
             max_tokens=config.max_tokens,
             max_wall_time_seconds=config.max_wall_time_seconds,
