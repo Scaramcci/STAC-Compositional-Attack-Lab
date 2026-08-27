@@ -56,7 +56,7 @@ if [[ ! -f "${PROJECT_ROOT}/${CONFIG}" ]]; then
   exit 2
 fi
 
-mapfile -t RUN_METADATA < <(
+RUN_METADATA="$(
   PYTHONPATH="${PROJECT_ROOT}/src" "${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" <<'PY'
 import sys
 from pathlib import Path
@@ -64,22 +64,20 @@ from pathlib import Path
 from stac_attack_lab.execution.sample_generation import load_sample_generation_config
 
 config = load_sample_generation_config(Path(sys.argv[1]))
-print(config.library_version)
-print(config.pipeline_id)
-print(Path(config.output_root) / config.library_version)
-print(
+values = (
+    config.library_version,
+    config.pipeline_id,
+    Path(config.output_root) / config.library_version,
     Path(config.output_root)
     / config.library_version
     / "interactions/raw"
-    / config.pipeline_id
+    / config.pipeline_id,
 )
+print("\t".join(str(value) for value in values))
 PY
-)
+)"
 
-LIBRARY_VERSION="${RUN_METADATA[0]}"
-PIPELINE_ID="${RUN_METADATA[1]}"
-BUILD_REL="${RUN_METADATA[2]}"
-COLLECTION_REL="${RUN_METADATA[3]}"
+IFS=$'\t' read -r LIBRARY_VERSION PIPELINE_ID BUILD_REL COLLECTION_REL <<< "${RUN_METADATA}"
 BUILD_ROOT="${PROJECT_ROOT}/${BUILD_REL}"
 LOG_FILE="${BUILD_ROOT}/tmux-collection.log"
 

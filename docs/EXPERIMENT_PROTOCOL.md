@@ -1,5 +1,7 @@
 # Experiment Protocol
 
+> 本文定义研究协议与历史对照设计，不作为当前执行状态入口。当前结构、运行命令和 Gate A 阻断状态以 [`PROJECT_GUIDE_ZH.md`](PROJECT_GUIDE_ZH.md) 为准；legacy offline/online 段落只用于历史复现。
+
 ## Research Questions
 
 当前实验将一条组合攻击建模为带类型的组件传播图，关注的不是单一最终成功率，而是：

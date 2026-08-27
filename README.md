@@ -1,147 +1,218 @@
 # STAC Compositional Attack Lab
 
-本仓库研究组合攻击如何进入 Agent 系统、在组件之间传播、经过持久化或重组后影响后续行为，以及防御应部署在哪个传播节点。项目采用本地合成环境和无价值 canary，不执行真实外传、不读取真实凭证，也不允许被测工具访问宿主机或公网。
+面向 Agent 系统组合攻击传播、持久化与因果验证的可复现实验框架。
 
-## 给审阅者的阅读顺序
+本项目不只判断“攻击是否成功”，还记录攻击如何进入 Agent、经过哪些组件、何时写入持久状态、如何跨 turn/session 被重新激活，以及最终 effect 是否由完整的事件和状态证据支持。项目仅用于授权的 SafeClaw/OpenClaw 隔离 benchmark、synthetic service 和无价值 canary，不面向真实账号、生产系统或公网目标。
 
-1. 本页：研究思路、当前边界和实验运行状态。
-2. [`docs/RESEARCH_STATUS.md`](docs/RESEARCH_STATUS.md)：已经实现、尚未实现和下一步需要修正的内容。
-3. [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md)：代码模块、角色隔离、数据流和产物说明。
-4. [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)：当前实验协议及后续传播、防御实验设计。
-5. [`docs/PROMPTS.md`](docs/PROMPTS.md)：Planner、Attacker、Victim、PromptWriter、Verifier、Judge 的权限和 prompt 契约。
-6. [`SECURITY.md`](SECURITY.md)：安全边界。
+## 当前状态
 
-## 当前研究对象
+| 部分 | 状态 | 可以得出的结论 |
+|---|---|---|
+| Legacy STAC offline/online | 已完成 30 个冻结样本和 30 个 evaluation episode | 历史单一组合攻击链与记录基础设施可运行 |
+| Formal-v2 synthetic library | 1 个 accepted synthetic sample，1 个 negative | Miner、library、Planner、Attacker、materializer 和 verifier 可做确定性回归 |
+| Real SafeClaw pilot | 原 pilot 与 recovery pilot 均为 `accepted=0/2` | Gate A 未通过，不能进入主 collection |
+| Main collection | 未启动 | 不存在 30 个真实 accepted primitive samples |
+| Formal-v2 evaluation | 未启动 | 不存在 15-case ASR、迁移性或 sample-conditioned 研究结果 |
 
-当前已实现并实际运行的是一类多阶段组合攻击，不是多种独立攻击的全集。其传播链为：
+当前正式实验必须保持 fail closed：不能用 synthetic library 替代真实 library，不能降低 accepted threshold，也不能把 partial matrix 表述为正式结果。
 
-```text
-不可信工具检索结果进入 Victim
-  -> Victim 将相关内容写入 workspace memory
-  -> 后续任务重新检索该 memory
-  -> 内容影响工具参数
-  -> 本地 action tool 处理合成 canary
-```
+## 研究问题
 
-这条链用于验证四个问题：攻击从哪里进入、是否跨组件传播、是否通过记忆形成跨阶段影响、最终行为是否可由完整 artifact lineage 解释。攻击成功与否由确定性 verifier 根据事件、artifact lineage 和环境快照判断，LLM Verifier/Judge 只提供语义说明，不能覆盖 hard verdict。
+项目把一次组合攻击表示为带类型的交互图，主要回答：
 
-当前实现覆盖一个入口、一个线性传播拓扑、一种记忆介质和一个本地 canary sink。因此，它是后续系统化攻击图谱的第一类基线，不能表述为已经覆盖完整 Agent 攻击面。
+1. 不可信内容从哪个入口进入 Agent？
+2. 内容经过了哪些组件和信任边界？
+3. 哪次操作造成持久化、召回、控制流变化或 sandbox effect？
+4. 哪条 causal edge 是完整攻击链必需的？
+5. 攻击被阻断时，失败发生在哪个 primitive 或依赖上？
+6. 官方 benchmark success 与内部 mechanism evidence 是否一致？
 
-## Formal-v2 primitive 与冻结库
+formal-v2 使用四个互斥的底层 primitive family：`TRANSFER`、`TRANSFORM`、`MUTATE`、`CONTROL`。`Ingest / Adopt / Persist / Recall / Select / Bind / Act / Record / Recover` 是建立在 observable occurrence 和 typed causal edge 上的语义 macro。
 
-formal-v2 底层只使用 `TRANSFER / TRANSFORM / MUTATE / CONTROL` 四个互斥 family。`Ingest / Adopt / Persist / Recall / Select / Bind / Act / Record / Recover` 是建立在 core occurrence 与 typed causal edge 上的语义宏，不是九个底层 enum；outcome 和 evidence grade 与 family 正交。
-
-新的 synthetic construction 入口为：
-
-```bash
-PYTHONPATH=src .venv/bin/python -m stac_attack_lab.cli sample attack-build \
-  --config configs/sample_generation/formal_v1.yaml
-```
-
-已冻结的 `data/primitive_libraries/frozen/formal-v2-attack-synthetic/` 来自显式对抗目标下的受控 fake/synthetic 轨迹，包含一个 accepted positive 和一个 defense-blocked negative。Planner public view、execution binding view 与 private construction evidence 物理分离；public/execution 不含离线攻击 prompt、payload、canary/oracle 或 transcript。历史 `OfflineSample` 数据和 `offline build` 仍是 legacy prompt-bearing 路径，不能当作 formal-v2 库。
-
-Phase A synthetic construction 已完成并保留为历史 frozen fixture。真实 adaptive Construction Attacker、完整 SafeClaw Victim driver、primitive-aware trajectory planner 和 independent Formal Attacker 已实现；materializer 与官方 evaluator 仍不是 Attacker。尚未启动真实模型 Sample Collection，也未进行正式 ASR/迁移性实验。
-
-真实 Sample Collection 使用 v2 pilot-first 流程。先显式导出 `SAFECLAW_MODEL` 和提供方确认可用于 `/v1/embeddings` 的 `SAFECLAW_EMBEDDING_MODEL`，再启动有锁、可恢复的 pilot launcher：
-
-```bash
-export SAFECLAW_MODEL=gpt-5.5
-: "${SAFECLAW_EMBEDDING_MODEL:?export a provider-verified embedding model id first}"
-export SAFECLAW_EMBEDDING_MODEL
-bash scripts/run_safeclaw_sample_collection.sh \
-  --config configs/sample_generation/safeclaw_adversarial_v2_pilot.yaml
-```
-
-launcher 先运行 `collect-preflight`；该阶段不启动 Victim、Attacker 或 Docker task。只有 preflight 全部通过后才进入真实 collection。pilot 审计、主 campaign、确定性 mine/audit/freeze 与正式 evaluation 的 tmux 命令见 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md)。历史 `safeclaw_adversarial_v1.yaml` 和 `scripts/run_sample_collection.sh` 不属于该 v2 正式流程。
-
-## 对话数据在哪里
-
-仓库保留了两组完整可观察对话，均为 JSONL，每行一个按 `sequence_no` 排序的事件。
-
-### 离线样本构建对话
-
-[`data/frozen/stac-verified-30-v0.1/conversations.jsonl`](data/frozen/stac-verified-30-v0.1/conversations.jsonl)
-
-这里记录 GPT-5.5 Planner、Attacker、PromptWriter、Verifier、Judge 与 Gemini Victim 在样本构建阶段的请求和响应。对应的冻结样本位于：
-
-- [`data/frozen/stac-verified-30-v0.1/samples.jsonl`](data/frozen/stac-verified-30-v0.1/samples.jsonl)
-- `data/frozen/stac-verified-30-v0.1/verification/<candidate-id>/events.jsonl`
-- `data/frozen/stac-verified-30-v0.1/verification/<candidate-id>/verdicts.jsonl`
-- `data/frozen/stac-verified-30-v0.1/verification/<candidate-id>/artifacts/`
-- `data/frozen/stac-verified-30-v0.1/verification/<candidate-id>/snapshots/`
-
-### 正式 evaluation 对话
-
-[`experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/conversations.jsonl`](experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/conversations.jsonl)
-
-这里记录 GPT-5.5 Planner、Attacker、Verifier、Judge 与本地 Huihui-Qwen3 Victim 的交互，以及 Victim 与环境工具之间的 request/result、确定性 verifier 返回给 Planner 的阶段状态。每次攻击的环境事件和判定分别位于同目录的：
+## 系统流程
 
 ```text
-<attack-id>/events.jsonl
-<attack-id>/verdicts.jsonl
-<attack-id>/report.json
+安全与环境检查
+  -> interaction collection
+  -> raw trajectory + checkpoints
+  -> normalized InteractionGraph
+  -> primitive occurrence extraction
+  -> causal chain mining and filtering
+  -> sample library audit
+  -> immutable frozen sample library
+  -> Scheduler assigns zero or one sample
+  -> Planner builds a validated trajectory
+  -> independent Attacker realizes the attack
+  -> OpenClaw Victim executes in SafeClaw
+  -> mechanism verifier + official evaluator
+  -> complete record + formal report
 ```
 
-`conversations.jsonl` 的关键字段包括：
+这里的 `collection` 发生在 `sample` 之前。Collection 保存完整交互轨迹；sample 是从轨迹中确定性挖掘、审计并冻结的因果 primitive chain。
 
-- `attack_id`：所属攻击实例；
-- `sequence_no`：全局对话顺序；
-- `event_type`：model request/response、tool request/result、verifier result 或 error；
-- `sender_role`、`recipient_role`：消息在组件之间的传播方向；
-- `request_messages`、`raw_model_response`、`parsed_structured_response`：可观察输入、原始输出和结构化输出；
-- `related_event_ids`、`artifact_refs`、`snapshot_refs`、`hard_verdict_refs`：对话与执行证据的链接；
-- `prompt_id`、`prompt_hash`、`model_id`：prompt 与模型配置的可追溯信息。
+## 核心角色
 
-仓库不请求或记录隐藏 chain-of-thought。`transcript_audit.json` 检查事件顺序、角色隔离、模型分配、链接完整性和敏感信息过滤。
+| 角色 | 职责 |
+|---|---|
+| Construction Attacker | 在 collection 阶段根据公开 observation 生成 delivery、session、retry 或 reroute 动作 |
+| Collector | 展开 task × seed matrix，保存 raw trajectory、event、checkpoint 和 provenance |
+| Scheduler | 根据 public task、能力和预算，在 Planner 之前绑定零个或一个 sample |
+| Planner | 基于单个已分配 sample 构造合法 primitive/state trajectory |
+| Formal Attacker | 根据 execution view 和 validated plan 生成 fresh slot value 与逐 stage action |
+| OpenClaw Victim | 被测完整 Agent：模型、context、memory、workspace、tools 和 session lifecycle |
+| Mechanism Verifier | 用 graph、occurrence、edge 和 action lineage 验证攻击机制 |
+| Official Evaluator | 给出 SafeClaw benchmark 的官方结果投影 |
+| Recorder/Reporter | 写入 checkpoint、model-call journal、complete record、audit 和报告 |
 
-## 当前实验运行状态
+`judge.py`、runner、bridge 和 materializer 是执行基础设施，不是 Attacker。当前 preregistered 三个 condition 使用 deterministic fixed/no-sample Planner；只有显式加入 `sample_llm_tiebreak` 才会调用 LLM Planner。
 
-- 离线阶段已经构建并冻结 30 个通过完整执行和确定性验证的样本，版本为 `stac-verified-30-v0.1`。
-- evaluation 已在服务器完成 30 个计划 episode，Planner/Attacker/Verifier/Judge 使用 GPT-5.5，Victim 使用本地 Huihui-Qwen3。
-- 运行支持逐攻击 checkpoint、失败后 resume、append-only 进度日志和 transcript audit。
-- 当前运行验证了上述单一攻击链的执行闭环；clean、ablation、defense 和更多攻击拓扑尚未进行正式模型实验。
-- 当前结果只应视为系统工程与基线攻击链验证。传播因果分析、转折点定位和多防御比较仍是下一阶段工作。
-- 下一版本离线收集配置为 configs/experiments/stac_sample_build_gpt_gemini_50.yaml（50 个 hard-pass，最多 200 个候选）；本次未运行任何真实模型调用。
+## 项目结构
 
-## 已实现的系统能力
+```text
+stac-compositional-attack-lab/
+├── README.md                  项目入口与当前状态
+├── SECURITY.md                授权范围和隔离要求
+├── Makefile                   质量检查与当前 v2 入口
+├── configs/                   环境、实验、模型、task 和 sample 配置
+├── data/                      seed、raw/normalized interaction、generated/frozen library
+├── docs/                      当前文档和历史归档
+├── experiments/               legacy 与 SafeClaw 正式运行产物
+├── integrations/              SafeClaw bridge/patch 与外部 benchmark checkout
+├── prompts/                   各角色的版本化 prompt
+├── schemas/                   Pydantic 生成的 JSON Schema
+├── scripts/                   当前 launcher；旧脚本位于 scripts/legacy
+├── src/stac_attack_lab/       核心 Python 包
+└── tests/                     unit、integration 和 e2e tests
+```
 
-- 独立 Planner、Attacker、Victim、PromptWriter、Verifier、Judge 角色及 prompt/schema/model 配置；
-- Pydantic 数据契约和生成的 JSON Schema；
-- 攻击原语注册、攻击图验证和在线 STAC 状态机；
-- 本地 `WorkspaceCanaryEnv`、事件日志、artifact lineage、状态快照；
-- 不可被 LLM 覆盖的确定性 verifier；
-- Fake、Gemini、OpenAI-compatible、Huihui/vLLM 模型客户端；
-- 离线样本生成、审计、冻结和在线绑定执行；
-- 每个攻击完成后持久化进度，配额中断后可恢复；
-- 完整可观察对话记录与自动 transcript audit；
-- 基础 clean、ablation、memory guard 和报告代码路径。
-- SafeClaw no_sample 使用同一模板的合法 benign materialization，并保持 task/seed/budget/environment 配对。
+各目录的详细说明见：
 
-## 尚未实现的研究扩展
+- [`docs/PROJECT_GUIDE_ZH.md`](docs/PROJECT_GUIDE_ZH.md)
+- [`configs/README.md`](configs/README.md)
+- [`data/README.md`](data/README.md)
+- [`scripts/README.md`](scripts/README.md)
+- [`experiments/README.md`](experiments/README.md)
 
-- 多入口：用户输入、文件、Agent 间消息、Planner context、任务交接等；
-- 多传播机制：摘要、改写、委派、参数序列化、跨会话召回等；
-- 重组攻击：分片合并、多来源汇聚、可信与不可信内容混合、延迟触发；
-- 多种图拓扑：分支、汇聚、反馈循环、跨 Agent、跨会话传播；
-- 多种安全危害 sink 及统一严重度定义；
-- 自动转折点检测、node/edge ablation 和因果贡献分析；
-- 入口、memory、retrieval、Agent handoff、action sink 等多位置防御；
-- 防御的 benign utility、误报、开销、绕过和自适应攻击评估；
-- AgentDojo 与 SHADE_Arena 的正式实验集成，目前只有只读 adapter/contract smoke。
+## 安装与本地质量检查
 
-## 运行与复现
+要求 Python 3.11+。真实 SafeClaw 运行建议使用 Linux 服务器。
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
-make lint
-make typecheck
-make test
-make smoke-offline
-make smoke-online
-make smoke-report
+make check
+make schemas
 ```
 
-Fake profile 不需要 API key 或网络。真实模型配置和运行命令见 [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)。凭证只从本地环境变量读取，不写入代码、配置、文档或日志。
+`make check` 依次执行 Ruff、mypy 和 pytest。部分 SafeClaw contract tests 依赖被 `.gitignore` 排除的 pinned upstream checkout；未准备 upstream 时，这些测试会失败，而不是自动下载依赖。
 
-`scripts/run_sample_collection.sh` 是通用 STAC offline/GPT-Gemini legacy 入口，输出到 `data/generated/<run-id>/`，不生成本实验的 SafeClaw primitive library。SafeClaw v2 collection 必须使用 `scripts/run_safeclaw_sample_collection.sh`，正式 evaluation 使用带 v2 参数的 `scripts/run_formal_evaluation.sh`。两者的 pilot-first 顺序、tmux 命令、输出目录、mine/audit/freeze 门禁和恢复方法以 [FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md](FORMAL_COLLECTION_EVALUATION_HANDOFF_20260826.md) 为准。
+## 当前 SafeClaw 外部依赖
+
+真实 collection/evaluation 需要：
+
+- `integrations/safeclaw/upstream/SafeClawArena`；
+- upstream commit `a11f5cceaba0676be721021f8d232638fd111305`；
+- Docker 与 `openclaw-env:2026.3.12`；
+- 可应用的 `integrations/safeclaw/patches/a11f5cce-safety.patch`；
+- allowlisted Victim/Attacker model endpoint；
+- 独立且从 host/Docker 均可访问的 `/v1/embeddings` endpoint；
+- 至少 20 GiB 可用磁盘；
+- 只存在本地环境变量或 mode-0600 环境文件中的凭证。
+
+Preflight 不会 clone upstream、下载模型、构建 image 或放宽安全门禁。
+
+## 运行入口
+
+查看所有 Makefile 入口：
+
+```bash
+make help
+```
+
+对显式版本化 collection 配置运行 preflight：
+
+```bash
+make sample-preflight \
+  CONFIG=configs/sample_generation/<authorized-version>.yaml
+```
+
+运行经授权的 collection：
+
+```bash
+make sample-collection \
+  CONFIG=configs/sample_generation/<authorized-version>.yaml
+```
+
+Collection launcher 只执行 `collect-preflight -> collect`，不会自动 mine、audit 或 freeze。完整命令和停止条件见 [`docs/PROJECT_GUIDE_ZH.md`](docs/PROJECT_GUIDE_ZH.md)。
+
+Formal preflight：
+
+```bash
+make formal-preflight
+```
+
+Formal evaluation 只有在真实 library audit/freeze 通过后才可能启动：
+
+```bash
+make formal-evaluation
+```
+
+当前 config 指向尚不存在的 `data/primitive_libraries/frozen/formal-v3-safeclaw-20260824`，因此会在 Victim episode 之前停止。这是预期门禁，不是应绕过的错误。
+
+## 正式实验设计
+
+当前 preregistered formal matrix：
+
+```text
+1 个 PSE 2.1 task × 3 conditions × 5 seeds = 15 cases
+```
+
+Conditions：
+
+- `assigned_sample`：使用 scheduler 分配的一个真实冻结 sample；
+- `no_sample`：同 task/seed/budget/template 的合法 benign baseline；
+- `dependency_ablation`：保留同一 sample 与 plan，只替换一个预注册 sample-derived slot。
+
+同一 pair 必须保持 task、seed、budget、public prompt、library、registry、environment 和 official evaluator 不变。只有 condition 指定的变量可以变化。
+
+## 证据与可恢复性
+
+正式 case 的核心产物包括：
+
+- `formal_case_assignment.json`
+- `planner_input.json`
+- `evaluation_plan.json`
+- `formal_attacker_input.json`
+- `materialized_task.json`
+- `episode_result.json`
+- `interaction_graph.json`
+- `primitive_extraction.json`
+- `mechanism_evaluation.json`
+- `official_verdict.json`
+- `model_calls.jsonl`
+- `complete_interaction_record.json`
+
+运行支持 whole-episode attempt、append-only transition、case checkpoint 和 `--resume`。中断 attempt 不会与新的 Victim container 拼接。正式报告必须从持久化 artifact 重建，不能只依赖 stdout。
+
+## 文档导航
+
+建议首次审阅按以下顺序阅读：
+
+1. 本 README；
+2. [`docs/PROJECT_GUIDE_ZH.md`](docs/PROJECT_GUIDE_ZH.md)；
+3. [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md)；
+4. [`docs/PROMPTS.md`](docs/PROMPTS.md)；
+5. [`SECURITY.md`](SECURITY.md)；
+6. [`docs/DECISIONS.md`](docs/DECISIONS.md)。
+
+阶段性计划、旧命令和服务器进度位于 [`docs/archive/`](docs/archive/)，只用于历史追溯。
+
+## 当前限制
+
+- 真实 formal-v2 library 尚未产生；
+- 当前只 preregister 了一个 coverage-limited PSE 2.1 formal task；
+- 尚未完成多入口、多拓扑、多 Agent、多危害 sink 和系统化防御比较；
+- 当前不能声称广泛攻击覆盖、跨类别迁移性或正式 ASR；
+- AgentDojo 和 SHADE_Arena 仍只有 adapter/contract smoke。
+
+任何实验结论都必须明确区分：代码实现、deterministic smoke、synthetic fixture、真实 pilot、完整 frozen library 和正式 matched evaluation。

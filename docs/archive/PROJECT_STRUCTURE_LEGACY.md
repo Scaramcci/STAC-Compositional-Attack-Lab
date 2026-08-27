@@ -1,5 +1,7 @@
 # Project Structure
 
+> Archive snapshot：该说明已由 `docs/PROJECT_GUIDE_ZH.md` 替代，路径和运行状态可能与当前仓库不同。
+
 本文档说明模块职责、依赖方向、离线到在线的数据流、角色隔离和运行产物。研究状态与尚未实现的范围见 [`docs/RESEARCH_STATUS.md`](docs/RESEARCH_STATUS.md)。
 
 ## 顶层结构

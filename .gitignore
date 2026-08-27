@@ -1,3 +1,4 @@
+.DS_Store
 .env
 __pycache__/
 *.pyc
@@ -30,6 +31,8 @@ experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/*
 !experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/verdicts.jsonl
 reports/*
 !reports/.gitkeep
+
+FORMAL_EXPERIMENT_COMMANDS_20260826_中文翻译.md
 
 data/frozen/smoke-*/
 

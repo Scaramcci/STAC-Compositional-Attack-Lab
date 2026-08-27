@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VLLM_BIN="${VLLM_BIN:-${PROJECT_ROOT}/.venv-vllm/bin/vllm}"
 VLLM_BIN_DIR="$(dirname "${VLLM_BIN}")"
 export PATH="${VLLM_BIN_DIR}:${PATH}"

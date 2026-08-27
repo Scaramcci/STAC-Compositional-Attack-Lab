@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 umask 077
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUN_ID="${1:-safeclaw-formal-v1-main}"
 FORMAL_CONFIG="${2:-configs/experiments/safeclaw_formal_v1.yaml}"
 PREFLIGHT_CONFIG="${3:-configs/environments/safeclaw_openclaw_v1.yaml}"

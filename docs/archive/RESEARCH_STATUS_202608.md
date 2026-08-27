@@ -1,5 +1,7 @@
 # Research Status
 
+> Archive snapshot：这是 2026-08 阶段性状态记录。当前状态以 `README.md` 和 `docs/PROJECT_GUIDE_ZH.md` 为准。
+
 本文档面向项目审阅，说明当前实验已经实现到哪里、尚未实现什么，以及扩展为系统化攻击传播与防御研究前必须修正的问题。这里不讨论攻击成功率或模型优劣。
 
 ## 2026-08-20 formal-v2 状态

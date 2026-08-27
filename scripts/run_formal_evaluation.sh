@@ -4,9 +4,9 @@ set -Eeuo pipefail
 umask 077
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_ID="safeclaw-formal-v1-main"
-FORMAL_CONFIG="configs/experiments/safeclaw_formal_v1.yaml"
-PREFLIGHT_CONFIG="configs/environments/safeclaw_openclaw_v1.yaml"
+RUN_ID="safeclaw-formal-v2-main"
+FORMAL_CONFIG="configs/experiments/safeclaw_formal_v2.yaml"
+PREFLIGHT_CONFIG="configs/environments/safeclaw_openclaw_v2.yaml"
 UPSTREAM_REL="integrations/safeclaw/upstream/SafeClawArena"
 PSE_TASK_REL="tasks/pse/pse-2.1-001.json"
 PYTHON_BIN="${STAC_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"

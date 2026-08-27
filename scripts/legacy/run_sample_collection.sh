@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 umask 077
 
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG="configs/experiments/stac_sample_build_gpt_gemini_50.yaml"
 PYTHON_BIN="${STAC_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"
 
