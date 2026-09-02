@@ -35,7 +35,7 @@ def _graph(tmp_path: Path) -> InteractionGraph:
 
 def test_deterministic_extractor_recognizes_all_formal_families(tmp_path: Path) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     result = extract_primitive_occurrences(graph, registry)
 
     assert len(result.occurrences) == 8
@@ -60,7 +60,7 @@ def test_semantic_proposal_does_not_override_missing_hard_evidence(tmp_path: Pat
             ]
         }
     )
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     result = extract_primitive_occurrences(
         graph,
         registry,

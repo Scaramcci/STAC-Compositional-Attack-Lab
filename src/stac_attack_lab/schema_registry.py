@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from stac_attack_lab.contracts import SCHEMA_MODELS as LEGACY_SCHEMA_MODELS
 from stac_attack_lab.datasets.primitive_chain import (
     AcceptedSampleRecord,
     PrimitiveChainCandidate,
@@ -47,7 +46,7 @@ from stac_attack_lab.primitives.core import CorePrimitiveSpec
 from stac_attack_lab.primitives.macros import AttackMacroSpec
 from stac_attack_lab.verification.formal_aggregate import FormalRunResult
 
-FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
+SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "core_primitive_spec": CorePrimitiveSpec,
     "attack_macro_spec": AttackMacroSpec,
     "raw_interaction_trajectory": RawInteractionTrajectory,
@@ -80,12 +79,7 @@ FORMAL_SCHEMA_MODELS: dict[str, type[BaseModel]] = {
 }
 
 
-SCHEMA_MODELS: dict[str, type[BaseModel]] = {**LEGACY_SCHEMA_MODELS, **FORMAL_SCHEMA_MODELS}
-
-
 def validate_schema_registry() -> None:
-    if set(LEGACY_SCHEMA_MODELS) & set(FORMAL_SCHEMA_MODELS):
-        raise ValueError("schema_registry_name_conflict")
     for name, model in SCHEMA_MODELS.items():
         schema = model.model_json_schema()
         if schema.get("type") != "object":

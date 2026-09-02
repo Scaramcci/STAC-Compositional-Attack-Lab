@@ -4,7 +4,7 @@ set -Eeuo pipefail
 umask 077
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONFIG="configs/sample_generation/safeclaw_adversarial_v2_pilot.yaml"
+CONFIG="configs/sample_generation/pilot_collection.yaml"
 PYTHON_BIN="${STAC_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"
 PREFLIGHT_ONLY=false
 PRINT_OUTPUT=false

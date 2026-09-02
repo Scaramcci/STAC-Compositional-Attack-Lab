@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _build(tmp_path: Path, version: str = "formal-test-v1") -> Path:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": version,
@@ -98,7 +98,7 @@ def test_freeze_is_atomic_immutable_and_idempotent(tmp_path: Path) -> None:
 
 
 def test_test_split_is_rejected_before_collection(tmp_path: Path) -> None:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "allowed_source_splits": ["test"],
@@ -114,7 +114,7 @@ def test_explicit_sample_stages_are_hash_bound_resume_safe_and_model_free(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     version = "formal-explicit-stages-v1"
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": version,
@@ -153,7 +153,7 @@ def test_explicit_sample_stages_are_hash_bound_resume_safe_and_model_free(
 
 
 def test_mining_rejects_tampered_collection(tmp_path: Path) -> None:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": "formal-tampered-collection-v1",
@@ -173,7 +173,7 @@ def test_mining_rejects_tampered_collection(tmp_path: Path) -> None:
 
 def test_freeze_requires_current_explicit_audit_report(tmp_path: Path) -> None:
     version = "formal-audit-gated-freeze-v1"
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": version,
@@ -200,7 +200,7 @@ def test_audit_and_freeze_require_preregistered_accepted_sample_target(
     tmp_path: Path,
 ) -> None:
     version = "formal-target-gate-v1"
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": version,

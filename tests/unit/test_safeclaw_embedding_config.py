@@ -69,6 +69,7 @@ def test_model_config_fails_closed_when_embedding_key_is_missing() -> None:
         )
 
 
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="SafeClawArena checkout not installed")
 def test_patched_judge_applies_memory_search_config_without_secret_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

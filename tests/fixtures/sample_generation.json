@@ -1,0 +1,51 @@
+{
+  "schema_version": "2.1",
+  "pipeline_id": "synthetic-regression",
+  "library_id": "stac-formal-primitive-library",
+  "library_version": "synthetic-regression",
+  "registry_path": "configs/primitives/registry.yaml",
+  "source_adapter": "jsonl_authorized_fixture",
+  "source_fixture_path": "tests/fixtures/interactions/authorized_synthetic.jsonl",
+  "source_task_ids": [
+    "construction-synthetic-001",
+    "construction-synthetic-blocked-001"
+  ],
+  "acquisition_mode": "adversarial_trace",
+  "construction_objective_id": "synthetic-persistence-propagation",
+  "public_attack_goal": "Exercise the current sample pipeline with authorized synthetic events.",
+  "allowed_delivery_surfaces": [
+    "synthetic_fixture",
+    "persistent_memory",
+    "local_action_sink"
+  ],
+  "required_trust_boundary_crossings": [
+    "untrusted_source_to_agent_context",
+    "persistent_memory_to_later_session"
+  ],
+  "public_terminal_predicate_ids": ["sandbox_terminal_effect_observed"],
+  "safety_constraint_ids": [
+    "synthetic_canary_only",
+    "no_network",
+    "no_host_files",
+    "no_real_credentials"
+  ],
+  "construction_attacker_model_hash": "deterministic-test-double",
+  "construction_prompt_hash": "synthetic-test-objective",
+  "attacker_stage_implemented": false,
+  "allowed_source_splits": ["train", "dev", "synthetic"],
+  "formal_excluded_task_ids": [
+    "ipi-4.1-001",
+    "pse-2.1-001",
+    "cdf-3.1-001",
+    "ssi-1.1-001"
+  ],
+  "seed": 20260817,
+  "available_capabilities": [
+    "read_untrusted_source",
+    "persistent_state_write",
+    "lifecycle_boundary",
+    "persistent_state_read",
+    "effectful_sandbox_action"
+  ],
+  "output_root": "data/primitive_libraries/generated"
+}

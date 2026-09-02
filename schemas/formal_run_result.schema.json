@@ -164,11 +164,6 @@
           ],
           "title": "Embedding Calls When Observable"
         },
-        "gemini_native_calls": {
-          "minimum": 0,
-          "title": "Gemini Native Calls",
-          "type": "integer"
-        },
         "input_tokens": {
           "anyOf": [
             {
@@ -252,7 +247,6 @@
         "attacker_decision_calls",
         "victim_gateway_requests",
         "victim_provider_completions_when_observable",
-        "gemini_native_calls",
         "embedding_calls_when_observable",
         "whole_episode_attempts",
         "input_tokens",

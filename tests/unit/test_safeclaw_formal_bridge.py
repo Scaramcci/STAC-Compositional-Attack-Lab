@@ -47,6 +47,7 @@ def _official_projection(report: dict[str, object]) -> dict[str, object]:
     return {key: report[key] for key in keys}
 
 
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="SafeClawArena checkout not installed")
 def test_safety_patch_and_interactive_inputs_preserve_official_evaluator(
     tmp_path: Path,
 ) -> None:

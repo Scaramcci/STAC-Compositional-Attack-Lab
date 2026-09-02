@@ -29,7 +29,7 @@ def _result(
         condition=condition,
         seed=7,
         planner_type="test",
-        library_version="formal-v1",
+        library_version="test-library",
         sample_id="sample-1",
         plan_id="plan-1",
         binding_id="binding-1",

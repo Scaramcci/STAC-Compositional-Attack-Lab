@@ -326,12 +326,12 @@ def _project(tmp_path: Path) -> tuple[Path, SafeClawFormalConfig, SafeClawRunner
     (upstream / "scripts/reset_env.sh").write_text("# synthetic reset\n", encoding="utf-8")
     (upstream / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
     shutil.copy(
-        ROOT / "configs/primitives/formal_v1.yaml", project / "configs/primitives/formal_v1.yaml"
+        ROOT / "configs/primitives/registry.yaml", project / "configs/primitives/registry.yaml"
     )
     shutil.copy(TASK, project / "templates/task.json")
     shutil.copy(PATCH, project / "integrations/safeclaw/patches/safety.patch")
 
-    sample_base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    sample_base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     sample_config = sample_base.model_copy(
         update={
             "library_version": "formal-e2e-v1",
@@ -403,7 +403,7 @@ def _project(tmp_path: Path) -> tuple[Path, SafeClawFormalConfig, SafeClawRunner
         track="safeclaw_compositional",
         environment_config_path="configs/environments/safeclaw.json",
         task_set_path="configs/task_sets/formal.json",
-        registry_path="configs/primitives/formal_v1.yaml",
+        registry_path="configs/primitives/registry.yaml",
         library_path="data/primitive_libraries/frozen/formal-e2e-v1",
         conditions=["sample_rule_based", "no_sample", "dependency_ablation"],
         seeds=[11],

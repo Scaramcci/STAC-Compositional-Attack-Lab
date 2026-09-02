@@ -1,5 +1,0 @@
-provider: openai_compatible
-model: local-model
-temperature: 0.0
-max_output_tokens: 1200
-timeout_seconds: 60

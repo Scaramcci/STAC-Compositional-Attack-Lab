@@ -73,7 +73,7 @@ class PrimitiveChainCandidate(StrictModel):
     registry_hash: str
     interaction_graph_id: str
     occurrence_ids: list[str]
-    core_nodes: list[PublicCoreNode] = Field(default_factory=list)
+    core_nodes: list[PublicCoreNode] = Field(min_length=1)
     core_edges: list[PublicCoreEdge] = Field(default_factory=list)
     duplicate_provenance_paths: list[list[str]] = Field(default_factory=list)
     nodes: list[ChainNode]

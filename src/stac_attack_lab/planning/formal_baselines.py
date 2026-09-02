@@ -69,30 +69,6 @@ def _abstain_plan(
     )
 
 
-MACRO_PRIMARY_FAMILY = {
-    "macro.ingest@2": CorePrimitiveFamily.transfer,
-    "macro.adopt@2": CorePrimitiveFamily.transform,
-    "macro.persist@2": CorePrimitiveFamily.mutate,
-    "macro.recall@2": CorePrimitiveFamily.transfer,
-    "macro.select@2": CorePrimitiveFamily.transform,
-    "macro.bind@2": CorePrimitiveFamily.transform,
-    "macro.act@2": CorePrimitiveFamily.mutate,
-    "macro.record@2": CorePrimitiveFamily.mutate,
-    "macro.recover@2": CorePrimitiveFamily.control,
-}
-
-MACRO_ADVERSARIAL_ROLE: dict[str, AdversarialRole] = {
-    "macro.ingest@2": "entry",
-    "macro.adopt@2": "propagation",
-    "macro.persist@2": "persistence",
-    "macro.recall@2": "activation",
-    "macro.select@2": "propagation",
-    "macro.bind@2": "propagation",
-    "macro.act@2": "effect",
-    "macro.record@2": "persistence",
-    "macro.recover@2": "control",
-}
-
 CONTROL_INTERVENTIONS: tuple[ControlIntervention, ...] = (
     "remove_poisoning",
     "remove_trigger",
@@ -143,69 +119,37 @@ def build_long_horizon_trajectory(
     stages: list[PrimitiveTrajectoryStage] = []
     previous_state = "public_state:benign_context"
     core_nodes = sorted(sample.planner_view.core_nodes, key=lambda item: item.position)
-    if core_nodes:
-        family_roles: dict[CorePrimitiveFamily, AdversarialRole] = {
-            CorePrimitiveFamily.transfer: "propagation",
-            CorePrimitiveFamily.transform: "propagation",
-            CorePrimitiveFamily.mutate: "effect",
-            CorePrimitiveFamily.control: "control",
-        }
-        for index, node in enumerate(core_nodes):
-            macro_ref = node.macro_annotations[0] if node.macro_annotations else "macro.unannotated"
-            output_type = (
-                node.public_output_state_types[0]
-                if node.public_output_state_types
-                else f"{node.subtype}_completed"
+    family_roles: dict[CorePrimitiveFamily, AdversarialRole] = {
+        CorePrimitiveFamily.transfer: "propagation",
+        CorePrimitiveFamily.transform: "propagation",
+        CorePrimitiveFamily.mutate: "effect",
+        CorePrimitiveFamily.control: "control",
+    }
+    for index, node in enumerate(core_nodes):
+        macro_ref = node.macro_annotations[0] if node.macro_annotations else "macro.unannotated"
+        output_type = (
+            node.public_output_state_types[0]
+            if node.public_output_state_types
+            else f"{node.subtype}_completed"
+        )
+        output_state = f"public_state:{node.node_id}:{output_type}"
+        stages.append(
+            PrimitiveTrajectoryStage(
+                stage_id=node.node_id,
+                core_node_ref=node.node_id,
+                macro_ref=macro_ref,
+                primary_family=node.family,
+                input_state_refs=[previous_state],
+                output_state_ref=output_state,
+                carried_state_refs=[previous_state],
+                adversarial_role="entry" if index == 0 else family_roles[node.family],
+                activation_condition=(
+                    "public_cross_session_state_available" if node.session_boundary_before else None
+                ),
+                trust_boundary_crossing=index == 0 or node.session_boundary_before,
             )
-            output_state = f"public_state:{node.node_id}:{output_type}"
-            stages.append(
-                PrimitiveTrajectoryStage(
-                    stage_id=node.node_id,
-                    core_node_ref=node.node_id,
-                    macro_ref=macro_ref,
-                    primary_family=node.family,
-                    input_state_refs=[previous_state],
-                    output_state_ref=output_state,
-                    carried_state_refs=[previous_state],
-                    adversarial_role="entry" if index == 0 else family_roles[node.family],
-                    activation_condition=(
-                        "public_cross_session_state_available"
-                        if node.session_boundary_before
-                        else None
-                    ),
-                    trust_boundary_crossing=index == 0 or node.session_boundary_before,
-                )
-            )
-            previous_state = output_state
-    else:
-        for legacy_node in sample.planner_view.macro_nodes:
-            output_predicate = (
-                legacy_node.public_postconditions[0]
-                if legacy_node.public_postconditions
-                else f"{legacy_node.node_id}_completed"
-            )
-            output_state = f"public_state:{legacy_node.node_id}:{output_predicate}"
-            stages.append(
-                PrimitiveTrajectoryStage(
-                    stage_id=legacy_node.node_id,
-                    core_node_ref=f"legacy-macro:{legacy_node.node_id}",
-                    macro_ref=legacy_node.macro_primitive_ref,
-                    primary_family=MACRO_PRIMARY_FAMILY[legacy_node.macro_primitive_ref],
-                    input_state_refs=[previous_state],
-                    output_state_ref=output_state,
-                    carried_state_refs=[previous_state],
-                    adversarial_role=MACRO_ADVERSARIAL_ROLE[legacy_node.macro_primitive_ref],
-                    activation_condition=(
-                        legacy_node.public_preconditions[0]
-                        if legacy_node.macro_primitive_ref == "macro.recall@2"
-                        and legacy_node.public_preconditions
-                        else None
-                    ),
-                    trust_boundary_crossing=legacy_node.macro_primitive_ref
-                    in {"macro.ingest@2", "macro.recall@2", "macro.act@2"},
-                )
-            )
-            previous_state = output_state
+        )
+        previous_state = output_state
     persist = next((item for item in stages if item.macro_ref == "macro.persist@2"), None)
     recall = next((item for item in stages if item.macro_ref == "macro.recall@2"), None)
     entry = next((item for item in stages if item.adversarial_role == "entry"), stages[0])

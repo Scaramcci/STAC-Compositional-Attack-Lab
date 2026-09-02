@@ -1,4 +1,0 @@
-{"primitive_id":"tool_response_injection","category":"entry"}
-{"primitive_id":"memory_write","category":"persistence"}
-{"primitive_id":"memory_retrieval","category":"retrieval"}
-{"primitive_id":"canary_tool_trigger","category":"trigger"}

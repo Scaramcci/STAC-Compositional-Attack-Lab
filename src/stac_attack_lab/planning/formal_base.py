@@ -100,8 +100,8 @@ class SingleSamplePlannerInput(StrictModel):
         return self
 
 
-# Source compatibility only. The strict v3 schema rejects legacy `public_samples`
-# and library metadata, so this alias cannot expose the full library to a Planner.
+# Shared name for the strict single-sample planner contract. The schema rejects
+# full-library metadata, so a Planner can only receive the scheduled sample.
 FormalPlannerInput = SingleSamplePlannerInput
 
 

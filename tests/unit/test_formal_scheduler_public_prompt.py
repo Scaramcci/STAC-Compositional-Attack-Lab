@@ -22,7 +22,7 @@ TASK = ROOT / "tests/fixtures/safeclaw/compositional_task.json"
 
 
 def _library(tmp_path: Path) -> PrimitiveChainLibrary:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": "scheduler-public-prompt-test-v1",

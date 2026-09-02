@@ -1,18 +1,10 @@
-# Documentation Index
+# Documentation
 
-本目录只把当前有效文档放在顶层；阶段性计划、服务器 handoff 和旧状态快照统一放入 `archive/`。
-
-## 当前文档
-
-| 文档 | 用途 |
+| 文档 | 内容 |
 |---|---|
-| [`PROJECT_GUIDE_ZH.md`](PROJECT_GUIDE_ZH.md) | 面向首次接触项目的完整中文说明：研究目标、架构、角色、数据流和运行方式 |
-| [`EXPERIMENT_PROTOCOL.md`](EXPERIMENT_PROTOCOL.md) | 研究问题、实验配对、指标、checkpoint 和审计协议 |
-| [`PROMPTS.md`](PROMPTS.md) | Planner、Attacker、Victim、Verifier、Judge 的 prompt 与权限契约 |
-| [`DECISIONS.md`](DECISIONS.md) | 关键工程和研究设计决策 |
-| [`../SECURITY.md`](../SECURITY.md) | 授权范围、隔离边界、凭证和数据处理要求 |
+| [PROJECT_GUIDE_ZH.md](PROJECT_GUIDE_ZH.md) | 面向首次接触项目的结构、角色、数据流、运行命令和产物说明 |
+| [EXPERIMENT_PROTOCOL.md](EXPERIMENT_PROTOCOL.md) | 当前实验门禁、配对设计、指标和停止条件 |
+| [PROMPTS.md](PROMPTS.md) | 当前三个模型角色的输入、输出和权限边界 |
+| [../SECURITY.md](../SECURITY.md) | 授权范围、凭证、隔离和 fail-closed 要求 |
 
-## 历史归档
-
-[`archive/`](archive/) 保存旧项目结构说明、历史状态和 2026-08 formal-v2 服务器执行材料。归档内容用于追溯，不是当前默认运行入口。
-
+本目录不保留历史计划、旧命令或旧状态快照；当前状态以根目录 README 和本目录文档为准。

@@ -74,7 +74,6 @@ class FormalExecutionAccounting(StrictModel):
     attacker_decision_calls: NonNegativeInt
     victim_gateway_requests: NonNegativeInt
     victim_provider_completions_when_observable: NonNegativeInt | None
-    gemini_native_calls: NonNegativeInt
     embedding_calls_when_observable: NonNegativeInt | None
     whole_episode_attempts: NonNegativeInt
     input_tokens: NonNegativeInt | None

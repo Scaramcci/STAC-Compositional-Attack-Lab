@@ -6,44 +6,11 @@ __pycache__/
 * 2.jsonl
 .venv/
 src/*.egg-info/
-integrations/.conda-agentdojo/
-integrations/agentdojo/
 integrations/safeclaw/upstream/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-data/generated/*
-!data/generated/.gitkeep
-experiments/runs/*
-!experiments/runs/.gitkeep
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/
-experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/run_manifest.json
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/progress.json
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/attack_progress.jsonl
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/conversations.jsonl
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/results.jsonl
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/transcript_audit.json
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/
-experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/*
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/report.json
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/events.jsonl
-!experiments/runs/evaluation_gpt_huihui_4090-02cb0b56baac/*/verdicts.jsonl
-reports/*
-!reports/.gitkeep
-
-FORMAL_EXPERIMENT_COMMANDS_20260826_中文翻译.md
-
-data/frozen/smoke-*/
-
-.venv-vllm/
-# Formal v2 generated evidence and run artifacts
-data/interactions/raw/*
-!data/interactions/raw/.gitkeep
-data/interactions/normalized/*
-!data/interactions/normalized/.gitkeep
-data/primitive_candidates/*
-!data/primitive_candidates/.gitkeep
+# Generated evidence and run artifacts
 data/primitive_libraries/generated/*
 !data/primitive_libraries/generated/.gitkeep
 experiments/safeclaw_runs/*

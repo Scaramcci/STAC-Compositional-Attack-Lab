@@ -583,6 +583,7 @@
       "items": {
         "$ref": "#/$defs/PublicCoreNode"
       },
+      "minItems": 1,
       "title": "Core Nodes",
       "type": "array"
     },
@@ -692,6 +693,7 @@
     "registry_hash",
     "interaction_graph_id",
     "occurrence_ids",
+    "core_nodes",
     "nodes",
     "edges",
     "entry_predicates",

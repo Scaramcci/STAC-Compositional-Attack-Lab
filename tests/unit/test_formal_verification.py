@@ -58,8 +58,8 @@ def _graph(tmp_path: Path) -> InteractionGraph:
     return InteractionGraph.model_validate_json(graph_path.read_text(encoding="utf-8"))
 
 
-def _plan_and_views(tmp_path: Path):  # type: ignore[no-untyped-def]
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+def _plan_and_views(tmp_path: Path, *, require_state_recall_edge: bool = False):  # type: ignore[no-untyped-def]
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": "formal-verifier-test-v1",
@@ -68,7 +68,19 @@ def _plan_and_views(tmp_path: Path):  # type: ignore[no-untyped-def]
     )
     library = PrimitiveChainLibrary(build_sample_library(ROOT, config))
     descriptor = parse_safeclaw_task(TASK, upstream_root=ROOT)
-    public = library.public_index()[0]
+    samples = library.public_index()
+    public = (
+        next(
+            sample
+            for sample in samples
+            if any(
+                edge.edge_id.startswith("core-edge-state-e3-e6")
+                for edge in sample.planner_view.core_edges
+            )
+        )
+        if require_state_recall_edge
+        else samples[0]
+    )
     planner_input = FormalPlannerInput(
         planner_input_id="formal-verifier-input",
         assignment_id="assignment-formal-verifier",
@@ -142,7 +154,7 @@ def _official_payload(attack_succeeded: bool = True) -> dict[str, object]:
 
 def test_formal_mechanism_verifies_all_required_layers(tmp_path: Path) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrences = extract_primitive_occurrences(graph, registry).occurrences
     _, planner_view, execution_view = _plan_and_views(tmp_path)
     mechanism = evaluate_formal_mechanism(
@@ -167,7 +179,7 @@ def test_formal_mechanism_requires_selected_occurrence_action_lineage(
     tmp_path: Path,
 ) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrences = extract_primitive_occurrences(graph, registry).occurrences
     _, planner_view, execution_view = _plan_and_views(tmp_path)
     occurrence_by_ref = {
@@ -257,7 +269,7 @@ def test_formal_mechanism_requires_selected_occurrence_action_lineage(
 
 def test_occurrence_missing_state_diff_is_not_observable(tmp_path: Path) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrence = next(
         item
         for item in extract_primitive_occurrences(graph, registry).occurrences
@@ -282,7 +294,7 @@ def test_occurrence_missing_state_diff_is_not_observable(tmp_path: Path) -> None
 
 def test_semantic_evidence_cannot_upgrade_hard_occurrence(tmp_path: Path) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrence = (
         extract_primitive_occurrences(graph, registry)
         .occurrences[0]
@@ -311,9 +323,9 @@ def test_typed_state_edge_is_not_replaced_by_temporal_order(tmp_path: Path) -> N
             ]
         }
     )
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrences = extract_primitive_occurrences(graph, registry).occurrences
-    _, planner_view, execution_view = _plan_and_views(tmp_path)
+    _, planner_view, execution_view = _plan_and_views(tmp_path, require_state_recall_edge=True)
     mechanism = evaluate_formal_mechanism(
         planner_view=planner_view,
         execution_view=execution_view,
@@ -325,7 +337,7 @@ def test_typed_state_edge_is_not_replaced_by_temporal_order(tmp_path: Path) -> N
     verdict = next(
         item
         for item in mechanism.edge_verdicts
-        if "memory_write@1->core.transfer.retrieve@1" in item.edge_id
+        if "memory_write@1->core.transfer.retrieve@1:state:" in item.edge_id
     )
 
     assert verdict.verdict == CausalVerdict.fail
@@ -334,7 +346,7 @@ def test_typed_state_edge_is_not_replaced_by_temporal_order(tmp_path: Path) -> N
 
 def test_official_adapter_and_aggregate_truth_table(tmp_path: Path) -> None:
     graph = _graph(tmp_path)
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     occurrences = extract_primitive_occurrences(graph, registry).occurrences
     plan, planner_view, execution_view = _plan_and_views(tmp_path)
     episode = _episode()

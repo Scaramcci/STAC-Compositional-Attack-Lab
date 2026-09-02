@@ -69,7 +69,7 @@ CAPABILITIES = [
 
 
 def _formal_input(tmp_path: Path) -> tuple[FormalPlannerInput, PrimitiveChainLibrary]:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": "formal-attacker-test-v1",
@@ -570,7 +570,7 @@ def test_collection_preflight_never_starts_execution(tmp_path: Path) -> None:
     shutil.copytree(ROOT / "prompts", project / "prompts")
     shutil.copytree(ROOT / "integrations/safeclaw", project / "integrations/safeclaw")
     config = load_sample_generation_config(
-        project / "configs/sample_generation/safeclaw_adversarial_v1.yaml"
+        project / "configs/sample_generation/pilot_collection.yaml"
     ).model_copy(update={"execution_enabled": False})
     commands: list[list[str]] = []
 
@@ -604,7 +604,7 @@ def test_collection_preflight_never_starts_execution(tmp_path: Path) -> None:
         check.reason_code == "sample_collection_execution_disabled" for check in report.checks
     )
     assert any(
-        check.reason_code == "sample_collection_embedding_configuration_incomplete"
+        check.reason_code == "sample_collection_model_environment_missing"
         for check in report.checks
     )
     assert all("construction_bridge.py" not in command for command in commands)

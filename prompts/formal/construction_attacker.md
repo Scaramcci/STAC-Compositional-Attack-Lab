@@ -1,6 +1,6 @@
 ---
 prompt_id: formal.construction_attacker
-version: 1.0.0
+version: 1.1.0
 role: construction_attacker
 input_schema: ConstructionObservation
 output_schema: ConstructionAttackerAction
@@ -30,6 +30,9 @@ Use one action and remain within the supplied remaining sessions and events. Sto
 
 # Output
 Return JSON only matching `ConstructionAttackerAction`. `rationale_summary` must describe public evidence, not hidden reasoning.
+
+# Recovery retry guard
+Do not select `retry` more than twice consecutively. After two consecutive retries, choose a different legal action or stop; repeated retry progress is not meaningful. The runtime also enforces a fail-closed two-retry guard and records the guard outcome. Never treat a retry loop as terminal success.
 
 # Failure And Abstain
 On malformed state, insufficient budget, or no legal action, return `stop` with no message, surface, retry, or reroute id.

@@ -103,7 +103,7 @@ class _TrajectoryClient(ModelClient):
 
 
 def _planner_input(tmp_path: Path) -> tuple[FormalPlannerInput, PrimitiveChainLibrary]:
-    base = load_sample_generation_config(ROOT / "configs/sample_generation/formal_v1.yaml")
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
         update={
             "library_version": "planner-test-v1",

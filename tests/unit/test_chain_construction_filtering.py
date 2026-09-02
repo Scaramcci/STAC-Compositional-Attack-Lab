@@ -65,7 +65,7 @@ def _inputs(tmp_path: Path) -> tuple[InteractionGraph, object, object]:
         output_root=tmp_path / "normalized",
     )
     graph = InteractionGraph.model_validate_json(graph_path.read_text(encoding="utf-8"))
-    registry = load_formal_registry(ROOT / "configs/primitives/formal_v1.yaml")
+    registry = load_formal_registry(ROOT / "configs/primitives/registry.yaml")
     extraction = extract_primitive_occurrences(graph, registry)
     return graph, registry, extraction
 

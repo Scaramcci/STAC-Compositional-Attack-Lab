@@ -1,5 +1,0 @@
-provider: huihui_local
-model: huihui-qwen3-14b-abliterated-v2
-temperature: 0.0
-max_output_tokens: 1200
-timeout_seconds: 120

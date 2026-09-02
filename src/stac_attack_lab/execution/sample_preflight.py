@@ -185,9 +185,9 @@ def run_sample_collection_preflight(
             attacker_model = RoleModelConfig.model_validate(load_simple_yaml(model_path))
     add(
         "attacker_model",
-        attacker_model is not None and attacker_model.provider != "fake",
+        attacker_model is not None,
         "construction_attacker_model_is_real",
-        "construction_attacker_model_missing_or_fake",
+        "construction_attacker_model_missing",
     )
     attacker_model_available = True
     if attacker_model is not None and attacker_model.provider == "openai_compatible":
@@ -224,10 +224,7 @@ def run_sample_collection_preflight(
         "sample_collection_embedding_configuration_incomplete",
     )
     if attacker_model is not None:
-        if attacker_model.provider == "openai_compatible":
-            required_env.extend(["OPENAI_BASE_URL", "OPENAI_API_KEY"])
-        elif attacker_model.provider == "gemini":
-            required_env.append("GEMINI_API_KEY")
+        required_env.extend(["OPENAI_BASE_URL", "OPENAI_API_KEY"])
     missing_env = sorted({name for name in required_env if not env.get(name)})
     add(
         "model_environment",

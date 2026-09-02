@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from stac_attack_lab.contracts import OfflineSample
 from stac_attack_lab.environments.safeclaw.contracts import (
     SafeClawBindingSlot,
     SafeClawPublicTaskView,
@@ -19,13 +18,13 @@ from stac_attack_lab.primitives.core import (
     PrimitiveOutcome,
 )
 from stac_attack_lab.primitives.formal_registry import load_formal_registry
-from stac_attack_lab.schema_registry import FORMAL_SCHEMA_MODELS, validate_schema_registry
+from stac_attack_lab.schema_registry import SCHEMA_MODELS, validate_schema_registry
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_formal_registry_is_frozen_and_legacy_aliases_resolve() -> None:
-    path = ROOT / "configs/primitives/formal_v1.yaml"
+def test_formal_registry_is_stable_and_aliases_resolve() -> None:
+    path = ROOT / "configs/primitives/registry.yaml"
     first = load_formal_registry(path)
     second = load_formal_registry(path)
 
@@ -82,23 +81,16 @@ def test_formal_registry_is_frozen_and_legacy_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(FORMAL_SCHEMA_MODELS) == 29
+    assert len(SCHEMA_MODELS) == 29
     assert {
         "sample_collection_stage_manifest",
         "sample_mining_stage_manifest",
         "sample_library_audit_report",
-    } <= set(FORMAL_SCHEMA_MODELS)
-    for model in FORMAL_SCHEMA_MODELS.values():
+    } <= set(SCHEMA_MODELS)
+    for model in SCHEMA_MODELS.values():
         schema = model.model_json_schema()
         assert schema["type"] == "object"
         json.dumps(schema)
-
-
-def test_legacy_frozen_sample_contract_remains_unchanged() -> None:
-    line = (ROOT / "data/frozen/mvp-v0.1/samples.jsonl").read_text(encoding="utf-8").splitlines()[0]
-    sample = OfflineSample.model_validate_json(line)
-    assert sample.model_dump_json()
-    assert sample.dataset_version == "generated"
 
 
 def test_public_safeclaw_view_forbids_private_oracle_fields() -> None:

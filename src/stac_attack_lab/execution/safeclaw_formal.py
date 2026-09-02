@@ -315,7 +315,6 @@ def _formal_execution_accounting(
     }
     planner_model_calls = sum(item.get("role") == "planner" for item in model_requests)
     attacker_model_calls = sum(item.get("role") == "attacker" for item in model_requests)
-    gemini_native_calls = sum(item.get("provider_id") == "gemini" for item in model_requests)
     if interactive_loop is not None:
         source = interactive_loop.accounting.model_dump(mode="json")
     elif baseline_trace is not None and isinstance(baseline_trace.get("accounting"), dict):
@@ -419,7 +418,6 @@ def _formal_execution_accounting(
         attacker_decision_calls=attacker_decision_calls,
         victim_gateway_requests=victim_gateway_requests,
         victim_provider_completions_when_observable=victim_completions,
-        gemini_native_calls=gemini_native_calls,
         embedding_calls_when_observable=None,
         whole_episode_attempts=episode_attempts,
         input_tokens=input_tokens,
