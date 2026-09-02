@@ -9,6 +9,7 @@ from typing import Any, cast
 from pydantic import Field, model_validator
 
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.redaction import redact_value
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.base import (
     AdversarialInteractionSourceAdapter,
@@ -238,7 +239,14 @@ def collect_interactions(
                     }
                 )
         except Exception as exc:
-            failures.append({"trajectory_id": trajectory_id, "reason": type(exc).__name__})
+            error_message = str(redact_value(str(exc)).sanitized) or "no_exception_message"
+            failures.append(
+                {
+                    "trajectory_id": trajectory_id,
+                    "reason": type(exc).__name__,
+                    "message": error_message,
+                }
+            )
             error_event = {
                 "event_id": f"collection-error-{trajectory_id}",
                 "session_id": "collection-error",
@@ -249,7 +257,10 @@ def collect_interactions(
                 "operation": "stop_collection_error",
                 "status": "error",
                 "lifecycle_id": trajectory_id,
-                "public_payload": {"failure_category": type(exc).__name__},
+                "public_payload": {
+                    "failure_category": type(exc).__name__,
+                    "failure_message": error_message,
+                },
                 "evidence_ref_ids": [f"collection_failure:{trajectory_id}"],
             }
             error_collected = CollectedInteraction(
@@ -266,7 +277,7 @@ def collect_interactions(
                 failure_category=type(exc).__name__,
                 provenance={
                     "collector_error_record": "true",
-                    "exception_message_recorded": "false",
+                    "exception_message_recorded": "true_redacted",
                 },
             )
             path = _write_collected(

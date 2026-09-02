@@ -51,7 +51,7 @@ stac-compositional-attack-lab/
 └── tests/                    当前流水线的 unit、integration 和 e2e tests
 ```
 
-详细说明见 [项目结构与运行指南](docs/PROJECT_GUIDE_ZH.md)。
+详细说明见 [项目结构与运行指南](docs/PROJECT_GUIDE_ZH.md)。Linux 长任务命令见 [tmux 运行手册](docs/LINUX_TMUX_RUNBOOK_ZH.md)。
 
 ## 安装
 

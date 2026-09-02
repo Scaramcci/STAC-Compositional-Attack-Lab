@@ -261,10 +261,13 @@ experiments/safeclaw_runs/<run-id>/
     ├── mechanism_evaluation.json
     ├── official_verdict.json
     ├── model_call_events.json
+    ├── failure_events.jsonl          # 仅失败 case
     └── complete_interaction_record.json
 ```
 
 审阅单个 case 时先读 `complete_interaction_record.json`，再检查 assignment、plan、materialized task、InteractionGraph、mechanism evaluation 和 official verdict。
+
+完整 Linux `tmux` 命令和记录查看方式见 [LINUX_TMUX_RUNBOOK_ZH.md](LINUX_TMUX_RUNBOOK_ZH.md)。
 
 ## 11. Resume 与停止条件
 

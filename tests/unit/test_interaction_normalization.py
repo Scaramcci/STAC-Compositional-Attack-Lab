@@ -5,6 +5,11 @@ from pathlib import Path
 
 import pytest
 
+from stac_attack_lab.interactions.base import (
+    CollectedInteraction,
+    CollectionBudget,
+    SourceInteractionTask,
+)
 from stac_attack_lab.interactions.collector import (
     InteractionCollectionPlan,
     collect_interactions,
@@ -23,6 +28,18 @@ from stac_attack_lab.interactions.normalizer import (
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/fixtures/interactions/authorized_synthetic.jsonl"
+
+
+class _FailingAdapter(JsonlFixtureInteractionAdapter):
+    def collect(
+        self,
+        task: SourceInteractionTask,
+        *,
+        seed: int,
+        budget: CollectionBudget,
+    ) -> CollectedInteraction:
+        del task, seed, budget
+        raise RuntimeError("provider rejected token=short-provider-token")
 
 
 def _plan() -> InteractionCollectionPlan:
@@ -146,6 +163,21 @@ def test_collection_manifest_contains_no_fixture_payload(tmp_path: Path) -> None
     )
     assert "SYNTHETIC_MARKER" not in json.dumps(manifest)
     assert manifest["formal_exclusion_hash"]
+
+
+def test_collection_failure_log_preserves_redacted_reason(tmp_path: Path) -> None:
+    summary = collect_interactions(_plan(), _FailingAdapter(FIXTURE), tmp_path / "raw")
+    failure_log = (summary.collection_root / "collection_failures.jsonl").read_text(
+        encoding="utf-8"
+    )
+    trajectory = RawInteractionTrajectory.model_validate_json(
+        summary.trajectory_paths[0].read_text(encoding="utf-8")
+    )
+
+    assert summary.failure_count == 1
+    assert "short-provider-token" not in failure_log
+    assert "***REDACTED***" in failure_log
+    assert trajectory.provenance["exception_message_recorded"] == "true_redacted"
 
 
 def test_collection_expands_and_resumes_the_task_seed_matrix(tmp_path: Path) -> None:

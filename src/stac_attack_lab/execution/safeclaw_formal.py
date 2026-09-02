@@ -1185,6 +1185,7 @@ def run_safeclaw_formal(
             if after_case is not None:
                 after_case(completed)
         except Exception as exc:
+            recorder.record_failure(case_id, exc)
             recorder.mark_error(case_id, type(exc).__name__)
             raise
     audit = recorder.audit()

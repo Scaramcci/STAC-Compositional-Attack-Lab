@@ -129,6 +129,30 @@ def test_formal_recorder_rejects_secrets_before_write(tmp_path: Path) -> None:
     assert not (tmp_path / "run/cases/case-1/unsafe.json").exists()
 
 
+def test_formal_recorder_persists_redacted_failure_detail(tmp_path: Path) -> None:
+    secret = "sk-failure-secret-123456789"
+    run_root = tmp_path / "run"
+    recorder = FormalRunRecorder(run_root, [secret])
+    recorder.initialize(
+        _manifest(),
+        [("case-1", "pair-1", "task-1", "sample_rule_based", 1)],
+    )
+
+    event = recorder.record_failure(
+        "case-1",
+        RuntimeError(f"gateway rejected authorization={secret}"),
+    )
+    recorder.mark_error("case-1", event.error_type)
+    failure_log = (run_root / "cases/case-1/failure_events.jsonl").read_text(encoding="utf-8")
+
+    assert event.stage == FormalStage.pending
+    assert event.attempt_no == 1
+    assert secret not in failure_log
+    assert "***REDACTED***" in failure_log
+    assert recorder.load_progress().cases[0].last_error_category == "RuntimeError"
+    assert recorder.audit().passed is True
+
+
 def test_formal_recorder_audit_detects_artifact_tampering(tmp_path: Path) -> None:
     recorder = FormalRunRecorder(tmp_path / "run")
     recorder.initialize(

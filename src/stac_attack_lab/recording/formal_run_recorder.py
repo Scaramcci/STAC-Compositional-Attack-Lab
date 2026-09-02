@@ -11,7 +11,11 @@ from typing import Any, Literal
 from pydantic import Field, NonNegativeInt
 
 from stac_attack_lab.contracts import StrictModel
-from stac_attack_lab.environments.safeclaw.redaction import scan_for_secrets, scan_tree
+from stac_attack_lab.environments.safeclaw.redaction import (
+    redact_value,
+    scan_for_secrets,
+    scan_tree,
+)
 from stac_attack_lab.hashing import file_hash
 from stac_attack_lab.recording.events import append_jsonl, read_jsonl
 from stac_attack_lab.recording.model_calls import validate_model_call_event
@@ -69,6 +73,18 @@ class FormalStageTransition(StrictModel):
     timestamp: str
     artifact_names: list[str]
     error_category: str | None = None
+
+
+class FormalFailureEvent(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    kind: Literal["formal_case_failure"] = "formal_case_failure"
+    run_id: str
+    case_id: str
+    stage: FormalStage
+    attempt_no: int
+    error_type: str
+    error_message: str
+    timestamp: str
 
 
 class FormalRunManifest(StrictModel):
@@ -237,6 +253,28 @@ class FormalRunRecorder:
             increment_attempt=True,
         )
 
+    def record_failure(self, case_id: str, error: BaseException) -> FormalFailureEvent:
+        progress = self.load_progress()
+        current = self._case(progress, case_id)
+        sanitized_message = str(redact_value(str(error), self.exact_secrets).sanitized)
+        event = FormalFailureEvent(
+            run_id=progress.run_id,
+            case_id=case_id,
+            stage=current.stage,
+            attempt_no=current.attempt_count + 1,
+            error_type=type(error).__name__,
+            error_message=sanitized_message or "no_exception_message",
+            timestamp=_now(),
+        )
+        payload = event.model_dump(mode="json")
+        if scan_for_secrets(payload, self.exact_secrets):
+            raise ValueError("formal_failure_record_secret_gate_failed")
+        append_jsonl(
+            self.run_root / "cases" / case_id / "failure_events.jsonl",
+            payload,
+        )
+        return event
+
     def finalize_result(self, result: FormalRunResult) -> FormalProgressSnapshot:
         record = self.record_artifact(result.case_id, FormalStage.verified, "formal_result", result)
         existing_results = [
@@ -373,6 +411,18 @@ class FormalRunRecorder:
                     if call_id not in response_ids
                 ):
                     findings.append(f"model_call_error_has_validation:{case.case_id}")
+            failure_path = self.run_root / "cases" / case.case_id / "failure_events.jsonl"
+            if failure_path.exists():
+                checked += 1
+                try:
+                    failures = [
+                        FormalFailureEvent.model_validate(item) for item in read_jsonl(failure_path)
+                    ]
+                except Exception:
+                    findings.append(f"formal_failure_event_invalid:{case.case_id}")
+                else:
+                    if any(item.case_id != case.case_id for item in failures):
+                        findings.append(f"formal_failure_case_mismatch:{case.case_id}")
         results: list[FormalRunResult] = []
         try:
             results = [

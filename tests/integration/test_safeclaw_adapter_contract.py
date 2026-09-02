@@ -360,3 +360,6 @@ def test_recursive_redaction_preserves_canaries_but_removes_credentials() -> Non
     assert API_KEY not in serialized
     assert "CANARY_SYNTHETIC_ACTION" in serialized
     assert result.findings
+
+    message = redact_value("gateway failed: token=short-provider-token").sanitized
+    assert message == "gateway failed: ***REDACTED***"

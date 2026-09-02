@@ -17,6 +17,10 @@ SECRET_PATTERNS = (
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}"),
     re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"),
     re.compile(r"\bAIza[A-Za-z0-9_-]{20,}\b"),
+    re.compile(
+        r"(?i)\b(?:api[_-]?key|token|authorization|password|passwd|secret|credential)"
+        r"\s*[=:]\s*[^\s,;]+"
+    ),
 )
 
 

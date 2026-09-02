@@ -132,7 +132,7 @@ fi
 "${PYTHON_BIN}" -u -m stac_attack_lab.cli safeclaw audit-run \
   --run-root "${RUN_ROOT_REL}"
 
-"${PYTHON_BIN}" -u -m stac_attack_lab.cli safeclaw formal-report \
+"${PYTHON_BIN}" -u -m stac_attack_lab.cli safeclaw report \
   --run-root "${RUN_ROOT_REL}"
 
 echo "formal_output=${RUN_ROOT}"
