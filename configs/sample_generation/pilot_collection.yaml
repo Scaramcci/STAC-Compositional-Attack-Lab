@@ -13,7 +13,7 @@
   "construction_attacker_prompt_path": "prompts/formal/construction_attacker.md",
   "victim_model_env": "SAFECLAW_MODEL",
   "allowed_victim_models": [
-    "gpt-5.5"
+    "gemini-2.5-flash"
   ],
   "victim_base_url_env": "OPENAI_BASE_URL",
   "victim_api_key_env": "OPENAI_API_KEY",
@@ -21,7 +21,7 @@
   "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",
   "embedding_base_url_env": "SAFECLAW_EMBEDDING_BASE_URL",
   "embedding_api_key_env": "SAFECLAW_EMBEDDING_API_KEY",
-  "victim_model_hash": "safeclaw-target-gpt-5.5-openai-compatible-v2",
+  "victim_model_hash": "safeclaw-target-gemini-2.5-flash-openai-compatible-v1",
   "execution_enabled": true,
   "image_tag": "openclaw-env:2026.3.12",
   "source_task_ids": [

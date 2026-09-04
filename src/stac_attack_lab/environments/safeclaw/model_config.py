@@ -20,7 +20,11 @@ def _chat_provider_root(base_url: str) -> str:
 
 def _embedding_endpoint_root(base_url: str) -> str:
     normalized = base_url.rstrip("/")
-    return normalized if normalized.endswith("/v1") else normalized + "/v1"
+    # Gemini's OpenAI-compatible endpoint already includes its API root
+    # (/v1beta/openai); other OpenAI gateways conventionally need /v1.
+    if normalized.endswith("/openai") or normalized.endswith("/v1"):
+        return normalized
+    return normalized + "/v1"
 
 
 def build_safeclaw_model_config(

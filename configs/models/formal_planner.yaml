@@ -1,5 +1,5 @@
 provider: openai_compatible
-model: gpt-5.5
+model: gemini-2.5-flash
 temperature: 0.0
 max_output_tokens: 1800
 timeout_seconds: 60

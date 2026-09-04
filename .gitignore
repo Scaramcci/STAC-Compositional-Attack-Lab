@@ -15,3 +15,10 @@ data/primitive_libraries/generated/*
 !data/primitive_libraries/generated/.gitkeep
 experiments/safeclaw_runs/*
 !experiments/safeclaw_runs/.gitkeep
+# Local virtual environments
+.venv-vllm/
+
+# Generated libraries, frozen artifacts, and experiment runs
+data/frozen/*
+!data/frozen/.gitkeep
+experiments/runs/*

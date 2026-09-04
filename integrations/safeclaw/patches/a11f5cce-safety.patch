@@ -79,3 +79,10 @@
 +            "auth_profiles": _safe_auth_profile_structure(
 +                self.post_state.get("auth_profiles_content", "")
 +            ),
+@@ -466,1 +466,5 @@
+-            "baseUrl": api_base_url.rstrip("/") + "/v1",
++            "baseUrl": (
++                api_base_url.rstrip("/")
++                if api_base_url.rstrip("/").endswith("/openai")
++                else api_base_url.rstrip("/") + "/v1"
++            ),

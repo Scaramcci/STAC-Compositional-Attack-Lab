@@ -37,6 +37,10 @@ class OpenAICompatibleClient:
     def endpoint_host(self) -> str:
         return urlparse(self.base_url or "").netloc
 
+    @property
+    def _is_gemini_endpoint(self) -> bool:
+        return self.endpoint_host == "generativelanguage.googleapis.com"
+
     def generate(
         self,
         messages: list[dict[str, str]],
@@ -59,9 +63,13 @@ class OpenAICompatibleClient:
             "messages": [{"role": "system", "content": prompt}, *messages],
             "temperature": 0,
             "max_tokens": self.max_output_tokens,
-            "seed": seed,
         }
-        if self.use_response_format:
+        # Gemini rejects the OpenAI-only seed field.
+        if not self._is_gemini_endpoint:
+            payload["seed"] = seed
+        if self._is_gemini_endpoint:
+            payload["response_format"] = {"type": "json_object"}
+        elif self.use_response_format:
             payload["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {

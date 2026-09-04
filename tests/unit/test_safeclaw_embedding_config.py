@@ -144,3 +144,19 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
     assert applied["embedding_model"] == "synthetic-embedding"
     assert "chat-secret" not in output
     assert "embedding-secret" not in output
+
+def test_gemini_embedding_endpoint_root_is_not_double_versioned() -> None:
+    payload, _ = build_safeclaw_model_config(
+        target_model_id="gemini-2.5-flash",
+        target_base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        target_api_key_env="CHAT_KEY",
+        environment={"CHAT_KEY": "chat-secret", "EMBED_KEY": "embedding-secret"},
+        embedding=SafeClawEmbeddingRuntime(
+            provider="openai",
+            model_id="gemini-embedding-001",
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            api_key_env="EMBED_KEY",
+        ),
+    )
+    assert payload["api_base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert payload["embedding_api_base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"

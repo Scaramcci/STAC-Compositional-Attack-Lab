@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import Field, model_validator
 
@@ -44,6 +44,23 @@ class ConstructionAttackerAction(StrictModel):
     reroute_id: str | None = None
     expected_public_predicate_id: str | None = None
     rationale_summary: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_model_action_aliases(cls, value: Any) -> Any:
+        # Gemini sometimes emits descriptive action names instead of the
+        # canonical enum values required by the construction contract.
+        if isinstance(value, dict) and isinstance(value.get("action_type"), str):
+            aliases = {
+                "use_retry": "retry",
+                "use_reroute": "reroute",
+                "begin_new_session": "start_new_session",
+            }
+            action_type = value["action_type"]
+            if action_type in aliases:
+                value = dict(value)
+                value["action_type"] = aliases[action_type]
+        return value
 
     @model_validator(mode="after")
     def validate_action_shape(self) -> ConstructionAttackerAction:
