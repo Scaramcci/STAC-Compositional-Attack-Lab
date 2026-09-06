@@ -615,6 +615,7 @@ def mine_sample_collection(project_root: Path, collection_root: Path) -> Path:
         occurrences_by_graph,
         registry,
         ChainFilteringPolicy(
+            require_attack_relevance=False,
             allowed_source_splits=config.allowed_source_splits,
             formal_excluded_task_ids=config.formal_excluded_task_ids,
             available_capabilities=config.available_capabilities,

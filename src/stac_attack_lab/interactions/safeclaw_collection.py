@@ -264,9 +264,21 @@ class SafeClawConstructionInteractionAdapter:
             if not stopped and action_count >= budget.max_actions and last_failure is None:
                 last_failure = "construction_action_budget_exhausted"
             result = self.driver.finish()
-        except Exception:
+        except Exception as exc:
+            partial_events, partial_checkpoints = self.driver.observed_snapshot()
             self.driver.abort()
-            raise
+            return CollectedInteraction(
+                source_task=task,
+                episode_id=f"construction-episode-{task.source_task_id}",
+                session_ids=list(dict.fromkeys(session_ids)),
+                source_events=partial_events,
+                checkpoints=partial_checkpoints,
+                model_hashes={"victim": self.driver.model_hash},
+                config_hash=stable_hash({"task": task.source_task_id, "seed": seed}),
+                status="partial" if partial_events else "error",
+                failure_category=type(exc).__name__,
+                provenance={"adapter_id": self.adapter_id, "partial_observation_preserved": "true"},
+            )
         all_events.extend(result.source_events)
         all_checkpoints.extend(result.checkpoints)
         if len(all_events) > budget.max_events and last_failure is None:
@@ -373,6 +385,10 @@ class SafeClawSubprocessVictimDriver:
     def _next_sequence(self) -> int:
         self._event_sequence += 1
         return self._event_sequence
+
+    def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Return append-only observations collected before an abort."""
+        return list(self._events), list(self._checkpoints)
 
     def _read_bridge(self) -> dict[str, Any]:
         if self._process is None or self._process.stdout is None:
@@ -578,7 +594,15 @@ class SafeClawSubprocessVictimDriver:
             }
         ]
         memory_state_ref = "safeclaw_state:memory"
-        if self._new_session_pending and post_state.get("memory_content"):
+        # A non-empty persisted file only proves state existence. Recall is
+        # emitted only when the bridge reports an explicit retrieval event.
+        explicit_retrievals = session.get("memory_retrievals", [])
+        if self._new_session_pending and isinstance(explicit_retrievals, list) and explicit_retrievals:
+            retrieval = explicit_retrievals[0] if isinstance(explicit_retrievals[0], dict) else {}
+            retrieved_hash = str(retrieval.get("content_hash") or stable_hash(post_state.get("memory_content", "")))
+            retrieved_parents = retrieval.get("parent_artifact_ids", [])
+            if not isinstance(retrieved_parents, list):
+                retrieved_parents = []
             source_events.append(
                 {
                     "event_id": f"state-read-memory-{action.action_id}-{action_nonce}",
@@ -594,8 +618,8 @@ class SafeClawSubprocessVictimDriver:
                         {
                             "artifact_id": f"artifact-recall-{action.action_id}",
                             "artifact_type": "recalled_state",
-                            "content_hash": stable_hash(post_state.get("memory_content", "")),
-                            "parent_artifact_ids": [],
+                            "content_hash": retrieved_hash,
+                            "parent_artifact_ids": [str(item) for item in retrieved_parents],
                             "taint_labels": ["synthetic", "persistent"],
                             "trust_label": "derived",
                             "source_ref_ids": [f"checkpoint:{session_id}:memory"],

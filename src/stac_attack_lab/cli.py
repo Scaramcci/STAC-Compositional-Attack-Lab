@@ -66,7 +66,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sample = sub.add_parser("sample")
     sample_sub = sample.add_subparsers(dest="sample_command", required=True)
-    for command in ("collect-preflight", "collect"):
+    for command in ("collect-preflight", "collect", "collect-and-mine"):
         action = sample_sub.add_parser(command)
         action.add_argument("--config", required=True)
     mine = sample_sub.add_parser("mine")
@@ -109,13 +109,17 @@ def _main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "sample":
-        if args.sample_command in {"collect-preflight", "collect"}:
+        if args.sample_command in {"collect-preflight", "collect", "collect-and-mine"}:
             sample_config = load_sample_generation_config(root / args.config)
             preflight_report = run_sample_collection_preflight(root, sample_config)
             if args.sample_command == "collect-preflight" or not preflight_report.passed:
                 print(preflight_report.model_dump_json(indent=2))
                 return 0 if preflight_report.passed else 1
-            print(collect_sample_interactions(root, sample_config))
+            collection_root = collect_sample_interactions(root, sample_config)
+            if args.sample_command == "collect-and-mine":
+                print(mine_sample_collection(root, collection_root))
+            else:
+                print(collection_root)
             return 0
         if args.sample_command == "mine":
             print(mine_sample_collection(root, _project_scoped_path(root, args.collection)))

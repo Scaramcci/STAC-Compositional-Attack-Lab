@@ -21,6 +21,7 @@ class ChainFilteringPolicy(StrictModel):
     formal_excluded_task_ids: list[str] = Field(default_factory=list)
     available_capabilities: list[str]
     maximum_candidates_per_topology: NonNegativeInt = 100
+    require_attack_relevance: bool = True
 
 
 class CandidateFilterRecord(StrictModel):
@@ -119,8 +120,10 @@ def filter_chain_candidate(
             evidence_errors.append(f"candidate_occurrence_missing:{occurrence_id}")
             continue
         evidence_refs.extend(occurrence.evidence_ref_ids)
-        if occurrence.outcome != PrimitiveOutcome.passed or not occurrence.hard_fact:
-            evidence_errors.append(f"candidate_occurrence_not_hard_pass:{occurrence_id}")
+        if occurrence.outcome in {PrimitiveOutcome.not_reached, PrimitiveOutcome.not_observable}:
+            evidence_errors.append(f"candidate_occurrence_not_observed:{occurrence_id}")
+        if not occurrence.hard_fact:
+            evidence_errors.append(f"candidate_occurrence_not_hard_fact:{occurrence_id}")
         if not set(occurrence.evidence_grades) & {
             EvidenceGrade.direct,
             EvidenceGrade.deterministic_derived,
@@ -211,6 +214,8 @@ def filter_chain_candidate(
         relevance_errors.append("terminal_predicate_missing")
     if candidate.terminal_relation != "observed":
         relevance_errors.append(f"terminal_relation_not_observed:{candidate.terminal_relation}")
+    if not policy.require_attack_relevance:
+        relevance_errors = []
     decisions.append(
         _decision(
             FilterGate.attack_relevance,

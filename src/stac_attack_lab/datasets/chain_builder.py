@@ -36,10 +36,8 @@ def build_primitive_chain_sample(
         decision.passed for decision in candidate.filter_decisions
     ):
         raise ValueError("only_fully_accepted_candidates_can_become_samples")
-    if candidate.acquisition_mode.value != "adversarial_trace":
-        raise ValueError("accepted_sample_requires_adversarial_trace")
-    if candidate.construction_manifest is None:
-        raise ValueError("accepted_sample_requires_construction_manifest")
+    # A usable sample is an observed, traceable path. Attack relevance and
+    # official success are evaluated independently during formal evaluation.
     occurrence_by_id = {item.occurrence_id: item for item in occurrences}
     unknown = set(candidate.occurrence_ids) - set(occurrence_by_id)
     if unknown:
@@ -107,19 +105,13 @@ def build_primitive_chain_sample(
     planner_view = PlannerSampleView(
         sample_id=sample_id,
         sample_version="2.0",
-        public_summary=(
-            "Authorized benchmark chain: untrusted ingress, persistent state, explicit "
-            "lifecycle boundary, delayed retrieval, and sandbox effect."
-        ),
+        public_summary="Authorized benchmark observed primitive path; outcome and attack relevance are reported separately.",
         core_nodes=candidate.core_nodes,
         core_edges=candidate.core_edges,
         macro_nodes=public_nodes,
         macro_edges=public_edges,
         applicability_predicates=[
             "authorized_benchmark_sandbox",
-            "explicit_lifecycle_boundary",
-            "observable_persistent_state",
-            "observable_effectful_sink",
         ],
         required_capabilities=capabilities,
         component_role_signature=component_roles,
@@ -151,7 +143,7 @@ def build_primitive_chain_sample(
             slot.slot_id: {"type": slot.value_type, "source": "public_task_view"}
             for slot in binding_slots
         },
-        session_requirements=["at_least_two_sessions", "persistent_state_retained"],
+        session_requirements=[],
         materialization_template_ids=["safeclaw-persistence-chain-v1"],
         legal_retry_node_ids=[],
         legal_reroute_node_ids=[],
@@ -195,8 +187,14 @@ def build_primitive_chain_sample(
             "registry_hash": registry.registry_hash,
             "construction_attacker_model_hash": (
                 candidate.construction_manifest.construction_attacker_model_hash
+                if candidate.construction_manifest is not None
+                else "unknown"
             ),
-            "construction_prompt_hash": candidate.construction_manifest.construction_prompt_hash,
+            "construction_prompt_hash": (
+                candidate.construction_manifest.construction_prompt_hash
+                if candidate.construction_manifest is not None
+                else "unknown"
+            ),
         },
     )
     sample = PrimitiveChainSample(
@@ -210,14 +208,14 @@ def build_primitive_chain_sample(
         registry_hash=registry.registry_hash,
         observation_schema_version=registry.observable_projection_version,
         construction_pipeline_version=construction_pipeline_version,
-        acquisition_mode="adversarial_trace",
+        acquisition_mode=candidate.acquisition_mode.value,
         planner_view=planner_view,
         execution_view=execution_view,
         private_evidence_view=private_view,
         validation=SampleValidationSummary(
             validation_level="portable_to_interface",
             gate_decisions=candidate.filter_decisions,
-            validation_environment="authorized_synthetic_construction",
+            validation_environment="authorized_benchmark_observation",
             validation_seeds=[],
             replay_refs=candidate.source_trace_refs,
         ),

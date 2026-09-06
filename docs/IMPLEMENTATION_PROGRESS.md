@@ -46,3 +46,16 @@ Scope: W00-W10，目标 observation/sample/evaluation v3，尚未实现。
 ## 变更日志（追加）
 
 - 2026-09-06：完成首轮基线搜索，创建 IMPLEMENTATION_WORKPLAN.md / IMPLEMENTATION_PROGRESS.md。镜像缺失阻止立即进行真实 benchmark，但不阻止回归与修复。用户询问 Docker 权限，已说明只读授权有效，后续具体 Docker 操作由工具审批；无需放宽 socket 权限。下一动作：源码与回归基线。
+
+- 2026-09-06 continued: 实际基线 HEAD 为 `63aca49feda4ff7b4ea0a2d0a1dcd95c0f2785f3`，工作区初始干净；生成目录仅有旧 tmux 日志/manifest，未发现 raw trajectory、source events 或 filter decisions，历史 gate 统计不可得。
+- 2026-09-06 continued: W01/W03 第一批完成。`filter_chain_candidate` 新增 strict `require_attack_relevance` 开关；sample mining 显式使用 observation-based admission，仍要求直接/确定性证据且不把 attempted 改为 passed；sample builder 不再硬编码 adversarial terminal/persistent two-session 故事。验证：`tests/unit/test_chain_construction_filtering.py` 9 passed，`tests/unit/test_primitive_chain_library.py` 18 passed。下一步：补 SafeClaw driver 永久回归并修 collection 持久化。
+
+- 2026-09-06 continued: W00 历史产物复查发现旧 `safeclaw-construction-main` 有 120 条 trajectory、24 条 collection failures；失败原因主要为 `ConstructionAttackerAction` 的 delivery surface/message 必填约束与 retry id shape mismatch。该数据属于旧运行，未覆盖或重新贴标签。
+- 2026-09-06 continued: W02 第一批完成：`SafeClawSubprocessVictimDriver` 增加 append-only observed snapshot；`collect_adversarial` 在 driver 异常时保存已发生 events/checkpoints 并返回 partial/error `CollectedInteraction`；memory 非空不再自动推断 recall，仅接受 bridge 显式 `memory_retrievals`。验证：SafeClaw/runtime/formal bridge/filter/library focused suite 31 passed，`git diff --check` 通过。下一步：补充 bridge 的显式 retrieval 协议字段与 state/artifact lineage，再跑全量 unit suite。
+
+- 2026-09-06 continued: W02/W03 增量：显式 retrieval 记录若包含 `content_hash`/`parent_artifact_ids`，driver 会保留其 lineage；缺失时仍不会把文件存在升级为 recall 事实。全量 unit + SafeClaw adapter integration：118 passed。未修改旧运行数据，未启动真实计费 benchmark。
+
+- 2026-09-06 continued: 代码审查确认 no-sample 当前执行的是合法 baseline replay，尚未生成与 treatment 同模型/预算/注入面的攻击动作；这是 W06 未完成项，不能宣称对照已满足研究目标。新增 `sample collect-and-mine --config ...` 便捷入口，保留 collection 与 mining 内部职责。CLI/config 回归 4 passed。
+- 2026-09-06 continued: W00 标记 verified；W02/W03 保持 in_progress。下一步：补 bridge 显式 retrieval/event 协议，随后设计 no-sample attacker execution contract，并增加正式对照回归。
+
+- 2026-09-06 continued: broader validation completed: unit + integration + SafeClaw formal e2e = 119 passed; `git diff --check` passed. Current source changes are limited to observation/sample semantics, collection failure preservation, automatic collect-and-mine CLI, and documentation/status. No real benchmark run was started.

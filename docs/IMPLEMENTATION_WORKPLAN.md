@@ -18,10 +18,10 @@ SafeClawArena：`a11f5cceaba0676be721021f8d232638fd111305`，已核对。
 
 | 任务 | 状态 | 文件级工作 | 依赖 | 验收与迁移 |
 |---|---|---|---|---|
-| W00 | in_progress | 本文件、IMPLEMENTATION_PROGRESS.md；新增历史诊断文档；tests/unit/test_adversarial_collection_runtime.py 增加真实 driver 的模拟 bridge 回归 | 无 | 记录历史原始产物搜索范围、阶段/gate 原因，区分历史/复现/假设；无数据不得编造统计 |
+| W00 | verified | 本文件、IMPLEMENTATION_PROGRESS.md；历史产物与失败原因盘点；runtime 回归 | 无 | 历史证据、当前复现与假设已分开记录 |
 | W01 | pending | docs/EXPERIMENT_DESIGN_V3.md；interactions/models.py、datasets/primitive_chain.py、contracts.py、schemas/、configs/primitives/registry.yaml | W00 | observed prefix、blocked、missing evidence 独立表达；版本化双读/新写，旧库不重新贴标签 |
-| W02 | pending | interactions/safeclaw_collection.py、collector.py、construction.py、models.py；recording/；construction_bridge.py、formal_bridge.py | W01 | 每动作持久化与崩溃恢复；真实 session/call ID；无 read 不生成 recall；等长和子目录变更可见；deadline、usage unknown、错误不冒充 stop；新 observation 协议 |
-| W03 | pending | interactions/normalizer.py；extraction/occurrences.py、chains.py、filtering.py；datasets/chain_builder.py、library.py；execution/sample_generation.py；cli.py | W02 | observed subpaths 与必要 DAG 前驱；局部缺失隔离；独立 outcome；确定性重算；episode/sample/topology 分开统计；collect 自动 extraction 入口；新派生版本保留源 hash |
+| W02 | in_progress | interactions/safeclaw_collection.py、collector.py、construction.py、models.py；recording/；construction_bridge.py、formal_bridge.py | W01 | 已完成 partial observation 保留、无证据不生成 recall；bridge retrieval 协议与真实 session/call ID 仍待完善 |
+| W03 | in_progress | interactions/normalizer.py；extraction/occurrences.py、chains.py、filtering.py；datasets/chain_builder.py、library.py；execution/sample_generation.py；cli.py | W02 | 已完成 observed admission 解耦与 `sample collect-and-mine` 入口；DAG 前驱/版本化 v3 产物仍待完善 |
 | W04 | pending | environments/safeclaw/task_adapter.py、materializer.py；两 bridge；configs/task_sets/；interactions/construction.py；cli.py | W01,W02 | 字段级允许注入面、保留合法任务及官方字段 hash；PSE 和另一类有限覆盖；人提交动作同样校验记录；不支持明确拒绝 |
 | W05 | pending | planning/formal_llm.py、formal_baselines.py、binding_planner.py；prompts/formal/trajectory_planner.md | W03,W04 | 两种 sample 在同任务有可追踪映射差异；无 first-component fallback；能力约束；记录 LLM/fallback 及失败 |
 | W06 | pending | execution/formal_attacker.py、formal_action_loop.py、safeclaw_formal.py；planning/formal_baselines.py；configs/models/、experiments/；prompts/formal/ | W05 | 无 sample 仍同模型/目标/预算/注入面生成执行攻击；一次动作允许多个 observed primitive；ablation 从冻结 treatment 派生且检查实际请求 |
