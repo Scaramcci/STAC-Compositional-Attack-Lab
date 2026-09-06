@@ -17,7 +17,7 @@
   ],
   "victim_base_url_env": "OPENAI_BASE_URL",
   "victim_api_key_env": "OPENAI_API_KEY",
-  "embedding_provider": "openai",
+  "embedding_provider": "ark_multimodal",
   "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",
   "embedding_base_url_env": "SAFECLAW_EMBEDDING_BASE_URL",
   "embedding_api_key_env": "SAFECLAW_EMBEDDING_API_KEY",

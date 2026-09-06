@@ -70,10 +70,12 @@ def test_model_config_fails_closed_when_embedding_key_is_missing() -> None:
 
 
 @pytest.mark.skipif(not UPSTREAM.is_dir(), reason="SafeClawArena checkout not installed")
+@pytest.mark.parametrize("provider", ["openai", "ark_multimodal"])
 def test_patched_judge_applies_memory_search_config_without_secret_output(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    provider: str,
 ) -> None:
     patched = tmp_path / "SafeClawArena"
     shutil.copytree(UPSTREAM, patched)
@@ -110,7 +112,8 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
                 "model": "synthetic-chat",
                 "api_base_url": "https://provider.invalid",
                 "api_key": "chat-secret",
-                "embedding_provider": "openai",
+                "embedding_provider": provider,
+                "embedding_adapter_source": "# synthetic adapter source",
                 "embedding_model": "synthetic-embedding",
                 "embedding_api_base_url": "https://embedding.invalid/v1",
                 "embedding_api_key": "embedding-secret",
@@ -134,16 +137,30 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
             "model": "synthetic-embedding",
             "fallback": "none",
             "remote": {
-                "baseUrl": "https://embedding.invalid/v1",
+                "baseUrl": (
+                    "http://127.0.0.1:18792/v1"
+                    if provider == "ark_multimodal"
+                    else "https://embedding.invalid/v1"
+                ),
                 "apiKey": "embedding-secret",
+                **({"batch": {"enabled": False}} if provider == "ark_multimodal" else {}),
             },
         }
     ]
+    if provider == "ark_multimodal":
+        adapter_configs = [
+            item for item in captured_inputs if isinstance(item, dict) and "source" in item
+        ]
+        assert adapter_configs[0]["base_url"] == "https://embedding.invalid/v1"
+        assert adapter_configs[0]["api_key"] == "embedding-secret"
+        assert any("ark_embedding_adapter_start_failed" in command for command in docker_commands)
+        assert all("embedding-secret" not in command for command in docker_commands)
     assert any("memorySearch" in command for command in docker_commands)
     assert applied["embedding_configured"] is True
     assert applied["embedding_model"] == "synthetic-embedding"
     assert "chat-secret" not in output
     assert "embedding-secret" not in output
+
 
 def test_gemini_embedding_endpoint_root_is_not_double_versioned() -> None:
     payload, _ = build_safeclaw_model_config(
@@ -159,4 +176,26 @@ def test_gemini_embedding_endpoint_root_is_not_double_versioned() -> None:
         ),
     )
     assert payload["api_base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
-    assert payload["embedding_api_base_url"] == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert (
+        payload["embedding_api_base_url"]
+        == "https://generativelanguage.googleapis.com/v1beta/openai"
+    )
+
+
+def test_ark_runtime_deploys_adapter_and_preserves_api_root() -> None:
+    payload, secrets = build_safeclaw_model_config(
+        target_model_id="synthetic-chat",
+        target_base_url="https://chat.invalid/v1",
+        target_api_key_env="CHAT_KEY",
+        environment={"CHAT_KEY": "chat", "ARK_KEY": "ark"},
+        embedding=SafeClawEmbeddingRuntime(
+            provider="ark_multimodal",
+            model_id="ep-test",
+            base_url="https://ark.cn-beijing.volces.com/api/v3/",
+            api_key_env="ARK_KEY",
+        ),
+    )
+    assert payload["embedding_api_base_url"] == "https://ark.cn-beijing.volces.com/api/v3"
+    assert payload["embedding_provider"] == "ark_multimodal"
+    assert "def create_server" in payload["embedding_adapter_source"]
+    assert "ark" in secrets

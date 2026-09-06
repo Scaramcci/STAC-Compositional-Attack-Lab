@@ -494,10 +494,10 @@ def run_safeclaw_formal(
     if missing_env:
         raise ValueError("missing_formal_environment_variables:" + ",".join(missing_env))
     if environment_config.embedding_policy == "required_endpoint":
-        if environment_config.embedding_provider != "openai":
+        if environment_config.embedding_provider not in ("openai", "ark_multimodal"):
             raise ValueError("formal_embedding_provider_unsupported")
         embedding = SafeClawEmbeddingRuntime(
-            provider="openai",
+            provider=environment_config.embedding_provider,
             model_id=str(env[embedding_model_env]),
             base_url=str(env[embedding_base_url_env]),
             api_key_env=embedding_api_key_env,

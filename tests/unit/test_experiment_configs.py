@@ -38,7 +38,7 @@ def test_collection_campaign_is_bounded_disjoint_and_hash_pinned() -> None:
     assert len(pilot.source_task_ids) * len(pilot.effective_seeds) == 8
     assert pilot.max_collection_trajectories == 8
     assert pilot.target_accepted_samples == 2
-    assert main.embedding_provider == "openai"
+    assert main.embedding_provider == "ark_multimodal"
     assert main.embedding_model_env == "SAFECLAW_EMBEDDING_MODEL"
     assert main.embedding_base_url_env == "SAFECLAW_EMBEDDING_BASE_URL"
     assert main.embedding_api_key_env == "SAFECLAW_EMBEDDING_API_KEY"
@@ -95,7 +95,7 @@ def test_formal_matrix_is_three_condition_and_coverage_limited() -> None:
     assert formal.allowed_target_models == ["gemini-2.5-flash"]
     assert environment.allowed_target_models == formal.allowed_target_models
     assert environment.embedding_policy == "required_endpoint"
-    assert environment.embedding_provider == "openai"
+    assert environment.embedding_provider == "ark_multimodal"
     assert environment.embedding_model_env == "SAFECLAW_EMBEDDING_MODEL"
     assert environment.embedding_base_url_env == "SAFECLAW_EMBEDDING_BASE_URL"
     assert environment.embedding_api_key_env == "SAFECLAW_EMBEDDING_API_KEY"

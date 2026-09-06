@@ -212,7 +212,7 @@ def run_sample_collection_preflight(
         if name
     ]
     embedding_configured = (
-        config.embedding_provider == "openai"
+        config.embedding_provider in ("openai", "ark_multimodal")
         and config.embedding_model_env is not None
         and config.embedding_base_url_env is not None
         and config.embedding_api_key_env is not None

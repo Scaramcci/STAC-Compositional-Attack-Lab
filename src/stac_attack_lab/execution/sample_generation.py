@@ -68,7 +68,7 @@ class SampleGenerationConfig(StrictModel):
     allowed_victim_models: list[str] = Field(default_factory=list)
     victim_base_url_env: str | None = None
     victim_api_key_env: str | None = None
-    embedding_provider: Literal["openai"] | None = None
+    embedding_provider: Literal["openai", "ark_multimodal"] | None = None
     embedding_model_env: str | None = None
     embedding_base_url_env: str | None = None
     embedding_api_key_env: str | None = None

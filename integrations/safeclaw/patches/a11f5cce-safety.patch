@@ -16,7 +16,53 @@
 @@ -461 +473 @@
 -        print(f"  Provider override (Seclaw): ...{api_key[-6:]} -> {api_base_url or 'default'}")
 +        print(f"  Provider override (Seclaw): credential redacted -> {api_base_url or 'default'}")
-@@ -496,0 +509,26 @@
+@@ -467 +479,5 @@
+-            "baseUrl": api_base_url.rstrip("/") + "/v1",
++            "baseUrl": (
++                api_base_url.rstrip("/")
++                if api_base_url.rstrip("/").endswith("/openai")
++                else api_base_url.rstrip("/") + "/v1"
++            ),
+@@ -496,0 +513,67 @@
++        if embedding_provider == "ark_multimodal":
++            adapter_config = {
++                "model": embedding_model,
++                "base_url": embedding_api_base_url,
++                "api_key": embedding_api_key,
++                "source": mc["embedding_adapter_source"],
++            }
++            adapter_path = "/tmp/_stac_ark_embedding.json"
++            subprocess.run(
++                ["docker", "exec", "-i", CONTAINER, "bash", "-c",
++                 f"umask 077; cat > {adapter_path}"],
++                input=json.dumps(adapter_config).encode(), capture_output=True, check=True,
++            )
++            subprocess.run(
++                ["docker", "exec", "-d", CONTAINER, "python3", "-c",
++                 "import json,sys; "
++                 "c=json.load(open(sys.argv[1])); "
++                 "exec(compile(c['source'], '<stac-ark-adapter>', 'exec'))",
++                 adapter_path],
++                capture_output=True, check=True,
++            )
++            # Wait for the container-local listener before restarting OpenClaw.
++            readiness = "\n".join([
++                "import time, urllib.request",
++                "for attempt in range(50):",
++                "    try:",
++                "        urllib.request.urlopen('http://127.0.0.1:18792/health', timeout=1).close()",
++                "        break",
++                "    except OSError:",
++                "        time.sleep(0.1)",
++                "else:",
++                "    raise SystemExit('ark_embedding_adapter_start_failed')",
++            ])
++            subprocess.run(
++                ["docker", "exec", CONTAINER, "python3", "-c", readiness],
++                capture_output=True, check=True,
++            )
++            embedding_provider = "openai"
++            embedding_api_base_url = "http://127.0.0.1:18792/v1"
 +        if embedding_provider:
 +            memory_search = {
 +                "enabled": True,
@@ -28,6 +74,8 @@
 +                    "apiKey": embedding_api_key,
 +                },
 +            }
++            if mc.get("embedding_provider") == "ark_multimodal":
++                memory_search["remote"]["batch"] = {"enabled": False}
 +            memory_tmp = "/tmp/_memory_search.json"
 +            subprocess.run(
 +                ["docker", "exec", "-i", CONTAINER, "bash", "-c", f"cat > {memory_tmp}"],
@@ -43,10 +91,10 @@
 +                f"json.dump(c,open('{config_path}','w'),indent=2)"
 +                f"\""
 +            )
-@@ -501 +539 @@
+@@ -501 +584 @@
 -        print(f"  Provider override: ...{api_key[-6:]} -> {api_base_url}")
 +        print(f"  Provider override: credential redacted -> {api_base_url}")
-@@ -540 +578,26 @@
+@@ -540 +623,26 @@
 -    return {"model": model_id, "api_base_url": api_base_url or "", "api_key_suffix": api_key[-6:] if api_key else ""}
 +    return {
 +        "model": model_id,
@@ -74,15 +122,8 @@
 +            "credential": "***REDACTED***",
 +        })
 +    return {"available": bool(raw), "profiles": profiles}
-@@ -1492 +1555,3 @@
+@@ -1492 +1600,3 @@
 -            "auth_profiles": self.post_state.get("auth_profiles_content", ""),
 +            "auth_profiles": _safe_auth_profile_structure(
 +                self.post_state.get("auth_profiles_content", "")
-+            ),
-@@ -466,1 +466,5 @@
--            "baseUrl": api_base_url.rstrip("/") + "/v1",
-+            "baseUrl": (
-+                api_base_url.rstrip("/")
-+                if api_base_url.rstrip("/").endswith("/openai")
-+                else api_base_url.rstrip("/") + "/v1"
 +            ),
