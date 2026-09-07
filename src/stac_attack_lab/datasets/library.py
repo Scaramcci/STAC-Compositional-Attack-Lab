@@ -160,8 +160,8 @@ def build_primitive_chain_library(
     )
     content_hashes = _content_hashes(output_dir)
     split_summary: dict[str, int] = {}
-    for sample in samples:
-        split_summary[sample.source_split] = split_summary.get(sample.source_split, 0) + 1
+    for candidate in [*accepted_candidates, *negative_candidates]:
+        split_summary[candidate.source_split] = split_summary.get(candidate.source_split, 0) + 1
     outcomes = attempt_outcome_counts or {"completed": len(samples)}
     reason_counts: dict[str, int] = {}
     for record in filter_records:
@@ -252,7 +252,23 @@ def audit_primitive_library(path: Path) -> list[str]:
     public_by_id = {item.sample_id: item for item in public_views}
     execution_by_id = {item.sample_id: item for item in execution_views}
     private_by_id = {item.sample_id: item for item in private_views}
+    candidates_by_hash: dict[str, PrimitiveChainCandidate] = {}
+    for candidate in candidates:
+        if candidate.candidate_hash in candidates_by_hash:
+            errors.append(f"duplicate_candidate_hash:{candidate.candidate_hash}")
+        candidates_by_hash[candidate.candidate_hash] = candidate
     for sample in samples:
+        matched_candidate = candidates_by_hash.get(sample.chain_hash)
+        if matched_candidate is None:
+            errors.append(f"accepted_sample_candidate_missing:{sample.sample_id}")
+        else:
+            candidate_manifest = matched_candidate.construction_manifest
+            if candidate_manifest is None or candidate_manifest.attempt_outcome != "completed":
+                errors.append(f"accepted_sample_attempt_not_complete:{sample.sample_id}")
+            if matched_candidate.terminal_relation != "observed":
+                errors.append(f"accepted_sample_terminal_not_observed:{sample.sample_id}")
+            if not matched_candidate.terminal_predicates:
+                errors.append(f"accepted_sample_terminal_predicate_missing:{sample.sample_id}")
         if _accepted_record_hash(sample) != sample.sample_hash:
             errors.append(f"sample_hash_mismatch:{sample.sample_id}")
         if sample.registry_hash != manifest.registry_hash:

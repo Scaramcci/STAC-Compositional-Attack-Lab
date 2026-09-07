@@ -23,7 +23,7 @@ SAFECLAW_EMBEDDING_API_KEY=your-ark-api-key
 
 接入点必须支持 `/embeddings/multimodal` 的纯文本输入。实验启动时，runner
 把标准库适配器源码和配置通过 stdin 注入临时 Victim 容器；适配器只监听容器内
-`127.0.0.1:18792`，随容器退出，无须安装方舟 SDK、下载模型或开放宿主机端口。
+`127.0.0.1:18790`，随容器退出，无须安装方舟 SDK、下载模型或开放宿主机端口。
 配置文件权限为 0600，启动参数不包含密钥，适配器不会记录输入或上游错误正文。
 
 OpenClaw 继续使用 `openai` memorySearch provider。适配器将 `/v1/embeddings`

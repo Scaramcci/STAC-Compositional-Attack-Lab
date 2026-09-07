@@ -1,0 +1,5 @@
+run_id=safeclaw-v3-smoke-20260906-121317
+command=sg docker -c bash -lc "set -a; source .env; set +a; bash scripts/run_safeclaw_sample_collection.sh --config configs/sample_generation/safeclaw_v3_smoke.yaml"
+log=experiments/safeclaw_v3_smoke/run-safeclaw-v3-smoke-20260906-121317.log
+budget=max_collection_trajectories=1,max_actions=4,max_turns=2,max_sessions=2,max_wall_time_seconds=300,timeout_seconds=120
+stop=first error/partial trajectory or budget exhaustion; no expansion

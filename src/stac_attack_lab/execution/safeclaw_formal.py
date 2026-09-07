@@ -37,7 +37,10 @@ from stac_attack_lab.execution.formal_attacker import (
     FormalAttacker,
     FormalAttackRealization,
     ModelFormalAttacker,
+    ModelNoSampleAttacker,
+    build_no_sample_attack_realization,
     make_formal_attacker_input,
+    make_no_sample_attacker_input,
 )
 from stac_attack_lab.execution.formal_interactive_episode import (
     run_interactive_baseline_episode,
@@ -446,6 +449,11 @@ def run_safeclaw_formal(
         raise ValueError("formal_execution_disabled_by_config")
     env = environment if environment is not None else os.environ
     formal_attacker = attacker or _configured_attacker(project_root, config)
+    no_sample_attacker = None
+    if isinstance(formal_attacker, ModelFormalAttacker):
+        no_sample_attacker = ModelNoSampleAttacker(
+            formal_attacker.client, project_root / "prompts/formal/no_sample_attacker.md"
+        )
     llm_planner = _configured_llm_planner(project_root, config)
     target_model = env.get(config.target_model_env)
     if (
@@ -668,10 +676,22 @@ def run_safeclaw_formal(
                         exact_secrets=[api_key, target_base_url],
                     )
                 )
+            if isinstance(no_sample_attacker, ModelNoSampleAttacker):
+                no_sample_attacker.set_call_recorder(
+                    ObservableModelCallRecorder(
+                        path=model_call_path,
+                        case_id=case_id,
+                        role="attacker",
+                        prompt=no_sample_attacker.prompt,
+                        exact_secrets=[api_key, target_base_url],
+                    )
+                )
             plan = case_planner.plan(planner_input)
             if plan.selected_sample_id != assignment.selected_sample_id:
                 raise ValueError("planner_changed_scheduler_assignment")
             realization: FormalAttackRealization | None = None
+            no_sample_input = None
+            no_sample_realization = None
             dependency_ablation_record: dict[str, Any] | None = None
             attacker_input = None
             if plan.selected_sample_id is None:
@@ -679,7 +699,17 @@ def run_safeclaw_formal(
                     raise ValueError(f"formal_planner_abstained:{plan.abstain_reason}")
                 selected_public = None
                 execution_view = None
-                slot_values = dict(task.baseline_materialization_values)
+                slot_values = dict(task.materialization_values)
+                no_sample_input = make_no_sample_attacker_input(
+                    case_id=case_id,
+                    public_task=descriptor.public_view,
+                    benchmark_public_prompt=descriptor.benchmark_public_prompt,
+                    plan=plan,
+                )
+                if isinstance(no_sample_attacker, ModelNoSampleAttacker):
+                    no_sample_realization = no_sample_attacker.realize(no_sample_input, seed=seed)
+                else:
+                    no_sample_realization = build_no_sample_attack_realization(no_sample_input)
             else:
                 selected_public = planner_input.selected_sample
                 if selected_public is None:
@@ -724,6 +754,13 @@ def run_safeclaw_formal(
             )
             recorder.record_artifact(case_id, FormalStage.planned, "planner_input", planner_input)
             recorder.record_artifact(case_id, FormalStage.planned, "evaluation_plan", plan)
+            if no_sample_input is not None and no_sample_realization is not None:
+                recorder.record_artifact(
+                    case_id, FormalStage.planned, "no_sample_attacker_input", no_sample_input
+                )
+                recorder.record_artifact(
+                    case_id, FormalStage.planned, "no_sample_attack_setup", no_sample_realization
+                )
             if attacker_input is not None and realization is not None:
                 recorder.record_artifact(
                     case_id,
@@ -819,6 +856,36 @@ def run_safeclaw_formal(
                         resume=True,
                     )
                     realization = interactive_loop.realization
+                elif no_sample_input is not None and no_sample_realization is not None:
+                    driver = (
+                        interactive_driver_factory(case_id)
+                        if interactive_driver_factory is not None
+                        else SafeClawInteractiveVictimDriver(
+                            upstream_root=upstream_root,
+                            safety_patch=safety_patch,
+                            bridge_path=(project_root / "integrations/safeclaw/formal_bridge.py"),
+                            case_root=episode_runner.output_root / case_id,
+                            target_model_id=request.target_model_id,
+                            target_base_url=request.target_base_url,
+                            target_api_key_env=request.target_api_key_env,
+                            embedding=request.embedding,
+                            environment=env,
+                        )
+                    )
+                    episode, sanitized, baseline_trace = run_interactive_baseline_episode(
+                        request=request,
+                        materialized_task=materialized,
+                        driver=driver,
+                        output_root=episode_runner.output_root,
+                        upstream_commit=preflight.upstream_commit,
+                        safety_patch_hash=(preflight.patch_hash or file_hash(safety_patch)),
+                        max_sessions=plan.budget.max_sessions,
+                        max_turns=plan.budget.max_turns,
+                        generated_actions=no_sample_realization.stage_actions,
+                        trace_filename="formal_no_sample_attack.json",
+                        control_type="no_sample_attack",
+                        resume=True,
+                    )
                 else:
                     driver = (
                         interactive_driver_factory(case_id)
@@ -1069,7 +1136,19 @@ def run_safeclaw_formal(
                     "reason": (None if planner_requests else "deterministic_planner_no_model_call"),
                 },
                 "attacker_stage": {
-                    "implemented": realization is not None,
+                    "implemented": realization is not None or no_sample_realization is not None,
+                    "control_type": (
+                        "sample_attacker"
+                        if realization is not None
+                        else (
+                            "no_sample_attack"
+                            if no_sample_realization is not None
+                            else "legal_baseline_replay"
+                        )
+                    ),
+                    "attack_generation_executed": "true"
+                    if realization is not None or no_sample_realization is not None
+                    else "false",
                     "model_id": (
                         attacker_requests[0].get("model_id") if attacker_requests else None
                     ),
@@ -1096,7 +1175,11 @@ def run_safeclaw_formal(
                         else (
                             "deterministic_attacker_no_model_call"
                             if realization is not None
-                            else "legal_baseline_condition"
+                            else (
+                                "no_sample_deterministic_test_double"
+                                if no_sample_realization is not None
+                                else "legal_baseline_condition"
+                            )
                         )
                     ),
                 },

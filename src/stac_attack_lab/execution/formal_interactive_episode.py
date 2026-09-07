@@ -357,13 +357,16 @@ def run_interactive_baseline_episode(
     safety_patch_hash: str,
     max_sessions: int,
     max_turns: int,
+    generated_actions: list[FormalAttackerStageAction] | None = None,
+    trace_filename: str = "formal_baseline_replay.json",
+    control_type: str = "legal_baseline_replay",
     resume: bool = True,
 ) -> tuple[SafeClawEpisodeResult, dict[str, Any], dict[str, Any]]:
     case_root = output_root / request.case_id
     case_root.mkdir(parents=True, exist_ok=True)
     episode_path = case_root / "episode_result.json"
     sanitized_path = case_root / "sanitized_result.json"
-    trace_path = case_root / "formal_baseline_replay.json"
+    trace_path = case_root / trace_filename
     if resume and all(path.is_file() for path in (episode_path, sanitized_path, trace_path)):
         episode = SafeClawEpisodeResult.model_validate_json(
             episode_path.read_text(encoding="utf-8")
@@ -393,36 +396,44 @@ def run_interactive_baseline_episode(
     observations: list[FormalVictimObservation] = []
     try:
         driver.start(materialized_task)
-        for index, session in enumerate(raw_sessions, start=1):
-            if not isinstance(session, dict):
-                raise ValueError("interactive_baseline_session_invalid")
-            session_id = str(session["session_id"])
-            call_id = (
-                "baseline-call-"
-                + stable_hash(
-                    {
-                        "case_id": request.case_id,
-                        "execution_attempt_id": attempt_id,
-                        "session_id": session_id,
-                        "index": index,
-                    }
-                )[:20]
-            )
-            action_id = "baseline-action-" + stable_hash(call_id)[:20]
-            action = FormalAttackerStageAction(
-                attacker_call_id=call_id,
-                attacker_action_id=action_id,
-                plan_id=f"baseline-plan:{request.case_id}",
-                benchmark_session_id=session_id,
-                stage_id=f"baseline-session-{index}",
-                macro_ref="baseline.public_session_replay",
-                action_type="victim_message",
-                benchmark_surface="safeclaw.session_lifecycle",
-                victim_visible_content=str(session["user_instruction"]),
-                public_slot_refs=[],
-                expected_public_predicate="baseline_session_completed",
-                rationale_summary="Replay the registered public baseline session.",
-            )
+        if generated_actions is not None:
+            actions_to_run = generated_actions
+        else:
+            actions_to_run = []
+            for index, session in enumerate(raw_sessions, start=1):
+                if not isinstance(session, dict):
+                    raise ValueError("interactive_baseline_session_invalid")
+                session_id = str(session["session_id"])
+                call_id = (
+                    "baseline-call-"
+                    + stable_hash(
+                        {
+                            "case_id": request.case_id,
+                            "execution_attempt_id": attempt_id,
+                            "session_id": session_id,
+                            "index": index,
+                        }
+                    )[:20]
+                )
+                actions_to_run.append(
+                    FormalAttackerStageAction(
+                        attacker_call_id=call_id,
+                        attacker_action_id="baseline-action-" + stable_hash(call_id)[:20],
+                        plan_id=f"baseline-plan:{request.case_id}",
+                        benchmark_session_id=session_id,
+                        stage_id=f"baseline-session-{index}",
+                        macro_ref="baseline.public_session_replay",
+                        action_type="victim_message",
+                        benchmark_surface="safeclaw.session_lifecycle",
+                        victim_visible_content=str(session["user_instruction"]),
+                        public_slot_refs=[],
+                        expected_public_predicate="baseline_session_completed",
+                        rationale_summary="Replay the registered public baseline session.",
+                    )
+                )
+        if len(actions_to_run) > max_sessions or len(actions_to_run) > max_turns:
+            raise ValueError("interactive_baseline_budget_exceeded")
+        for action in actions_to_run:
             observation = driver.apply(action, timeout_seconds=request.timeout_seconds)
             actions.append(action)
             observations.append(observation)
@@ -475,6 +486,7 @@ def run_interactive_baseline_episode(
         "observations": [item.model_dump(mode="json") for item in observations],
         "accounting": {
             "attacker_model_calls": 0,
+            "attacker_decision_calls": 1 if control_type == "no_sample_attack" else 0,
             "victim_gateway_requests": len(actions),
             "sessions_used": len(raw_sessions),
             "turns_used": len(actions),
@@ -510,7 +522,11 @@ def run_interactive_baseline_episode(
         status=SafeClawExecutionStatus.completed,
         error_category=None,
         upstream_commit=upstream_commit,
-        runner_version="safeclaw-formal-interactive-baseline-v1",
+        runner_version=(
+            "safeclaw-formal-interactive-no-sample-v1"
+            if control_type == "no_sample_attack"
+            else "safeclaw-formal-interactive-baseline-v1"
+        ),
         target_model_id=request.target_model_id,
         started_at=started_at,
         ended_at=_now(),
@@ -533,6 +549,8 @@ def run_interactive_baseline_episode(
             "safety_patch_hash": safety_patch_hash,
             "interactive_bridge": driver.driver_id,
             "baseline_trace_hash": str(trace["trace_hash"]),
+            "control_type": control_type,
+            "attack_generation_executed": "true" if control_type == "no_sample_attack" else "false",
             "execution_attempt_id": attempt_id,
             "attempt_ledger_ref": "interactive_attempts.jsonl",
         },

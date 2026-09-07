@@ -22,12 +22,16 @@ class OpenAICompatibleClient:
         max_output_tokens: int = 1200,
         *,
         use_response_format: bool = False,
+        base_url_env: str = "OPENAI_BASE_URL",
+        api_key_env: str = "OPENAI_API_KEY",
     ) -> None:
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
         self.use_response_format = use_response_format
-        self.base_url = os.environ.get("OPENAI_BASE_URL")
-        self._api_key = os.environ.get("OPENAI_API_KEY")
+        self.base_url_env = base_url_env
+        self.api_key_env = api_key_env
+        self.base_url = os.environ.get(base_url_env)
+        self._api_key = os.environ.get(api_key_env)
         self.last_raw_response: str | None = None
         self.last_usage: dict[str, Any] | None = None
         self.last_request_id: str | None = None
@@ -52,7 +56,7 @@ class OpenAICompatibleClient:
         self.last_usage = None
         self.last_request_id = None
         if not self.base_url or not self._api_key:
-            raise ModelCallError("missing_openai_env")
+            raise ModelCallError(f"missing_model_env:{self.base_url_env}:{self.api_key_env}")
         url = self.base_url.rstrip("/") + "/chat/completions"
         schema = response_schema.model_json_schema()
         prompt = "Return JSON only. The JSON must validate this schema:\n" + json.dumps(

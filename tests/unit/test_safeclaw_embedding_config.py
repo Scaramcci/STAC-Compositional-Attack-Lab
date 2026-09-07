@@ -138,7 +138,7 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
             "fallback": "none",
             "remote": {
                 "baseUrl": (
-                    "http://127.0.0.1:18792/v1"
+                    "http://127.0.0.1:18790/v1"
                     if provider == "ark_multimodal"
                     else "https://embedding.invalid/v1"
                 ),

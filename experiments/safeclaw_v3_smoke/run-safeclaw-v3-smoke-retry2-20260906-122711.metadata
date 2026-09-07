@@ -1,0 +1,5 @@
+run_id=safeclaw-v3-smoke-retry2-20260906-122711
+config=configs/sample_generation/safeclaw_v3_smoke_retry2.yaml
+OPENAI_MODEL_list=[gpt-5.5] process override
+budget=1 trajectory, 4 actions, 2 turns, 2 sessions, 300s wall, 120s action timeout
+stop=first partial/error or budget exhaustion

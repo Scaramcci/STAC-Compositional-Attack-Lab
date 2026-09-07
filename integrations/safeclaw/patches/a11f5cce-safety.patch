@@ -1,6 +1,11 @@
+diff --git a/scripts/judge.py b/scripts/judge.py
+index 466b14e..b4128df 100755
 --- a/scripts/judge.py
 +++ b/scripts/judge.py
-@@ -431,0 +432,12 @@
+@@ -429,6 +429,18 @@ def _apply_model_config(config_path: str):
+     model_id = mc.get("model", "gpt-5.1-codex")
+     api_key = mc.get("api_key")
+     api_base_url = mc.get("api_base_url")
 +    embedding_provider = mc.get("embedding_provider")
 +    embedding_model = mc.get("embedding_model")
 +    embedding_api_base_url = mc.get("embedding_api_base_url")
@@ -13,17 +18,33 @@
 +    )
 +    if any(embedding_values) and not all(embedding_values):
 +        raise ValueError("incomplete_embedding_model_config")
-@@ -461 +473 @@
+
+     p = _get_platform()
+
+@@ -458,13 +470,17 @@ def _apply_model_config(config_path: str):
+             f"json.dump(c,open('{cfg_path}','w'),indent=2)"
+             f"\""
+         )
 -        print(f"  Provider override (Seclaw): ...{api_key[-6:]} -> {api_base_url or 'default'}")
 +        print(f"  Provider override (Seclaw): credential redacted -> {api_base_url or 'default'}")
-@@ -467 +479,5 @@
+         return {"model": model_id, "api_base_url": api_base_url}
+
+     # Write provider config to openclaw.json (models.providers.openai)
+     if api_key and api_base_url:
+         provider_config = json.dumps({
 -            "baseUrl": api_base_url.rstrip("/") + "/v1",
 +            "baseUrl": (
 +                api_base_url.rstrip("/")
 +                if api_base_url.rstrip("/").endswith("/openai")
 +                else api_base_url.rstrip("/") + "/v1"
 +            ),
-@@ -496,0 +513,67 @@
+             "api": "openai-completions",
+             "apiKey": api_key,
+             "models": [{"id": model_id, "name": f"{model_id} (proxy)",
+@@ -494,11 +510,84 @@ def _apply_model_config(config_path: str):
+             f"json.dump(c,open('{config_path}','w'),indent=2)"
+             f"\""
+         )
 +        if embedding_provider == "ark_multimodal":
 +            adapter_config = {
 +                "model": embedding_model,
@@ -37,12 +58,18 @@
 +                 f"umask 077; cat > {adapter_path}"],
 +                input=json.dumps(adapter_config).encode(), capture_output=True, check=True,
 +            )
++            source_path = "/tmp/_stac_ark_embedding.py"
 +            subprocess.run(
-+                ["docker", "exec", "-d", CONTAINER, "python3", "-c",
++                ["docker", "exec", CONTAINER, "python3", "-c",
 +                 "import json,sys; "
 +                 "c=json.load(open(sys.argv[1])); "
-+                 "exec(compile(c['source'], '<stac-ark-adapter>', 'exec'))",
-+                 adapter_path],
++                 "open(sys.argv[2], 'w').write(c['source'])",
++                 adapter_path, source_path],
++                capture_output=True, check=True,
++            )
++            subprocess.run(
++                ["docker", "exec", "-d", CONTAINER, "bash", "-lc",
++                 f"python3 {source_path} {adapter_path} > /tmp/_stac_ark_embedding.log 2>&1"],
 +                capture_output=True, check=True,
 +            )
 +            # Wait for the container-local listener before restarting OpenClaw.
@@ -50,7 +77,7 @@
 +                "import time, urllib.request",
 +                "for attempt in range(50):",
 +                "    try:",
-+                "        urllib.request.urlopen('http://127.0.0.1:18792/health', timeout=1).close()",
++                "        urllib.request.urlopen('http://127.0.0.1:18790/health', timeout=1).close()",
 +                "        break",
 +                "    except OSError:",
 +                "        time.sleep(0.1)",
@@ -62,7 +89,7 @@
 +                capture_output=True, check=True,
 +            )
 +            embedding_provider = "openai"
-+            embedding_api_base_url = "http://127.0.0.1:18792/v1"
++            embedding_api_base_url = "http://127.0.0.1:18790/v1"
 +        if embedding_provider:
 +            memory_search = {
 +                "enabled": True,
@@ -91,10 +118,19 @@
 +                f"json.dump(c,open('{config_path}','w'),indent=2)"
 +                f"\""
 +            )
-@@ -501 +584 @@
+         if not p.get("config_writable"):
+             # Copy modified config back (requires root for NemoClaw)
+             dexec(f"cp /tmp/_openclaw_config.json {OPENCLAW_HOME}/openclaw.json")
+             dexec(f"chmod 444 {OPENCLAW_HOME}/openclaw.json")
 -        print(f"  Provider override: ...{api_key[-6:]} -> {api_base_url}")
 +        print(f"  Provider override: credential redacted -> {api_base_url}")
-@@ -540 +623,26 @@
+
+     # Also update auth-profiles key (gateway may prefer this over provider apiKey)
+     if api_key:
+@@ -537,7 +626,32 @@ def _apply_model_config(config_path: str):
+     print(f"  Gateway restarted — config: {validate.strip()}")
+
+     # Return applied config so it can be saved in the report
 -    return {"model": model_id, "api_base_url": api_base_url or "", "api_key_suffix": api_key[-6:] if api_key else ""}
 +    return {
 +        "model": model_id,
@@ -122,8 +158,17 @@
 +            "credential": "***REDACTED***",
 +        })
 +    return {"available": bool(raw), "profiles": profiles}
-@@ -1492 +1600,3 @@
+
+
+ def remove_container():
+@@ -1489,7 +1603,9 @@ class Evaluator:
+                 "skills_deployed": self.pre_state.get("skills_deployed", []),
+                 "plugins_deployed": self.pre_state.get("plugins_deployed", []),
+             },
 -            "auth_profiles": self.post_state.get("auth_profiles_content", ""),
 +            "auth_profiles": _safe_auth_profile_structure(
 +                self.post_state.get("auth_profiles_content", "")
 +            ),
+         }
+
+     def _check_skill_loaded(self) -> dict:

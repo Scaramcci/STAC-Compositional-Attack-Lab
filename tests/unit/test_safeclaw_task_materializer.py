@@ -234,7 +234,7 @@ def test_no_sample_uses_same_template_with_only_preregistered_content_delta(
         != (baseline_task["environment"]["workspace_files"])
     )
     assert sample_task["sessions"][0] != baseline_task["sessions"][0]
-    assert baseline_manifest["materialization_variant"] == "legal_baseline"
+    assert baseline_manifest["materialization_variant"] == "no_sample_attack"
 
 
 def test_materializer_rejects_unbound_extra_value(tmp_path: Path) -> None:

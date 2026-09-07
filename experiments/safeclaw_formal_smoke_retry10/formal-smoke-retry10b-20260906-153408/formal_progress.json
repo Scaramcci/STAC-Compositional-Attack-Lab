@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "artifacts": {},
+      "attempt_count": 1,
+      "case_id": "case-4ed68c2ce1a6ac231d81",
+      "condition": "assigned_sample",
+      "last_error_category": "ValueError",
+      "pair_id": "pair-a8926905bd6ae97216d3",
+      "result_ref": null,
+      "seed": 20260906,
+      "stage": "pending",
+      "task_id": "pse-2.1-001",
+      "updated_at": "2026-09-06T15:34:08.389186+00:00"
+    },
+    {
+      "artifacts": {},
+      "attempt_count": 0,
+      "case_id": "case-9e578ccd296e882a8a06",
+      "condition": "no_sample",
+      "last_error_category": null,
+      "pair_id": "pair-a8926905bd6ae97216d3",
+      "result_ref": null,
+      "seed": 20260906,
+      "stage": "pending",
+      "task_id": "pse-2.1-001",
+      "updated_at": "2026-09-06T15:34:08.370383+00:00"
+    }
+  ],
+  "config_hash": "d22af76aadd65cd351f307637c16f80881ccc35949c6d9e22589c3f829fd61ce",
+  "run_id": "formal-smoke-retry10b-20260906-153408",
+  "schema_version": "2.0",
+  "updated_at": "2026-09-06T15:34:08.389186+00:00"
+}

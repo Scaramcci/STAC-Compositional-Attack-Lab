@@ -50,6 +50,16 @@
       "title": "BindingSlot",
       "type": "object"
     },
+    "CandidateAcquisitionMode": {
+      "enum": [
+        "ordinary_trace",
+        "adversarial_trace",
+        "generated",
+        "composed"
+      ],
+      "title": "CandidateAcquisitionMode",
+      "type": "string"
+    },
     "ChainEdge": {
       "additionalProperties": false,
       "properties": {
@@ -823,9 +833,7 @@
   "additionalProperties": false,
   "properties": {
     "acquisition_mode": {
-      "const": "adversarial_trace",
-      "title": "Acquisition Mode",
-      "type": "string"
+      "$ref": "#/$defs/CandidateAcquisitionMode"
     },
     "chain_hash": {
       "title": "Chain Hash",
@@ -877,8 +885,8 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "2.0",
-      "default": "2.0",
+      "const": "3.0",
+      "default": "3.0",
       "title": "Schema Version",
       "type": "string"
     },

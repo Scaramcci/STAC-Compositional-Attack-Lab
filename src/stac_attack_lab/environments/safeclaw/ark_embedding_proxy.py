@@ -82,7 +82,7 @@ def convert_embeddings(payload: dict[str, Any], config: dict[str, str]) -> dict[
     }
 
 
-def create_server(config: dict[str, str], port: int = 18792) -> ThreadingHTTPServer:
+def create_server(config: dict[str, str], port: int = 18790) -> ThreadingHTTPServer:
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
             # Never log request bodies, headers, or upstream exception strings.

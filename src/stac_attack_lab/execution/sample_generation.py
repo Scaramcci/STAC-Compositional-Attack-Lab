@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
@@ -322,9 +323,24 @@ def _record_collection_stage(
     registry_hash: str,
 ) -> SampleCollectionStageManifest:
     collection_manifest_path = collection_root / "collection_manifest.json"
-    content_hashes = _tree_content_hashes(
-        collection_root, excluded_names={COLLECTION_STAGE_MANIFEST}
-    )
+    # Collection adapters may finish atomic child writes just after the
+    # collector returns. Require a stable snapshot before sealing the stage.
+    content_hashes: dict[str, str] = {}
+    for _attempt in range(3):
+        first = _tree_content_hashes(collection_root, excluded_names={COLLECTION_STAGE_MANIFEST})
+        time.sleep(0.05)
+        second = _tree_content_hashes(collection_root, excluded_names={COLLECTION_STAGE_MANIFEST})
+        if first == second:
+            content_hashes = second
+            break
+    if not content_hashes:
+        raise ValueError("sample_collection_content_snapshot_unstable")
+    collection_manifest = json.loads(collection_manifest_path.read_text(encoding="utf-8"))
+    trajectory_hashes = collection_manifest.get("trajectory_hashes", {})
+    for trajectory_id, expected_hash in trajectory_hashes.items():
+        relative = f"trajectories/{trajectory_id}/raw_trajectory.json"
+        if content_hashes.get(relative) != expected_hash:
+            raise ValueError("sample_collection_manifest_trajectory_hash_mismatch")
     stage = SampleCollectionStageManifest(
         pipeline_id=config.pipeline_id,
         config=config,
@@ -615,7 +631,7 @@ def mine_sample_collection(project_root: Path, collection_root: Path) -> Path:
         occurrences_by_graph,
         registry,
         ChainFilteringPolicy(
-            require_attack_relevance=False,
+            require_attack_relevance=True,
             allowed_source_splits=config.allowed_source_splits,
             formal_excluded_task_ids=config.formal_excluded_task_ids,
             available_capabilities=config.available_capabilities,

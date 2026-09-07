@@ -1,0 +1,38 @@
+{
+  "accepted_count": 1,
+  "attacker_stage_implemented": true,
+  "attempted_count": 1,
+  "blocked_count": 0,
+  "candidate_count": 1,
+  "construction_pipeline_version": "formal-sample-generation-v1",
+  "content_hashes": {
+    "accepted_samples.jsonl": "43fda82ebbf16ff886f93a888f3b96560c82d1ffc0285604e3fc1ee3a7e2c0dd",
+    "candidates.jsonl": "f6641e981e7c5d85226d6cb98adb719f2dbd955f55460cc3d509f92adb387db8",
+    "execution_views.jsonl": "ae3edb1f63d8f5c7bee3cbf48d0c6ffe24de791b30860938fba3155995f4271e",
+    "filter_decisions.jsonl": "c3e0fb6022fd0098e703c21aa2864e5d85cde8e2764f7029ee423b0d40322ad6",
+    "negative_samples.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "planner_public_index.jsonl": "191d277eda7452b677acd6ffcca7db77988d970898853e08e2f492649d3b3ec9",
+    "private_evidence.jsonl": "0a384f69d9c4259f1830ebe23a38d2723d67e351c006d7933f321a6ab0b10001"
+  },
+  "created_at": "2026-09-06T15:55:52.438993+00:00",
+  "error_count": 0,
+  "filter_policy_hash": "b386426c5179cdde096de23a8432d09e4608496380ec0cb90f5410f0d14434a0",
+  "formal_exclusion_hash": "7ec334995e3f435af05a51d85dabe076bb7a59fdf88a9faffe053366445fff60",
+  "frozen": false,
+  "library_id": "stac-formal-primitive-library",
+  "library_version": "safeclaw-v3-smoke-retry12-v3",
+  "manifest_type": "primitive_chain_library",
+  "negative_count": 0,
+  "not_observable_count": 0,
+  "observation_schema_version": "safeclaw-observable-v2",
+  "partial_count": 0,
+  "reason_code_distribution": {},
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf",
+  "registry_version": "formal-v2-semantic-macros",
+  "rejected_count": 0,
+  "schema_version": "2.1",
+  "source_split_summary": {
+    "train": 1
+  },
+  "tree_hash": "d20cfeee8635b70beb861d8ad9b48cfe3d9fb89989bd6c7ebbbe805540a464d9"
+}

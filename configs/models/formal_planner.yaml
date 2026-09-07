@@ -1,5 +1,7 @@
 provider: openai_compatible
-model: gemini-2.5-flash
+model: gpt-5.5
 temperature: 0.0
 max_output_tokens: 1800
 timeout_seconds: 60
+base_url_env: OPENAI_BASE_URL
+api_key_env: OPENAI_API_KEY

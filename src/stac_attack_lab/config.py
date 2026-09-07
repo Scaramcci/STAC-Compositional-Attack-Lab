@@ -18,6 +18,8 @@ class RoleModelConfig(StrictModel):
     temperature: float = Field(default=0.0, ge=0.0, le=2.0)
     max_output_tokens: PositiveInt = 1200
     timeout_seconds: PositiveInt = 60
+    base_url_env: str = "OPENAI_BASE_URL"
+    api_key_env: str = "OPENAI_API_KEY"
 
 
 def _parse_scalar(raw: str) -> Any:
@@ -77,7 +79,11 @@ def configured_openai_models(environment: Mapping[str, str] | None = None) -> li
         try:
             parsed = ast.literal_eval(raw)
         except (SyntaxError, ValueError):
-            parsed = [part.strip() for part in raw.split(",")]
+            parsed = (
+                [part.strip().strip("\"'") for part in raw[1:-1].split(",")]
+                if raw.startswith("[") and raw.endswith("]")
+                else [part.strip() for part in raw.split(",")]
+            )
     if isinstance(parsed, str):
         parsed = [parsed]
     if not isinstance(parsed, (list, tuple)):

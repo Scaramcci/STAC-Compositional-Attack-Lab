@@ -1,0 +1,3 @@
+run_id=formal-smoke-retry10b-20260906-153408
+config=configs/experiments/formal_smoke_retry10.yaml
+output=experiments/safeclaw_formal_smoke_retry10

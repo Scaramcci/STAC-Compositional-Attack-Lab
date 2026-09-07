@@ -279,7 +279,7 @@ class FormalEvaluationPlan(StrictModel):
                 has_sample_binding
                 or self.selected_chain_id is not None
                 or self.abstain_reason is not None
-                or self.materialization_variant != "legal_baseline"
+                or self.materialization_variant not in {"legal_baseline", "no_sample_attack"}
                 or self.adversarial_trajectory is not None
             ):
                 raise ValueError("formal_plan_baseline_fields_mismatch")

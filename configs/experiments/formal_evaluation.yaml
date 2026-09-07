@@ -31,8 +31,8 @@
   "allowed_target_models": [
     "gemini-2.5-flash"
   ],
-  "target_base_url_env": "OPENAI_BASE_URL",
-  "target_api_key_env": "OPENAI_API_KEY",
+  "target_base_url_env": "GEMINI_BASE_URL",
+  "target_api_key_env": "GEMINI_API_KEY",
   "timeout_seconds": 1200,
   "max_attempts": 2,
   "budget": {

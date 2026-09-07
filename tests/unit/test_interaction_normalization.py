@@ -116,6 +116,48 @@ def test_normalization_builds_causal_graph_across_benign_gap(tmp_path: Path) -> 
     )
 
 
+def test_unknown_memory_retrieval_does_not_create_state_dependency() -> None:
+    trajectory = RawInteractionTrajectory(
+        trajectory_id="unknown-retrieval",
+        source_adapter_id="safeclaw",
+        source_adapter_version="1",
+        source_environment_family="safeclaw",
+        source_environment_version="1",
+        source_task_id="task",
+        source_split="synthetic",
+        episode_id="episode",
+        session_ids=["s1"],
+        event_refs=[],
+        checkpoint_refs=[],
+        provenance={},
+        model_hashes={},
+        config_hash="config",
+        collection_seed=1,
+        collection_status="complete",
+    )
+    graph, audit = normalize_source_events(
+        trajectory,
+        [
+            {
+                "event_id": "unknown-read",
+                "session_id": "s1",
+                "sequence_no": 1,
+                "actor_role": "victim_system",
+                "event_type": "state_read",
+                "component_role": "persistent_memory",
+                "operation": "memory_retrieval_not_observable",
+                "status": "not_observable",
+                "public_payload": {"observation": "unknown"},
+                "evidence_ref_ids": ["bridge:s1:memory:unknown"],
+            }
+        ],
+        audit_ref="memory-unknown-audit",
+    )
+    assert audit.passed is True
+    assert graph.unresolved_links == []
+    assert graph.edges == []
+
+
 def test_orphan_request_is_explicitly_unresolved() -> None:
     trajectory = RawInteractionTrajectory(
         trajectory_id="orphan-trajectory",

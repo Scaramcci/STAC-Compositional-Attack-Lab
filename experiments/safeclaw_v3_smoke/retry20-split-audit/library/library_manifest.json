@@ -1,0 +1,42 @@
+{
+  "accepted_count": 0,
+  "attacker_stage_implemented": true,
+  "attempted_count": 1,
+  "blocked_count": 0,
+  "candidate_count": 1,
+  "construction_pipeline_version": "formal-sample-generation-v1",
+  "content_hashes": {
+    "accepted_samples.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidates.jsonl": "354ffc29a486343f2998fb97026c86de2c58f3f6c59f9e6a9fd8b2ac348e99f0",
+    "execution_views.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "filter_decisions.jsonl": "a255fa04c403f44000a144f2f75e100532f64a53edd38135843cf1fb776f6d62",
+    "negative_samples.jsonl": "354ffc29a486343f2998fb97026c86de2c58f3f6c59f9e6a9fd8b2ac348e99f0",
+    "planner_public_index.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "private_evidence.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "created_at": "2026-09-06T19:15:58.451917+00:00",
+  "error_count": 0,
+  "filter_policy_hash": "4e27c597f85220c4ed238117290a7266db0211c9f384718b999bfd028b8d02f1",
+  "formal_exclusion_hash": "7ec334995e3f435af05a51d85dabe076bb7a59fdf88a9faffe053366445fff60",
+  "frozen": false,
+  "library_id": "stac-formal-primitive-library",
+  "library_version": "safeclaw-v3-smoke-retry18-v3",
+  "manifest_type": "primitive_chain_library",
+  "negative_count": 1,
+  "not_observable_count": 0,
+  "observation_schema_version": "safeclaw-observable-v2",
+  "partial_count": 1,
+  "reason_code_distribution": {
+    "construction_attempt_not_complete:partial": 1,
+    "terminal_predicate_missing": 1,
+    "terminal_relation_not_observed:partial": 1
+  },
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf",
+  "registry_version": "formal-v2-semantic-macros",
+  "rejected_count": 0,
+  "schema_version": "2.1",
+  "source_split_summary": {
+    "train": 1
+  },
+  "tree_hash": "0b9767da0fba2653de34d441dde2e9fe2a0de2b910ca9e93a500150b69b07c78"
+}

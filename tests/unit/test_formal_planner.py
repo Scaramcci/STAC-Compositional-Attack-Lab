@@ -266,7 +266,7 @@ def test_formal_baselines_preserve_budget_and_seeded_choice(tmp_path: Path) -> N
     assert plans[0].baseline_binding is not None and plans[0].baseline_binding.binding_valid
     assert plans[0].binding is None
     assert plans[0].abstain_reason is None
-    assert plans[0].materialization_variant == "legal_baseline"
+    assert plans[0].materialization_variant == "no_sample_attack"
     assert RandomCompatiblePlanner().plan(planner_input).plan_hash == plans[2].plan_hash
 
 
@@ -380,3 +380,128 @@ def test_dependency_ablation_preregisters_one_required_edge_and_slot(
     assert intervention.trajectory_hash == stable_hash(
         ablation.adversarial_trajectory.model_dump(mode="json")
     )
+
+
+def test_no_sample_realization_accepts_runtime_hash_placeholder() -> None:
+    from stac_attack_lab.execution.formal_attacker import (
+        FormalAttackerStageAction,
+        NoSampleAttackRealization,
+    )
+
+    action = FormalAttackerStageAction(
+        stage_id="public-stage-1",
+        macro_ref="no_sample.generated_public_policy",
+        action_type="victim_message",
+        benchmark_surface="safeclaw_user_message",
+        victim_visible_content="Synthetic public action.",
+        public_slot_refs=[],
+        expected_public_predicate="public_session_completed",
+        rationale_summary="Public task only.",
+    )
+    value = NoSampleAttackRealization(
+        attacker_input_id="no-sample-input",
+        plan_id="plan-public",
+        stage_actions=[action],
+        realization_hash="runtime-computed",
+    )
+    assert value.realization_hash == "runtime-computed"
+
+
+def test_no_sample_model_attacker_recomputes_runtime_hash_and_validates_public_session(
+    tmp_path: Path,
+) -> None:
+    from stac_attack_lab.execution.formal_attacker import (
+        ModelNoSampleAttacker,
+        NoSampleAttackRealization,
+        make_no_sample_attacker_input,
+    )
+
+    planner_input, _ = _planner_input(tmp_path)
+    no_sample_input = planner_input.model_copy(
+        update={"condition": "no_sample", "selected_sample": None}
+    )
+    plan = NoSamplePlanner().plan(no_sample_input)
+    attacker_input = make_no_sample_attacker_input(
+        case_id="case-no-sample-model",
+        public_task=no_sample_input.public_task,
+        benchmark_public_prompt=no_sample_input.benchmark_public_prompt,
+        plan=plan,
+    )
+
+    class _Client(ModelClient):
+        def generate(self, messages, response_schema, seed, timeout):
+            del messages, seed, timeout
+            assert response_schema is NoSampleAttackRealization
+            session_id = attacker_input.benchmark_public_prompt.sessions[0].session_id
+            action = {
+                "stage_id": "public-stage-1",
+                "macro_ref": "no_sample.generated_public_policy",
+                "action_type": "victim_message",
+                "benchmark_surface": attacker_input.allowed_surfaces[0],
+                "benchmark_session_id": session_id,
+                "victim_visible_content": "Synthetic public action.",
+                "public_slot_refs": [],
+                "expected_public_predicate": "public_session_completed",
+                "rationale_summary": "Public task only.",
+            }
+            return response_schema.model_validate(
+                {
+                    "attacker_input_id": attacker_input.attacker_input_id,
+                    "plan_id": attacker_input.plan_id,
+                    "stage_actions": [action],
+                    "realization_hash": "runtime-computed",
+                }
+            )
+
+    result = ModelNoSampleAttacker(
+        _Client(), ROOT / "prompts/formal/no_sample_attacker.md"
+    ).realize(attacker_input, seed=7)
+    assert result.realization_hash != "runtime-computed"
+    assert result.stage_actions[0].benchmark_session_id == "session-1"
+
+
+def test_no_sample_model_attacker_rejects_unknown_session(tmp_path: Path) -> None:
+    from stac_attack_lab.execution.formal_attacker import (
+        ModelNoSampleAttacker,
+        make_no_sample_attacker_input,
+    )
+
+    planner_input, _ = _planner_input(tmp_path)
+    no_sample_input = planner_input.model_copy(
+        update={"condition": "no_sample", "selected_sample": None}
+    )
+    plan = NoSamplePlanner().plan(no_sample_input)
+    attacker_input = make_no_sample_attacker_input(
+        case_id="case-no-sample-invalid",
+        public_task=no_sample_input.public_task,
+        benchmark_public_prompt=no_sample_input.benchmark_public_prompt,
+        plan=plan,
+    )
+
+    class _Client(ModelClient):
+        def generate(self, messages, response_schema, seed, timeout):
+            del messages, seed, timeout
+            action = {
+                "stage_id": "public-stage-1",
+                "macro_ref": "no_sample.generated_public_policy",
+                "action_type": "victim_message",
+                "benchmark_surface": attacker_input.allowed_surfaces[0],
+                "benchmark_session_id": "private-session",
+                "victim_visible_content": "Synthetic public action.",
+                "public_slot_refs": [],
+                "expected_public_predicate": "public_session_completed",
+                "rationale_summary": "Public task only.",
+            }
+            return response_schema.model_validate(
+                {
+                    "attacker_input_id": attacker_input.attacker_input_id,
+                    "plan_id": attacker_input.plan_id,
+                    "stage_actions": [action],
+                    "realization_hash": "runtime-computed",
+                }
+            )
+
+    with pytest.raises(ValueError, match="no_sample_attacker_session_not_public"):
+        ModelNoSampleAttacker(_Client(), ROOT / "prompts/formal/no_sample_attacker.md").realize(
+            attacker_input, seed=7
+        )

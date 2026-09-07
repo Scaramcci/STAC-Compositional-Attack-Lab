@@ -14,8 +14,8 @@
   "allowed_target_models": [
     "gemini-2.5-flash"
   ],
-  "target_base_url_env": "OPENAI_BASE_URL",
-  "target_api_key_env": "OPENAI_API_KEY",
+  "target_base_url_env": "GEMINI_BASE_URL",
+  "target_api_key_env": "GEMINI_API_KEY",
   "embedding_policy": "required_endpoint",
   "embedding_provider": "ark_multimodal",
   "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",

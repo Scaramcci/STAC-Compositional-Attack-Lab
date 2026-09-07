@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.hashing import stable_hash
@@ -217,6 +217,16 @@ class ModelConstructionAttacker:
                 action_id=f"model-error-stop-{observation.session_index}",
                 action_type="stop",
                 rationale_summary="The attacker model call failed; collection stops fail closed.",
+            )
+        except ValidationError as exc:
+            error_code = str(exc.errors()[0].get("type", "validation_error"))[:80]
+            return ConstructionAttackerAction(
+                action_id=f"model-invalid-stop-{observation.session_index}",
+                action_type="stop",
+                rationale_summary=(
+                    f"The attacker action was rejected ({error_code}); "
+                    "collection stops fail closed."
+                ),
             )
         if not isinstance(value, ConstructionAttackerAction):
             raise TypeError("construction_attacker_response_type_mismatch")

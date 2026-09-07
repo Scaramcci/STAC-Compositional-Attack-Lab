@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from stac_attack_lab.datasets.primitive_chain import (
     BindingSlot,
+    CandidateAcquisitionMode,
     ExecutionBindingView,
     PlannerSampleView,
     PrimitiveChainCandidate,
@@ -104,8 +105,11 @@ def build_primitive_chain_sample(
     ]
     planner_view = PlannerSampleView(
         sample_id=sample_id,
-        sample_version="2.0",
-        public_summary="Authorized benchmark observed primitive path; outcome and attack relevance are reported separately.",
+        sample_version="3.0",
+        public_summary=(
+            "Authorized benchmark observed primitive path; outcome and attack relevance "
+            "are reported separately."
+        ),
         core_nodes=candidate.core_nodes,
         core_edges=candidate.core_edges,
         macro_nodes=public_nodes,
@@ -199,7 +203,7 @@ def build_primitive_chain_sample(
     )
     sample = PrimitiveChainSample(
         sample_id=sample_id,
-        sample_version="2.0",
+        sample_version="3.0",
         dataset_version=library_version,
         chain_id=candidate.chain_id,
         chain_hash=candidate.candidate_hash,
@@ -208,7 +212,7 @@ def build_primitive_chain_sample(
         registry_hash=registry.registry_hash,
         observation_schema_version=registry.observable_projection_version,
         construction_pipeline_version=construction_pipeline_version,
-        acquisition_mode=candidate.acquisition_mode.value,
+        acquisition_mode=CandidateAcquisitionMode(candidate.acquisition_mode),
         planner_view=planner_view,
         execution_view=execution_view,
         private_evidence_view=private_view,

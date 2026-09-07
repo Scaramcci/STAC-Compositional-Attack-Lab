@@ -127,7 +127,7 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
     handlers: list[type[BaseHTTPRequestHandler]] = []
 
     def capture_server(address: Any, handler: type[BaseHTTPRequestHandler]) -> Any:
-        assert address == ("127.0.0.1", 18792)
+        assert address == ("127.0.0.1", 18790)
         handlers.append(handler)
         return FakeServer()
 

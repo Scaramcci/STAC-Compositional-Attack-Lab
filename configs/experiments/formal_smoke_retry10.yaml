@@ -1,0 +1,41 @@
+{
+  "schema_version": "2.0",
+  "experiment_id": "safeclaw-formal-smoke-retry10",
+  "execution_enabled": true,
+  "track": "safeclaw_compositional",
+  "environment_config_path": "configs/environments/safeclaw.yaml",
+  "task_set_path": "configs/task_sets/evaluation_tasks.yaml",
+  "registry_path": "configs/primitives/registry.yaml",
+  "library_path": "data/primitive_libraries/frozen/safeclaw-v3-smoke-retry10-v3",
+  "require_frozen_library": true,
+  "attacker_stage_implemented": true,
+  "attacker_execution_enabled": true,
+  "attacker_model_config_path": "configs/models/formal_attacker.yaml",
+  "attacker_prompt_path": "prompts/formal/independent_attacker.md",
+  "planner_model_config_path": "configs/models/formal_planner.yaml",
+  "planner_selection_prompt_path": "prompts/formal/chain_selector.md",
+  "planner_trajectory_prompt_path": "prompts/formal/trajectory_planner.md",
+  "conditions": [
+    "assigned_sample",
+    "no_sample"
+  ],
+  "seeds": [
+    20260906
+  ],
+  "target_model_env": "SAFECLAW_MODEL",
+  "allowed_target_models": [
+    "gemini-2.5-flash"
+  ],
+  "target_base_url_env": "GEMINI_BASE_URL",
+  "target_api_key_env": "GEMINI_API_KEY",
+  "timeout_seconds": 180,
+  "max_attempts": 1,
+  "budget": {
+    "max_sessions": 3,
+    "max_turns": 24,
+    "max_tool_calls": 16,
+    "max_tokens": 8192,
+    "max_wall_time_seconds": 180
+  },
+  "output_root": "experiments/safeclaw_formal_smoke_retry10"
+}

@@ -1,0 +1,17 @@
+{
+  "accepted_count": 0,
+  "attacker_stage": {
+    "implemented": true
+  },
+  "attempt_outcome_counts": {
+    "error": 1
+  },
+  "candidate_count": 0,
+  "collection_manifest": "/home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab/experiments/safeclaw_v3_smoke/generated/safeclaw-v3-smoke-v3/interactions/raw/safeclaw-v3-smoke-20260906/collection_manifest.json",
+  "config_hash": "c849b5be7653776e20f3574642ab79527bfd44fce488b9950ab3dc33b6305a4b",
+  "library_root": "/home/kunyuan/snap/Zky_Agent_Attack/STAC-Compositional-Attack-Lab/experiments/safeclaw_v3_smoke/generated/safeclaw-v3-smoke-v3/library",
+  "negative_count": 0,
+  "pipeline_id": "safeclaw-v3-smoke-20260906",
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf",
+  "schema_version": "2.1"
+}

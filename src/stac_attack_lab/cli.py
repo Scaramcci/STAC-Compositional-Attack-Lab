@@ -49,6 +49,18 @@ def _write_schema(path: Path, model: type[BaseModel]) -> None:
     )
 
 
+def _resolve_safeclaw_task_path(root: Path, upstream: Path, value: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+    else:
+        root_candidate = (root / candidate).resolve()
+        resolved = root_candidate if root_candidate.is_file() else (upstream / candidate).resolve()
+    if not resolved.is_file():
+        raise ValueError("safeclaw_task_path_missing")
+    return resolved
+
+
 def _project_scoped_path(root: Path, value: str) -> Path:
     resolved_root = root.resolve()
     resolved = (root / value).resolve()
@@ -152,7 +164,7 @@ def _main(argv: list[str] | None = None) -> int:
         upstream = root / args.upstream
         pse_report = smoke_official_pse_evaluator(
             upstream / "scripts/judge.py",
-            upstream / args.task,
+            _resolve_safeclaw_task_path(root, upstream, args.task),
         )
         print(pse_report.model_dump_json(indent=2))
         return 0 if pse_report.passed else 1

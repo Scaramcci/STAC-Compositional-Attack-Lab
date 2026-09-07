@@ -202,7 +202,7 @@ class SampleValidationSummary(StrictModel):
 
 
 class PrimitiveChainSample(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["3.0"] = "3.0"
     sample_id: str
     sample_version: str
     dataset_version: str
@@ -213,7 +213,7 @@ class PrimitiveChainSample(StrictModel):
     registry_hash: str
     observation_schema_version: str
     construction_pipeline_version: str
-    acquisition_mode: Literal["adversarial_trace"]
+    acquisition_mode: CandidateAcquisitionMode
     planner_view: PlannerSampleView
     execution_view: ExecutionBindingView
     private_evidence_view: PrivateEvidenceView

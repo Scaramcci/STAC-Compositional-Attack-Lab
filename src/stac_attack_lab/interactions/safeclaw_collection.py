@@ -18,6 +18,7 @@ from stac_attack_lab.environments.safeclaw.model_config import (
     SafeClawEmbeddingRuntime,
     build_safeclaw_model_config,
 )
+from stac_attack_lab.environments.safeclaw.redaction import redact_value
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.base import (
     CollectedInteraction,
@@ -94,6 +95,7 @@ class ConstructionVictimResult(StrictModel):
 
 class ConstructionVictimDriver(Protocol):
     driver_id: str
+    model_hash: str
 
     def start(
         self,
@@ -106,6 +108,10 @@ class ConstructionVictimDriver(Protocol):
     def apply(self, action: ConstructionAttackerAction) -> ConstructionVictimStep: ...
 
     def finish(self) -> ConstructionVictimResult: ...
+
+    def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]: ...
+
+    def diagnostic_snapshot(self) -> str | None: ...
 
     def abort(self) -> None: ...
 
@@ -169,7 +175,6 @@ class SafeClawConstructionInteractionAdapter:
         configured = self._tasks[task.source_task_id]
         if not set(manifest.allowed_delivery_surfaces) <= set(configured.allowed_delivery_surfaces):
             raise ValueError("construction_manifest_surface_not_supported")
-        observation = self.driver.start(configured, seed=seed, budget=budget)
         all_events: list[dict[str, Any]] = []
         all_checkpoints: list[dict[str, Any]] = []
         session_ids: list[str] = []
@@ -185,6 +190,7 @@ class SafeClawConstructionInteractionAdapter:
         consecutive_retries = 0
         started_at = monotonic()
         try:
+            observation = self.driver.start(configured, seed=seed, budget=budget)
             for _ in range(budget.max_actions):
                 elapsed_seconds = monotonic() - started_at
                 if elapsed_seconds >= budget.max_wall_time_seconds:
@@ -266,6 +272,8 @@ class SafeClawConstructionInteractionAdapter:
             result = self.driver.finish()
         except Exception as exc:
             partial_events, partial_checkpoints = self.driver.observed_snapshot()
+            diagnostic = self.driver.diagnostic_snapshot()
+            failure_detail = str(redact_value(str(exc)).sanitized)[:1000]
             self.driver.abort()
             return CollectedInteraction(
                 source_task=task,
@@ -277,7 +285,12 @@ class SafeClawConstructionInteractionAdapter:
                 config_hash=stable_hash({"task": task.source_task_id, "seed": seed}),
                 status="partial" if partial_events else "error",
                 failure_category=type(exc).__name__,
-                provenance={"adapter_id": self.adapter_id, "partial_observation_preserved": "true"},
+                provenance={
+                    "adapter_id": self.adapter_id,
+                    "partial_observation_preserved": "true",
+                    "diagnostic_stderr_tail": diagnostic or "unavailable",
+                    "failure_detail": failure_detail or "unavailable",
+                },
             )
         all_events.extend(result.source_events)
         all_checkpoints.extend(result.checkpoints)
@@ -390,6 +403,17 @@ class SafeClawSubprocessVictimDriver:
         """Return append-only observations collected before an abort."""
         return list(self._events), list(self._checkpoints)
 
+    def diagnostic_snapshot(self) -> str | None:
+        """Return a bounded, redacted bridge stderr tail before cleanup."""
+        if self._stderr is None or self._temporary is None:
+            return None
+        self._stderr.flush()
+        path = Path(self._temporary.name) / "bridge.log"
+        if not path.is_file():
+            return None
+        text = path.read_text(encoding="utf-8", errors="replace")
+        return str(redact_value(text[-4000:]).sanitized)
+
     def _read_bridge(self) -> dict[str, Any]:
         if self._process is None or self._process.stdout is None:
             raise RuntimeError("safeclaw_construction_bridge_not_started")
@@ -400,7 +424,10 @@ class SafeClawSubprocessVictimDriver:
         if not isinstance(value, dict):
             raise RuntimeError("safeclaw_construction_bridge_invalid_response")
         if value.get("kind") == "error":
-            raise RuntimeError(str(value.get("error_category", "bridge_error")))
+            category = str(value.get("error_category", "bridge_error"))
+            phase = str(value.get("phase", "unknown"))
+            detail = str(value.get("detail", ""))[:1000]
+            raise RuntimeError(f"{category}:phase={phase}:detail={detail}")
         return cast(dict[str, Any], value)
 
     def _send_bridge(self, value: dict[str, Any]) -> dict[str, Any]:
@@ -597,9 +624,38 @@ class SafeClawSubprocessVictimDriver:
         # A non-empty persisted file only proves state existence. Recall is
         # emitted only when the bridge reports an explicit retrieval event.
         explicit_retrievals = session.get("memory_retrievals", [])
-        if self._new_session_pending and isinstance(explicit_retrievals, list) and explicit_retrievals:
+        retrieval_observation = str(session.get("memory_retrieval_observation", "unknown"))
+        if retrieval_observation == "unknown":
+            source_events.append(
+                {
+                    "event_id": f"state-read-memory-unknown-{action.action_id}-{action_nonce}",
+                    "session_id": session_id,
+                    "sequence_no": self._next_sequence(),
+                    "actor_role": "victim_system",
+                    "event_type": "state_read",
+                    "component_role": "persistent_memory",
+                    "operation": "memory_retrieval_not_observable",
+                    "status": "not_observable",
+                    # Unknown retrieval is diagnostic only. Without an explicit
+                    # bridge event, do not claim a state read or manufacture a
+                    # dependency on a state writer.
+                    "evidence_ref_ids": [f"bridge:{session_id}:memory:unknown"],
+                    "public_payload": {
+                        "observation": "unknown",
+                        "evidence_available": False,
+                        "transcript_provenance": session.get("transcript_provenance", {}),
+                    },
+                }
+            )
+        if (
+            self._new_session_pending
+            and isinstance(explicit_retrievals, list)
+            and explicit_retrievals
+        ):
             retrieval = explicit_retrievals[0] if isinstance(explicit_retrievals[0], dict) else {}
-            retrieved_hash = str(retrieval.get("content_hash") or stable_hash(post_state.get("memory_content", "")))
+            retrieved_hash = str(
+                retrieval.get("content_hash") or stable_hash(post_state.get("memory_content", ""))
+            )
             retrieved_parents = retrieval.get("parent_artifact_ids", [])
             if not isinstance(retrieved_parents, list):
                 retrieved_parents = []
@@ -660,9 +716,14 @@ class SafeClawSubprocessVictimDriver:
         tool_calls = session.get("tool_calls", [])
         for index, tool_call in enumerate(tool_calls if isinstance(tool_calls, list) else []):
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
+            provider_call_id = str(call_payload.get("id", "")) or None
             source_events.append(
                 {
-                    "event_id": f"tool-call-{action.action_id}-{action_nonce}-{index}",
+                    "event_id": (
+                        f"tool-call-{provider_call_id}"
+                        if provider_call_id
+                        else f"tool-call-{action.action_id}-{action_nonce}-{index}"
+                    ),
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "actor_role": "victim_agent",
@@ -671,7 +732,11 @@ class SafeClawSubprocessVictimDriver:
                     "operation": "safeclaw.tool_request",
                     "status": "attempted",
                     "input_artifact_ids": [response_artifact_id],
-                    "public_payload": call_payload,
+                    "public_payload": {
+                        **call_payload,
+                        "provider_tool_call_id": provider_call_id,
+                        "execution_result_observed": False,
+                    },
                     "evidence_ref_ids": [f"bridge:{session_id}:tool:{index}"],
                 }
             )

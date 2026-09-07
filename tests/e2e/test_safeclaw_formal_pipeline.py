@@ -566,15 +566,23 @@ def test_formal_pipeline_records_reports_and_resumes_without_duplicates(
 
     assert baseline_record["attack_realization"]["selected_sample"] is None
     assert baseline_record["attack_realization"]["execution_view"] is None
+    assert baseline_record["attacker_stage"]["control_type"] == "no_sample_attack"
+    assert baseline_record["attacker_stage"]["attack_generation_executed"] == "true"
+    assert baseline_record["accounting"]["attacker_model_calls"] == 0
+    assert baseline_record["accounting"]["attacker_decision_calls"] == 1
+    assert (
+        baseline_record["victim_stage"]["episode"]["runner_version"]
+        == "safeclaw-formal-interactive-no-sample-v1"
+    )
     assert (
         baseline_record["attack_realization"]["binding_manifest"]["materialization_variant"]
-        == "legal_baseline"
+        == "no_sample_attack"
     )
     assert (
         baseline_record["attack_realization"]["materialized_task"]["sessions"][0][
             "user_instruction"
         ]
-        == "Summarize SYNTHETIC_BENIGN_REFERENCE."
+        == "Store SYNTHETIC_UNTRUSTED_MARKER."
     )
     assert (
         baseline_record["planner_stage"]["output"]["budget"]

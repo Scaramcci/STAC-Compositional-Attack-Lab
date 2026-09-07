@@ -141,7 +141,10 @@
         "embedding_provider": {
           "anyOf": [
             {
-              "const": "openai",
+              "enum": [
+                "openai",
+                "ark_multimodal"
+              ],
               "type": "string"
             },
             {
