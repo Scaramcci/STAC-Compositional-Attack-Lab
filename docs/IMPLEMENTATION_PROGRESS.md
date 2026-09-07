@@ -350,4 +350,28 @@ Current scope: W01-W10, observation/sample/evaluation v3; implementation is part
 - 正式 evaluation 仍受严格 sample 前置条件阻塞；未启动 provider 或计费实验。
 
 - 质量门：`make check > /tmp/stac-make-check-mapping.log 2>&1` 退出码 0；ruff、mypy 64 source files、pytest 124 passed。
-- 2026-09-07 CLI path regression: fixed `_resolve_safeclaw_task_path` so repository-root-relative pinned upstream paths resolve stably even when the optional checkout is absent; consuming commands retain responsibility for missing-input errors. `tests/unit/test_safeclaw_cli.py`: 2 passed; full pytest: 121 passed, 3 skipped. Formal evaluation remains gated by completed terminal trajectory, evidence-backed persistence/retrieval lineage, and a valid frozen `safeclaw-main` library. Resume by providing the pinned checkout/structured lineage, then bounded collection, audit/freeze, paired smoke, and only afterward scale collection/evaluation.
+
+## Goal continuation checkpoint (2026-09-07)
+- make check passed: ruff 105 files, mypy 64 source files, pytest 124 passed.
+- No new completed trajectory or acceptable frozen library exists; formal evaluation remains fail-closed pending structured state-writer and memory-retrieval lineage.
+- Next run must use a fresh output directory, strict mine/audit/freeze, then paired treatment/no-sample smoke before scale-up.
+
+## 当前执行增量（goal continuation 2，2026-09-07）
+- 重新验证外部运行条件：`sg docker` 下 pinned image `openclaw-env:2026.3.12` 可见，SafeClaw preflight 全部通过；upstream commit、safety patch、模型环境、磁盘和 Docker gates 均 passed。当前 preflight patch hash 为 `53c31a4dd84136f994043139c87cb5346ef4483dd6393154a9f41b8c8a966402`。
+- `data/primitive_libraries/frozen/safeclaw-main` 仍缺失；代码搜索仍只发现 unknown retrieval 和显式 state-write 分支，没有新的结构化 runtime lineage 证据或 completed sample。
+- 未复用 retry18/19/20 输出目录，也未启动会覆盖旧产物的 collection。正式阶段仍需新 output directory、completed terminal trajectory、strict audit/freeze 后才能 paired smoke。
+
+## 当前执行增量（retry21 fresh bounded collection，2026-09-08）
+- 在 pinned Docker/preflight 全通过后，以全新配置/output root `configs/sample_generation/safeclaw_v3_smoke_retry21.yaml` / `experiments/safeclaw_v3_smoke/retry21-generated/` 运行一条 bounded collection。
+- wrapper/trajectory 标记为 `collection_status=complete`，但 authoritative provenance 显示 action/turn/session/tool/token 均为 0；`source_events.jsonl` 为 0 行，仅有 victim-pre/victim-post checkpoints。该结果不是 usable terminal trajectory，也不提供 persistence/retrieval lineage。
+- 因此未运行 mining/freeze 或 formal runner；retry21 保留为独立空轨迹证据，不能升级为 sample。下一步需诊断为何本次 driver 在无事件下返回 complete，并修复/回归后再开新目录重跑。
+
+## 当前执行增量（retry21 zero-action fail-closed repair，2026-09-08）
+- 修复 `safeclaw_collection` 状态聚合：driver 在零 action、零 source event 时即使返回 complete，也会被降级为 partial；保留已有有效 action 测试语义。
+- `make check` 通过：ruff、mypy 64 files、pytest 124 passed。
+- retry21 仍作为空轨迹审计证据保留；修复尚未产生新的 sample。下一步需新目录重跑 bounded collection，确认真实 action/event 后再 strict mining。
+
+## 当前执行增量（retry22 collection and strict mining，2026-09-09）
+- 通过 Docker preflight 后使用全新 retry22 output root 完成 bounded collection；状态修复生效：trajectory=`partial`，6 actions、2 turns、2 sessions、11 source events，failure=`construction_consecutive_retry_guard_exhausted`。
+- 严格 `sample mine` 完成：candidate=1、accepted=0、negative=1；拒绝原因 `construction_attempt_not_complete:partial`、`terminal_predicate_missing`、`terminal_relation_not_observed:partial`。没有 evidence-backed completed terminal/persistence sample，未 freeze、未启动 formal evaluation。
+- retry22 产物和配置保持独立，未覆盖历史 retry；下一步需解决 attacker/runtime retry guard 或取得结构化 state lineage 后再进行新 bounded run。

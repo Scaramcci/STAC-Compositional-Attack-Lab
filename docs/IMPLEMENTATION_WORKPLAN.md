@@ -298,4 +298,33 @@ SafeClawArena：`a11f5cceaba0676be721021f8d232638fd111305`，已核对。
 - [ ] 真实 OpenClaw indexing/search 和新 completed terminal sample 仍待运行环境/lineage 条件。
 
 - [x] model/embedding mapping audit 后全量质量门通过；日志 `/tmp/stac-make-check-mapping.log`。
-- 2026-09-07 continuation: CLI repository-relative upstream path regression repaired and tested (2 focused passed; full pytest 121 passed, 3 skipped). W09/W10 remain gated: obtain pinned checkout and observed state-writer/retrieval lineage, then produce a strict completed sample, audit/freeze it, execute paired smoke, and only then start large collection/evaluation.
+
+## Goal continuation checkpoint (2026-09-07)
+- [x] Re-audit artifacts and run full quality gate (ruff, mypy, pytest 124).
+- [ ] Obtain structured state-writer and memory-retrieval lineage.
+- [ ] Produce completed trajectory, strict frozen library, paired smoke, and final evaluation.
+
+No new completed trajectory or acceptable frozen library exists in this continuation; do not reuse retry10 or promote retry18-20 unknown/partial evidence.
+
+## Goal continuation checkpoint 2 (2026-09-07)
+- [x] Re-run SafeClaw preflight through `sg docker`; all deterministic gates passed and pinned image is available.
+- [ ] Run a fresh bounded collection only with a unique output root and after confirming structured state-write/retrieval lineage is present.
+- [ ] Freeze a strict accepted long-horizon library, then run paired treatment/no-sample and scale evaluation.
+
+Evidence: preflight passed, but `safeclaw-main` is absent and no new structured lineage/completed trajectory exists. Existing retry18-20 outputs remain immutable audit evidence.
+
+## Goal continuation checkpoint 3 (2026-09-08)
+- [x] Run a fresh bounded collection with a unique retry21 output root.
+- [x] Preserve the empty completed trajectory as audit evidence; no old output was overwritten.
+- [ ] Diagnose the zero-action `collection_status=complete` path and ensure it cannot satisfy sample gates.
+- [ ] Re-run bounded collection after the diagnostic/runtime fix, then strict mine/audit/freeze and paired smoke.
+
+Retry21 produced two state checkpoints but zero source events/actions/turns/sessions. It is not evidence of a long-horizon sample or successful runtime interaction.
+
+## Goal continuation checkpoint 4 (2026-09-09)
+- [x] Validate zero-action fail-closed fix with fresh retry22 collection.
+- [x] Run strict mining: candidate 1, accepted 0, negative 1 with explicit partial/terminal gate failures.
+- [ ] Repair the runtime/attacker retry-guard path or obtain structured lineage so a completed terminal trajectory can be produced.
+- [ ] Freeze a valid long-horizon library, run paired smoke, then scale collection and official evaluation.
+
+Retry22 is authoritative evidence of real interaction and correct gate rejection, not a valid sample.

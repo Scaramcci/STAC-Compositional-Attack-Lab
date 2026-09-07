@@ -300,7 +300,9 @@ class SafeClawConstructionInteractionAdapter:
             final_status: Literal["complete", "partial", "blocked", "error"] = "partial"
         else:
             final_status = (
-                result.status if result.source_events or result.checkpoints else last_status
+                result.status
+                if result.source_events or action_count > 0
+                else ("partial" if result.status == "complete" else last_status)
             )
         final_failure = last_failure or result.failure_category
         return CollectedInteraction(

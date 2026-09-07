@@ -1,0 +1,15 @@
+{
+  "acquisition_mode": "adversarial_trace",
+  "adapter_id": "safeclaw_adaptive_construction",
+  "adapter_version": "1.0.0",
+  "collection_id": "safeclaw-v3-smoke-retry22-20260909",
+  "construction_attacker_id": "model_construction_attacker_v1",
+  "failure_count": 0,
+  "formal_exclusion_hash": "7ec334995e3f435af05a51d85dabe076bb7a59fdf88a9faffe053366445fff60",
+  "plan_hash": "29d067daacee9269d9e8ef2a1edb7cb5131bb98328ddbf2f8fa3e6a69a2d9f83",
+  "schema_version": "2.0",
+  "trajectory_count": 1,
+  "trajectory_hashes": {
+    "trajectory-pse-2.2-002-d920080dfe0b6e84": "154926339dc1eb8f59a5e78bb0c2bfe7912b73e95262dda997520b290bec1992"
+  }
+}
