@@ -298,3 +298,4 @@ SafeClawArena：`a11f5cceaba0676be721021f8d232638fd111305`，已核对。
 - [ ] 真实 OpenClaw indexing/search 和新 completed terminal sample 仍待运行环境/lineage 条件。
 
 - [x] model/embedding mapping audit 后全量质量门通过；日志 `/tmp/stac-make-check-mapping.log`。
+- 2026-09-07 continuation: CLI repository-relative upstream path regression repaired and tested (2 focused passed; full pytest 121 passed, 3 skipped). W09/W10 remain gated: obtain pinned checkout and observed state-writer/retrieval lineage, then produce a strict completed sample, audit/freeze it, execute paired smoke, and only then start large collection/evaluation.

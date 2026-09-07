@@ -55,8 +55,11 @@ def _resolve_safeclaw_task_path(root: Path, upstream: Path, value: str) -> Path:
         resolved = candidate.resolve()
     else:
         root_candidate = (root / candidate).resolve()
-        resolved = root_candidate if root_candidate.is_file() else (upstream / candidate).resolve()
-    if not resolved.is_file():
+        resolved = root_candidate if root_candidate.is_file() or candidate.parts[:3] == ("integrations", "safeclaw", "upstream") else (upstream / candidate).resolve()
+    # Keep repository-relative upstream paths stable when the optional pinned
+    # checkout is absent; the command that consumes the path reports its own
+    # actionable missing-input error.
+    if not resolved.is_file() and not candidate.parts[:3] == ("integrations", "safeclaw", "upstream"):
         raise ValueError("safeclaw_task_path_missing")
     return resolved
 

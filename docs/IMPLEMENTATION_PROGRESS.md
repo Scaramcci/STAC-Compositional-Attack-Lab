@@ -350,3 +350,4 @@ Current scope: W01-W10, observation/sample/evaluation v3; implementation is part
 - 正式 evaluation 仍受严格 sample 前置条件阻塞；未启动 provider 或计费实验。
 
 - 质量门：`make check > /tmp/stac-make-check-mapping.log 2>&1` 退出码 0；ruff、mypy 64 source files、pytest 124 passed。
+- 2026-09-07 CLI path regression: fixed `_resolve_safeclaw_task_path` so repository-root-relative pinned upstream paths resolve stably even when the optional checkout is absent; consuming commands retain responsibility for missing-input errors. `tests/unit/test_safeclaw_cli.py`: 2 passed; full pytest: 121 passed, 3 skipped. Formal evaluation remains gated by completed terminal trajectory, evidence-backed persistence/retrieval lineage, and a valid frozen `safeclaw-main` library. Resume by providing the pinned checkout/structured lineage, then bounded collection, audit/freeze, paired smoke, and only afterward scale collection/evaluation.
