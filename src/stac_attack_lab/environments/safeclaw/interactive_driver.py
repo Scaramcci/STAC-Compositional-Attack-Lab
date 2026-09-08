@@ -264,7 +264,15 @@ class SafeClawInteractiveVictimDriver:
             "public_response_text": str(response.get("agent_response", "")),
             "public_tool_calls": tool_calls,
             "public_state_delta": changed_state,
-            "status": "completed",
+            "status": {
+                "timeout": "timeout",
+                "model_refusal": "blocked",
+                "empty_response": "error",
+                "unknown": "error",
+                "authentication_error": "error",
+                "rate_limited": "error",
+                "provider_or_gateway_error": "error",
+            }.get(str(response.get("response_observation")), "completed"),
         }
         observation = FormalVictimObservation.model_validate(
             {
@@ -286,6 +294,13 @@ class SafeClawInteractiveVictimDriver:
             "tool_event_ids": tool_event_ids,
             "observation": observation.model_dump(mode="json"),
             "provider_usage": usage if isinstance(usage, dict) else None,
+            "provider_usage_observation": response.get("provider_usage_observation"),
+            "response_observation": response.get("response_observation"),
+            "provider_response_id": response.get("provider_response_id"),
+            "provider_finish_reason": response.get("provider_finish_reason"),
+            "provider_response_hash": response.get("provider_response_hash"),
+            "provider_response_projection": response.get("provider_response_projection"),
+            "gateway_diagnostics": response.get("gateway_diagnostics", {}),
         }
         if scan_for_secrets(response_record, self._exact_secrets):
             raise ValueError("safeclaw_formal_action_record_secret_gate_failed")

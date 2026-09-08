@@ -162,6 +162,80 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
     assert "embedding-secret" not in output
 
 
+@pytest.mark.skipif(not UPSTREAM.is_dir(), reason="SafeClawArena checkout not installed")
+def test_patched_judge_sets_gemini_openai_compat_without_affecting_other_endpoints(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    patched = tmp_path / "SafeClawArena"
+    shutil.copytree(UPSTREAM, patched)
+    subprocess.run(
+        ["git", "apply", "--unidiff-zero", str(PATCH)],
+        cwd=patched,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    module = runpy.run_path(str(patched / "scripts/judge.py"))
+    captured_inputs: list[dict[str, Any]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        input_value = kwargs.get("input")
+        if isinstance(input_value, bytes):
+            captured_inputs.append(json.loads(input_value))
+        return subprocess.CompletedProcess(command, 0, b"", b"")
+
+    module["_get_platform"] = lambda: {
+        "cli_transport": False,
+        "config_writable": True,
+    }
+    module["dexec"] = lambda command: None
+    module["dexec_output"] = lambda command: "valid"
+    monkeypatch.setattr(module["subprocess"], "run", fake_run)
+    monkeypatch.setattr(module["time"], "sleep", lambda seconds: None)
+
+    expected_compat = {
+        "supportsStore": False,
+        "supportsUsageInStreaming": False,
+        "maxTokensField": "max_tokens",
+        "supportsStrictMode": False,
+    }
+    for index, (base_url, expected_base_url, compat) in enumerate(
+        [
+            (
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                expected_compat,
+            ),
+            ("https://provider.invalid", "https://provider.invalid/v1", None),
+        ]
+    ):
+        model_config = tmp_path / f"model-config-{index}.json"
+        model_config.write_text(
+            json.dumps(
+                {
+                    "model": "gemini-2.5-flash" if compat else "synthetic-chat",
+                    "api_base_url": base_url,
+                    "api_key": "chat-secret",
+                }
+            ),
+            encoding="utf-8",
+        )
+        captured_inputs.clear()
+        module["_apply_model_config"](str(model_config))
+        provider = next(item for item in captured_inputs if "models" in item)
+        assert provider["baseUrl"] == expected_base_url
+        model = provider["models"][0]
+        if compat is None:
+            assert "compat" not in model
+        else:
+            assert model["compat"] == compat
+
+    output = capsys.readouterr().out
+    assert "chat-secret" not in output
+
+
 def test_gemini_embedding_endpoint_root_is_not_double_versioned() -> None:
     payload, _ = build_safeclaw_model_config(
         target_model_id="gemini-2.5-flash",

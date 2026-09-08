@@ -1,0 +1,32 @@
+{
+  "accepted_count": 0,
+  "attempt_outcome_counts": {
+    "partial": 1
+  },
+  "candidate_count": 1,
+  "collection_tree_hash": "1d771b9627750331a031f3a21172b734e14effd74531ddfecae93d9c42bc4e68",
+  "config_hash": "3b3a23fee87f603b4a96f0849ddc2f86a7ed89debbc9f6d07bc6842c9a3a6596",
+  "library_tree_hash": "fa4273ac95e7125ee6984ebaa259447b24dc75919689c1bac64518f2126231ae",
+  "negative_count": 1,
+  "output_content_hashes": {
+    "extraction/graph-trajectory-pse-2.2-002-d07aa830de3b3aca-decisions.json": "8df43b6607faa6157b47483d009cde95756d36dfee944167a7bdaed8d1685701",
+    "extraction/graph-trajectory-pse-2.2-002-d07aa830de3b3aca-occurrences.jsonl": "ae04a2e30d0142f2b43d617c76dc6d9722e5b24486545050cbe9fe4e80a706d8",
+    "interactions/normalized/trajectory-pse-2.2-002-d07aa830de3b3aca/interaction_graph.json": "5b9b134bfabf076bdd35583dcb38613cc833f747006a4a56311e53e5f9b9f4c0",
+    "interactions/normalized/trajectory-pse-2.2-002-d07aa830de3b3aca/normalization_audit.json": "400bca79e558f3198250f7231c5dcb366ea081eebd1d5242f6fad0fa7b88b69b",
+    "library/accepted_samples.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/candidates.jsonl": "a8943a98a88953c26fee3182d602bfb33d1ad70143582a058a9dfa3b2241736d",
+    "library/execution_views.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/filter_decisions.jsonl": "2e45b76be1f3faebe005809535397248fda9b58467d297bd8f8d51a580724386",
+    "library/library_manifest.json": "0c0212e8c1e8304327701e7d9f724f62afe11816134a8a7d0ff6735318b03921",
+    "library/negative_samples.jsonl": "a8943a98a88953c26fee3182d602bfb33d1ad70143582a058a9dfa3b2241736d",
+    "library/planner_public_index.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/private_evidence.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample_generation_manifest.json": "009ec521e67fafe1d4473c210f1f8f7182973f54ef71781d0a37ba7eec7edccc"
+  },
+  "output_tree_hash": "320f76ee482084573b8928c42cc49625c6db97e613df2e5d3eac62080962aae3",
+  "pipeline_id": "safeclaw-stage-b-20260908-02",
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf",
+  "schema_version": "1.0",
+  "stage": "mining",
+  "target_accepted_samples": 1
+}

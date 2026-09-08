@@ -204,6 +204,9 @@ class SafeClawConstructionInteractionAdapter:
                 action = attacker.next_action(task, manifest, observation, seed=seed)
                 if action.action_type == "stop":
                     stopped = True
+                    attacker_failure = getattr(attacker, "last_failure_category", None)
+                    if isinstance(attacker_failure, str) and attacker_failure:
+                        last_failure = attacker_failure
                     break
                 is_delivery = action.action_type == "deliver_message"
                 if action.action_type == "retry":
@@ -237,7 +240,7 @@ class SafeClawConstructionInteractionAdapter:
                     last_failure = "construction_event_budget_exceeded"
                 elif tool_call_count > budget.max_tool_calls:
                     last_failure = "construction_tool_call_budget_exceeded"
-                elif is_delivery and step.token_count is None:
+                elif is_delivery and step.token_count is None and last_failure is None:
                     last_failure = "construction_token_usage_not_observable"
                 elif token_count > budget.max_tokens:
                     last_failure = "construction_token_budget_exceeded"
@@ -706,6 +709,38 @@ class SafeClawSubprocessVictimDriver:
                 )
         self._new_session_pending = False
         response_text = str(session.get("agent_response", ""))
+        response_observation = str(session.get("response_observation", "unknown"))
+        response_status = "passed"
+        response_failure: str | None = None
+        response_step_status: Literal["complete", "partial", "blocked", "error"] = "complete"
+        if response_observation == "empty_response":
+            response_status = "not_observable"
+            response_failure = "victim_empty_response"
+            response_step_status = "partial"
+        elif response_observation == "timeout":
+            response_status = "not_observable"
+            response_failure = "victim_timeout"
+            response_step_status = "partial"
+        elif response_observation == "authentication_error":
+            response_status = "error"
+            response_failure = "victim_authentication_error"
+            response_step_status = "error"
+        elif response_observation == "rate_limited":
+            response_status = "error"
+            response_failure = "victim_rate_limited"
+            response_step_status = "error"
+        elif response_observation == "provider_or_gateway_error":
+            response_status = "error"
+            response_failure = "victim_provider_or_gateway_error"
+            response_step_status = "error"
+        elif response_observation == "model_refusal":
+            response_status = "blocked"
+            response_failure = "victim_model_refusal"
+            response_step_status = "blocked"
+        elif response_observation == "unknown":
+            response_status = "not_observable"
+            response_failure = "victim_response_unknown"
+            response_step_status = "partial"
         response_artifact_id = f"artifact-response-{stable_hash(response_text)[:16]}-{action_nonce}"
         source_events.append(
             {
@@ -716,7 +751,7 @@ class SafeClawSubprocessVictimDriver:
                 "event_type": "message",
                 "component_role": "agent_context",
                 "operation": "extract_victim_response",
-                "status": "passed",
+                "status": response_status,
                 "input_artifact_ids": [message_id],
                 "output_artifacts": [
                     {
@@ -729,7 +764,16 @@ class SafeClawSubprocessVictimDriver:
                         "source_ref_ids": [f"bridge:{session_id}:response"],
                     }
                 ],
-                "public_payload": {"response": response_text},
+                "public_payload": {
+                    "response": response_text,
+                    "observation": response_observation,
+                    "provider_response_id": session.get("provider_response_id"),
+                    "provider_finish_reason": session.get("provider_finish_reason"),
+                    "provider_response_hash": session.get("provider_response_hash"),
+                    "provider_response_projection": session.get("provider_response_projection"),
+                    "provider_usage_observation": session.get("provider_usage_observation"),
+                    "gateway_diagnostics": session.get("gateway_diagnostics", {}),
+                },
                 "evidence_ref_ids": [f"bridge:{session_id}:response"],
             }
         )
@@ -819,7 +863,9 @@ class SafeClawSubprocessVictimDriver:
                 {"role": "attacker", "content": action.public_message or ""},
                 {"role": "victim", "content": response_text},
             ],
-            public_stage_status={"victim_session": "completed"},
+            public_stage_status={"victim_session": response_observation},
+            status=response_step_status,
+            failure_category=response_failure,
             tool_call_count=len(tool_calls) if isinstance(tool_calls, list) else 0,
             token_count=token_count if isinstance(token_count, int) else None,
         )

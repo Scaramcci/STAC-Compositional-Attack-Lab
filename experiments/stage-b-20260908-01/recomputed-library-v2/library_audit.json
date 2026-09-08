@@ -1,0 +1,10 @@
+{
+  "error_codes": [
+    "accepted_sample_target_not_met:0:1"
+  ],
+  "library_tree_hash": "50d6d1f6385eeee65976547e40ed1958ee530c67dd4b73cdae54b348f53338d8",
+  "mining_manifest_hash": "6f4d8c0fa02f0873f57528345020a753deb7c0694d8a75965a7c2c093d575541",
+  "passed": false,
+  "schema_version": "1.0",
+  "stage": "audit"
+}

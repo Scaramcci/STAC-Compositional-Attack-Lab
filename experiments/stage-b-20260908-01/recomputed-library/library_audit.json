@@ -1,0 +1,8 @@
+{
+  "error_codes": [],
+  "library_tree_hash": "beef1e43574fe2ad8fd06b8b38ca26efe5128ce3785d4c3139124036f8f8a48f",
+  "mining_manifest_hash": "c8dcc0bf28ffa408999e8bd5f8bffaaa728b0c7303923cdb42d5d56c74710d76",
+  "passed": true,
+  "schema_version": "1.0",
+  "stage": "audit"
+}

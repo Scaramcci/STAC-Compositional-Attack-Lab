@@ -18,6 +18,11 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from stac_attack_lab.environments.safeclaw.observations import (
+    classify_explicit_error,
+    classify_provider_response,
+    observable_gateway_diagnostics,
+)
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
 
 SUPPORTED_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
@@ -38,7 +43,9 @@ def _emit(value: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def _observable_state(raw: dict[str, Any]) -> dict[str, Any]:
+def _observable_state(
+    raw: dict[str, Any], exact_secrets: list[str] | None = None
+) -> dict[str, Any]:
     """Project bounded state evidence without provider credentials or raw logs."""
     keys = (
         "config_hash",
@@ -50,23 +57,7 @@ def _observable_state(raw: dict[str, Any]) -> dict[str, Any]:
         "workspace_file_contents",
     )
     projected = {key: raw.get(key) for key in keys}
-    gateway_log = str(raw.get("gateway_log") or "")
-    if gateway_log:
-        redacted_log = str(redact_value(gateway_log[-4000:]).sanitized)
-        projected["gateway_log_provenance"] = {
-            "content_hash": __import__("hashlib").sha256(redacted_log.encode()).hexdigest(),
-            "line_count": len(redacted_log.splitlines()),
-            "retrieval_marker_observed": any(
-                marker in redacted_log.lower()
-                for marker in ("memory search result", "memory_search_result", "memoryretrieval")
-            ),
-        }
-    else:
-        projected["gateway_log_provenance"] = {
-            "content_hash": None,
-            "line_count": 0,
-            "retrieval_marker_observed": False,
-        }
+    projected["gateway_log_provenance"] = observable_gateway_diagnostics(raw, exact_secrets or [])
     return projected
 
 
@@ -74,6 +65,21 @@ def _nonnegative_int(value: Any) -> int | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
         return None
     return int(value)
+
+
+def _transcript_provenance(
+    raw_state: dict[str, Any], exact_secrets: list[str] | None = None
+) -> dict[str, Any]:
+    transcript = str(raw_state.get("session_transcript_raw") or "")
+    redacted = str(redact_value(transcript[-12000:], exact_secrets or []).sanitized)
+    lines = redacted.splitlines()
+    return {
+        "content_hash": __import__("hashlib").sha256(redacted.encode()).hexdigest(),
+        "line_count": len(lines),
+        "tool_call_lines": sum(line.startswith("TOOL_CALL:") for line in lines),
+        "tool_result_lines": sum(line.startswith("TOOL_RESULT:") for line in lines),
+        "structured_lineage_available": False,
+    }
 
 
 def _observable_usage(raw: Any) -> dict[str, int] | None:
@@ -118,6 +124,22 @@ def _observable_usage(raw: Any) -> dict[str, int] | None:
     return None
 
 
+def _classify_response(
+    raw: Any,
+    agent_response: Any,
+    tool_calls: Any,
+    gateway_diagnostics: dict[str, Any] | None = None,
+    exact_secrets: list[str] | None = None,
+) -> dict[str, Any]:
+    return classify_provider_response(
+        raw,
+        agent_response,
+        tool_calls,
+        gateway_diagnostics=gateway_diagnostics,
+        exact_secrets=exact_secrets or [],
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--upstream", required=True)
@@ -127,6 +149,12 @@ def main() -> int:
     upstream = Path(args.upstream).resolve()
     task_path = Path(args.task).resolve()
     task = json.loads(task_path.read_text(encoding="utf-8"))
+    model_runtime = json.loads(Path(args.model_config).read_text(encoding="utf-8"))
+    exact_secrets = [
+        str(model_runtime.get(key) or "")
+        for key in ("api_key", "embedding_api_key")
+        if model_runtime.get(key)
+    ]
     judge = _load_judge(upstream)
     judge._set_platform("openclaw")
     runner = None
@@ -153,7 +181,7 @@ def main() -> int:
                 raise RuntimeError("safeclaw_gateway_unhealthy")
             phase = "capture_pre_state"
             runner.pre_state = runner.capture_pre_state()
-            pre_state = _observable_state(runner.capture_post_state())
+            pre_state = _observable_state(runner.capture_post_state(), exact_secrets)
         _emit({"kind": "ready", "pre_state": pre_state})
         for raw in sys.stdin:
             command = json.loads(raw)
@@ -193,25 +221,27 @@ def main() -> int:
                     session_index - 1,
                     shared_session_key=current_key,
                 )
-                public_post_state = _observable_state(runner.capture_post_state())
+                raw_post_state = runner.capture_post_state()
+                public_post_state = _observable_state(raw_post_state, exact_secrets)
             current_key = result.pop("_session_key")
             raw_api_response = result.pop("raw_api_response", None)
-            result["provider_usage"] = _observable_usage(raw_api_response)
-            transcript = str(public_post_state.get("session_transcript_raw") or "")
-            redacted_transcript = str(redact_value(transcript[-4000:]).sanitized)
-            result["transcript_provenance"] = {
-                "content_hash": __import__("hashlib")
-                .sha256(redacted_transcript.encode())
-                .hexdigest(),
-                "line_count": len(redacted_transcript.splitlines()),
-                "tool_call_lines": sum(
-                    line.startswith("TOOL_CALL:") for line in redacted_transcript.splitlines()
-                ),
-                "tool_result_lines": sum(
-                    line.startswith("TOOL_RESULT:") for line in redacted_transcript.splitlines()
-                ),
-                "structured_lineage_available": False,
-            }
+            classification = _classify_response(
+                raw_api_response,
+                result.get("agent_response"),
+                result.get("tool_calls"),
+                public_post_state.get("gateway_log_provenance"),
+                exact_secrets,
+            )
+            result.update(classification)
+            usage = _observable_usage(raw_api_response)
+            if usage is not None and any(value > 0 for value in usage.values()):
+                result["provider_usage"] = usage
+                result["provider_usage_observation"] = "reported_nonzero"
+            else:
+                result["provider_usage"] = None
+                result["provider_usage_observation"] = "gateway_zero_or_missing_unverified"
+            result["gateway_diagnostics"] = public_post_state.get("gateway_log_provenance", {})
+            result["transcript_provenance"] = _transcript_provenance(raw_post_state, exact_secrets)
             # The pinned upstream exposes assistant tool calls but no tool-result
             # stream. Preserve an explicit unknown status; never infer recall
             # from memory files or a memory-search request alone.
@@ -238,7 +268,7 @@ def main() -> int:
         _emit(
             {
                 "kind": "error",
-                "error_category": type(exc).__name__,
+                "error_category": classify_explicit_error(exc, type(exc).__name__),
                 "phase": phase,
                 "detail": detail or "no_exception_message",
             }

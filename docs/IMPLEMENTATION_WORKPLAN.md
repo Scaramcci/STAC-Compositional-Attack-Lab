@@ -1,6 +1,6 @@
 # 项目实施计划
 
-核查日期：2026-09-08（Europe/Berlin）；源码基线：`c3fd41a6`；阶段 A Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
+核查日期：2026-09-08（Europe/Berlin）；源码基线：`a4ce8940`；阶段 B Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
 
 本文件定义剩余工作、依赖和验收；[IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) 是唯一当前进度快照。本版替代此前反复追加的恢复指令，旧内容保留在 Git 历史中；不删除历史实验数据。
 
@@ -30,7 +30,7 @@
 - 模型/embedding 调用属于受控基础设施出口，仅连接已批准服务；凭证仅用于认证，不进入样本、报告或 Git。benchmark 效果端仅限容器/受控本地 sink。“不产生外部攻击效果”不等于“模型调用完全离线”。
 - 记录实际模型输入输出、工具请求/结果、状态变化、失败及判定；异常前的交互不得丢失。只记录可获得输出，不要求隐藏思维链。发布前脱敏，敏感原文与共享材料分开管理。
 - 保留旧 raw、冻结库、运行目录和 `.env`；不清空共享 Docker/tmux，不终止无关进程。新运行使用唯一 ID，不仅依赖日期命名。
-- `execution_enabled=true`、旧 Goal ID、文档中的历史授权不等于本轮调用授权。阶段 A 离线；阶段 B/C 须确认具体服务器范围与预算。
+- `execution_enabled=true`、旧 Goal ID、文档中的历史授权不等于新一轮调用授权。当前阶段 B 授权已按清单执行并触发停止条件；任何新增真实验证和阶段 C 仍须再次确认。
 - 不用措辞隐瞒任务或规避安全检查。拒绝是要保留的结果；额外权限需明确申请，不靠改名继续执行。
 
 ## 3. 工作包与验收
@@ -39,7 +39,7 @@
 
 | ID | 当前状态 | 工作与主要位置 | 依赖 | 验收 |
 |---|---|---|---|---|
-| W00 | verified | 当前代码、测试、产物盘点；两份状态文档 | 无 | 当前基线与历史证据分开；retry23 纳入；不声称服务器实时状态已验证 |
+| W00 | verified | 当前代码、测试、产物盘点；两份状态文档 | 无 | 当前基线、进程、历史证据和 Stage B 新产物分开；服务器状态已于本轮核对 |
 | W01 | verified | 三维契约/版本：`interactions/models.py`、`datasets/primitive_chain.py`、contracts、schemas、协议 | W00 | v3.1 sample/record 可表达 trace、structure、evidence、behavior、attack relevance、official outcome、eligibility；兼容迁移与回归通过 |
 | W02 | in_progress | 观测：`interactions/safeclaw_collection.py`、construction、collector、recording、两 bridge | W01 | 真实 call/session ID；请求与结果关联；异常前事件保留；多次 retrieval 不丢失；writer/reader/artifact parents 可追溯；缺失标 unknown |
 | W03 | verified | normalizer、extraction、chain_builder、library、sample_generation、CLI | W01,W02 | 有证据的非成功子图可入库；filter/audit/freeze 保留真实性与 hash/依赖门；两批旧 raw 只读重算稳定通过 |
@@ -47,8 +47,8 @@
 | W05 | verified | planning/binding_planner、formal_llm、formal_baselines、prompts | W03,W04 | 多组件角色拒绝；macro 会话绑定到最后一个有依据的 core occurrence；无首组件/任意会话 fallback；来源显式 |
 | W06 | in_progress | formal_attacker、formal_action_loop、safeclaw_formal、配置/prompts | W05 | no-sample 与 sample 输入隔离、动作/预算校验、ablation provenance 回归通过；Victim 请求未运行 |
 | W07 | in_progress | verification、reporting、两 bridge | W02,W04,W06 | interaction/official/mechanism outcome 分开统计；CSV/Markdown 与配对分母回归通过；pinned evaluator 真实 state 尚待 B |
-| W08 | in_progress | model_config、Ark proxy、preflight、patch | W00；真实验证需 W02 | 角色服务分离；upstream/image/patch/config hash；宿主→容器→OpenClaw indexing/search 分层验证；服务可达不等于检索链证实 |
-| W09 | blocked | 有预算真实 collection、建库、配对 smoke、正式评测 | B 需 W01-W04/W08；配对另需 W05-W07 | 先过 A；范围/预算确认；真实来源可抽查；停止条件生效；满足相应门才扩大，不无限 retry |
+| W08 | blocked | model_config、Ark proxy、preflight、patch | W00；真实验证需 W02 | direct Gemini 可用；OpenClaw HTTP 400 的额外请求字段已由镜像源码定位并加入离线 compat patch，但同根因真实复测轮数已达上限 |
+| W09 | blocked | 有预算真实 collection、建库、配对 smoke、正式评测 | B 需 W01-W04/W08；配对另需 W05-W07 | 3 次 trajectory attempt 后仍为 0 accepted；无 eligible/bound sample，按门停止，不 freeze、不执行伪配对 |
 | W10 | in_progress | schemas、计划/进度与阶段 B 草案 | 按阶段依赖前述 | 阶段 A schema/文档已完成；真实运行证据与最终交付仍待 B/C |
 
 W09 阻塞不能成为 W01-W07 停工理由。无服务器或 API 授权时继续离线代码、fixture、负例、报告与命令校验。
@@ -75,11 +75,11 @@ W09 阻塞不能成为 W01-W07 停工理由。无服务器或 API 授权时继�
 
 ### 阶段 B：有限真实验证（单独确认预算）
 
-启动前记录：服务器/目录、任务/split、各角色模型、允许出口/注入面、run/config hash、轨迹数、整批调用/token/费用上限、逐条/整批超时、重试总数、日志、tmux socket/session。以下仅是待用户确认的最小草案，不是授权；retry23 的预算不能视为本轮授权。
+启动前记录服务器/目录、任务/split、各角色模型、允许出口/注入面、run/config hash、轨迹数、整批调用/token/费用上限、逐条/整批超时、重试总数、日志、tmux socket/session。本轮授权与实际结果如下；它不延伸到新的真实尝试或阶段 C。
 
-**阶段 B 草案（不执行，等待确认）**
+**阶段 B 实际清单与结果**
 
-范围：一台已批准 Linux 主机；先核验 `pse-2.1-001`（PSE）与一条 CDF/非 PSE 任务的 adapter/materializer。真实 collection 只选一条已声明支持的 PSE construction task；未确认角色服务、出口和预算前，不调用模型/embedding，不启动 Victim。
+范围为当前已批准 Linux 项目目录。真实 collection 只使用 `pse-2.2-002`、`safeclaw_user_message`、seeds `20260908/20260909`；不支持的 surface 没有替换执行。
 
 ```bash
 cd /absolute/path/stac-compositional-attack-lab
@@ -96,13 +96,14 @@ bash scripts/run_formal_evaluation.sh \
 
 预检通过后，另建唯一 `stage-b-<date>-<nonce>` 目录和独立 tmux socket。先运行一条正常/阻断交互和一条授权 benchmark 对抗交互，各 `1 seed`、各 `1 trajectory`，保存 raw/source events/checkpoints、脱敏 bridge log、usage unknown 与 hash。只在 sample audit 通过后运行最小 matched `assigned_sample`/`no_sample`，保持同 task/seed/model/goal/budget/surface；缺合格输入或 binding invalid 即停。
 
-预算上限草案（整批硬上限，待确认）：
+本轮已授权预算上限（整批硬上限）：
 
 - collection：最多 `2 trajectories`，每条 `3 sessions / 24 actions / 16 tool calls / 8,192 tokens / 20 min`。
 - matched smoke：`2 conditions × 1 task × 1 seed = 2 cases`，每 case `3 sessions / 24 turns / 16 tool calls / 8,192 tokens / 20 min`，最多 `2 attempts`。
-- 整批：最多 `2` 条 collection trajectory 加 `2 cases × 2 attempts`，即最多 `6` 个实际执行 attempt、声明 token cap `49,152`、墙钟 cap `120 min`；费用 cap 必须由用户填写后才可启动。provider usage 缺失仍按这些上限停，不把 0 当零费用。
+- 初始范围为 `2` 条 collection trajectory 与 `2` 个 matched conditions；失败 case 在明确修改后最多第 2 次尝试。全阶段真实 trajectory/case execution 最多 `12` 次、累计最多 `4h`，单次最多 `20 min`。本轮没有金额上限，但不构成无限调用授权；provider usage 缺失按 unknown 记录并仍受执行数、token 配置与墙钟上限约束。
 
 停止条件：upstream/patch/image/hash 不匹配；bridge 协议或 tool-result/retrieval 无法验证；一次启动、空响应、认证或协议故障；sample audit 不通过；binding invalid；任一预算上限达到。触发后保留已发生片段，不自动扩大或重试。
+阶段 B 初始配置为 `configs/sample_generation/stage_b_20260908_01.json` / `experiments/stage-b-20260908-01/`；2 条 trajectory 均遇 OpenClaw 空响应。实际 adapter 只支持 adversarial construction，因此两条均为 adversarial acquisition；没有把它们冒充 ordinary normal collection。修复 response classification、legacy normalization 与 Attacker call recorder 并通过回归后，`configs/sample_generation/stage_b_20260908_02.json` / `experiments/stage-b-20260908-02/` 对 seed `20260909` 做了第 2 次且最后一次尝试，仍为 `partial / victim_empty_response`。实际计数为 trajectory `3/12`、formal `0`、真实 trajectory 墙钟 `392792 ms`；已知 Attacker 调用 retry 0、usage 2413，其他 provider usage unknown。修正后两批离线 audit 均为 0 accepted，未 freeze、未 matched。第二轮且最后一轮观测修改补充脱敏 gateway error-line projection、hidden-reasoning 排除、formal/collection 统一分类与 transcript 计数。`stage-b-20260908-03` benign OpenClaw probe（service probe 1/3）得到 provider/model 明确但 HTTP 400 无 body；`stage-b-20260908-04` direct Gemini minimal probe（service probe 2/3，1 call、无 tools、max_tokens 16、无重试）对同 endpoint/model 得到 HTTP 200/`OK` 与 provider total usage 24。镜像源码进一步确认 OpenClaw 默认额外发送 store、stream usage、`max_completion_tokens` 和 tool strict；版本化 patch 已对 Gemini `/openai` endpoint 关闭不兼容可选项并切换到 `max_tokens`，新 SHA-256 为 `6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523`，离线 apply/compile 和完整质量门通过。该候选修复尚未真实复测；未使用的第 3 个 service probe 不覆盖同根因 2 轮修改/复测上限。
 
 1. 核对 pinned upstream、patch、镜像、依赖，补跑缺 upstream 的测试。仅执行本阶段批准的基础设施探针。
 2. 默认提议一条正常或阻断交互、一条授权 benchmark 对抗交互，各一个 seed；先验证实际响应与检索观测，不扩大任务/预算。
@@ -111,6 +112,8 @@ bash scripts/run_formal_evaluation.sh \
 5. audit 通过后新建 **smoke 冻结快照**，不覆盖旧库；再执行同任务/seed/预算的 treatment/no-sample 配对。拒绝或攻击失败可以是有效结果；绑定失败、缺输入不算已执行。
 
 **B 完成条件**：有真实可追溯交互、合格输入、实际配对执行与判定产物。若未达到，只交付明确诊断并停止，不能宣称闭环完成。目标拓扑没出现时记录可行性限制，不无限重跑。
+
+当前 B 完成条件未满足：真实交互可追溯，但旧 OpenClaw 请求为 HTTP 400、离线 compat patch 尚未真实验证、sample audit 输入门失败，因而没有 eligible/bound sample、冻结库、matched official/mechanism 结果。阶段 C 不准入。下一轮需要用户明确扩大同根因复测授权，以唯一新 probe 验证已准备的 patch；若仍失败，再决定是否捕获字段级 provider error 或采用兼容 upstream/image。不能自动更换模型/供应商、扩大任务或进入 main collection。
 
 ### 阶段 C：正式实验与交付（再次确认总规模）
 

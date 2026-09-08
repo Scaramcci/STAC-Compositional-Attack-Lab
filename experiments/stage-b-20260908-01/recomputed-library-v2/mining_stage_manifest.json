@@ -1,0 +1,37 @@
+{
+  "accepted_count": 0,
+  "attempt_outcome_counts": {
+    "completed": 1,
+    "partial": 1
+  },
+  "candidate_count": 2,
+  "collection_tree_hash": "863f60237b53b603be559c20109caa394fd4530e0bc7e2286ae273f50b8c929e",
+  "config_hash": "ddce09ef9a2065030264b7ba9b0d8acf075cb80b64c5ba8980ad98972a9b0e6e",
+  "library_tree_hash": "50d6d1f6385eeee65976547e40ed1958ee530c67dd4b73cdae54b348f53338d8",
+  "negative_count": 2,
+  "output_content_hashes": {
+    "extraction/graph-trajectory-pse-2.2-002-8e90963a1684241b-decisions.json": "38903371b446491ef6e9af3e3bacacd96673670ec27b16a536b41b5fae02fa4d",
+    "extraction/graph-trajectory-pse-2.2-002-8e90963a1684241b-occurrences.jsonl": "0c01a60cf226ec470f933d06e26d4c451048f915868d39c661edfdb2d72781e8",
+    "extraction/graph-trajectory-pse-2.2-002-d07aa830de3b3aca-decisions.json": "f95de2f35ce934de0006ce0d6f19685c64d985b6228d9eae893ab8e92acc49c4",
+    "extraction/graph-trajectory-pse-2.2-002-d07aa830de3b3aca-occurrences.jsonl": "74496d26b11cda79aee037727ab97ec1ae5834d7967e326263ca05fca890600d",
+    "interactions/normalized/trajectory-pse-2.2-002-8e90963a1684241b/interaction_graph.json": "66357aefb3efda8ed9b2e12c5961cef4c5d6c6e49abc58f04a7f22d0859c6ad8",
+    "interactions/normalized/trajectory-pse-2.2-002-8e90963a1684241b/normalization_audit.json": "0517bbcad5058d844f2b148483b00d53f85c372c7344d635d87ce5860f963d94",
+    "interactions/normalized/trajectory-pse-2.2-002-d07aa830de3b3aca/interaction_graph.json": "1e8e069a7444a56ff0643c96f3dcaed01d8fde97545d6023e71a1ef3a1f49949",
+    "interactions/normalized/trajectory-pse-2.2-002-d07aa830de3b3aca/normalization_audit.json": "2b645ad1a461d5d7ee58b0d331be89765e75b150491043d87bd17f4d8be5e046",
+    "library/accepted_samples.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/candidates.jsonl": "0f22f4bd537c9c70fdec460f0712dd9401bc01cc904a9c6a504e3e0f0e7419ea",
+    "library/execution_views.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/filter_decisions.jsonl": "884d080558e3659781d02bc67a5c3287122fb4a13b32e831d582e86386a1937a",
+    "library/library_manifest.json": "0a64e2d6973360b80f71cdf34f5f5d884dca997dab4b609d8098095fbe699a0c",
+    "library/negative_samples.jsonl": "0f22f4bd537c9c70fdec460f0712dd9401bc01cc904a9c6a504e3e0f0e7419ea",
+    "library/planner_public_index.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "library/private_evidence.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sample_generation_manifest.json": "d2203c5273c3882c0c70402c2b91cf8530f9d578708bf3724938ec16dc10afa5"
+  },
+  "output_tree_hash": "6e3ad0a6284819fec75ac980ec18544262a6bf26b8fa7ad67e3b1789b82c57fe",
+  "pipeline_id": "safeclaw-stage-b-20260908-01",
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf",
+  "schema_version": "1.0",
+  "stage": "mining",
+  "target_accepted_samples": 1
+}

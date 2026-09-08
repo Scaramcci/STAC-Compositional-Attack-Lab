@@ -49,6 +49,8 @@ from stac_attack_lab.interactions.safeclaw_collection import (
 )
 from stac_attack_lab.models.factory import build_model_client
 from stac_attack_lab.primitives.formal_registry import load_formal_registry
+from stac_attack_lab.prompts.loader import load_prompt
+from stac_attack_lab.recording.model_calls import ObservableModelCallRecorder
 
 
 class SampleGenerationConfig(StrictModel):
@@ -433,6 +435,14 @@ def _collection_components(
     attacker_model_config = RoleModelConfig.model_validate(
         load_simple_yaml(project_root / model_config_path)
     )
+    exact_secrets = [
+        env.get(attacker_model_config.api_key_env, ""),
+        env.get(str(victim_api_key_env), ""),
+        env.get(str(embedding_api_key_env), ""),
+    ]
+    model_call_path = (
+        project_root / config.output_root / config.library_version / "model_calls.jsonl"
+    )
     live_attacker = ModelConstructionAttacker(
         client=build_model_client(attacker_model_config),
         prompt_path=project_root / prompt_path,
@@ -443,6 +453,13 @@ def _collection_components(
         public_terminal_predicate_ids=config.public_terminal_predicate_ids,
         safety_constraint_ids=config.safety_constraint_ids,
         model_hash=stable_hash(attacker_model_config.model_dump(mode="json")),
+        recorder=ObservableModelCallRecorder(
+            path=model_call_path,
+            case_id=config.pipeline_id,
+            role="attacker",
+            prompt=load_prompt(project_root / prompt_path),
+            exact_secrets=exact_secrets,
+        ),
     )
     task_set_path, upstream_dir, safety_patch_path, bridge_path = required_paths[:4]
     if None in (task_set_path, upstream_dir, safety_patch_path, bridge_path):

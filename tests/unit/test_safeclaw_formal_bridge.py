@@ -264,5 +264,7 @@ def test_formal_bridge_delivers_action_through_task_runner_and_official_evaluato
     assert [item["kind"] for item in messages] == ["ready", "step", "finished"]
     assert received_sessions[0]["user_instruction"] == action["victim_visible_content"]
     assert messages[1]["tool_calls"] == [{"name": "memory.write"}]
+    assert messages[1]["response_observation"] == "observed_tool_call"
+    assert messages[1]["provider_usage_observation"] == "reported_nonzero"
     assert messages[2]["official_report"]["sessions"][0]["session_id"] == "s1"
     assert removed == [True]

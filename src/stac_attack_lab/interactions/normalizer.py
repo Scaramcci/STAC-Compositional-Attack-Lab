@@ -78,6 +78,21 @@ def _artifact_from_raw(raw: dict[str, Any], producer_event_id: str) -> Interacti
     )
 
 
+def _normalized_status_and_payload(raw: dict[str, Any]) -> tuple[PrimitiveOutcome, dict[str, Any]]:
+    status = PrimitiveOutcome(str(raw.get("status", "passed")))
+    payload = dict(raw.get("public_payload", {}))
+    if str(raw.get("operation")) != "extract_victim_response":
+        return status, payload
+    response = str(payload.get("response") or "").strip()
+    observation = str(payload.get("observation") or "")
+    if observation in {"empty_response", "timeout", "unknown"}:
+        return PrimitiveOutcome.not_observable, payload
+    if response in {"No response from OpenClaw.", "No response from agent."}:
+        payload["observation"] = "empty_response"
+        return PrimitiveOutcome.not_observable, payload
+    return status, payload
+
+
 def normalize_source_events(
     trajectory: RawInteractionTrajectory,
     source_events: list[dict[str, Any]],
@@ -108,6 +123,7 @@ def normalize_source_events(
             artifact_producers[artifact.artifact_id] = event_id
             artifacts.append(artifact)
             output_ids.append(artifact.artifact_id)
+        normalized_status, public_payload = _normalized_status_and_payload(raw)
         events.append(
             InteractionEvent(
                 event_id=event_id,
@@ -120,7 +136,7 @@ def normalize_source_events(
                 event_type=InteractionEventType(str(raw["event_type"])),
                 component_role=str(raw["component_role"]),
                 operation=str(raw["operation"]),
-                status=PrimitiveOutcome(str(raw.get("status", "passed"))),
+                status=normalized_status,
                 input_artifact_ids=[str(item) for item in raw.get("input_artifact_ids", [])],
                 output_artifact_ids=output_ids,
                 read_state_refs=[str(item) for item in raw.get("read_state_refs", [])],
@@ -129,7 +145,7 @@ def normalize_source_events(
                 post_state_ref=raw.get("post_state_ref"),
                 request_event_id=raw.get("request_event_id"),
                 lifecycle_id=raw.get("lifecycle_id"),
-                public_payload=dict(raw.get("public_payload", {})),
+                public_payload=public_payload,
                 evidence_ref_ids=[str(item) for item in raw.get("evidence_ref_ids", [])],
                 plan_id=raw.get("plan_id"),
                 plan_stage_id=raw.get("plan_stage_id"),

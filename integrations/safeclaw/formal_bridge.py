@@ -12,6 +12,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
+from stac_attack_lab.environments.safeclaw.observations import (
+    classify_explicit_error,
+    classify_provider_response,
+    observable_gateway_diagnostics,
+)
+from stac_attack_lab.environments.safeclaw.redaction import redact_value
+
 
 def _load_judge(upstream: Path) -> ModuleType:
     path = upstream / "scripts/judge.py"
@@ -69,6 +76,12 @@ def main() -> int:
     upstream = Path(args.upstream).resolve()
     task_path = Path(args.task).resolve()
     task = json.loads(task_path.read_text(encoding="utf-8"))
+    model_runtime = json.loads(Path(args.model_config).read_text(encoding="utf-8"))
+    exact_secrets = [
+        str(model_runtime.get(key) or "")
+        for key in ("api_key", "embedding_api_key")
+        if model_runtime.get(key)
+    ]
     sessions = {str(item["session_id"]): item for item in task["sessions"]}
     judge = _load_judge(upstream)
     judge._set_platform("openclaw")
@@ -180,8 +193,25 @@ def main() -> int:
             initialized_sessions.add(session_id)
             session_keys[session_id] = result.pop("_session_key")
             raw_api_response = result.pop("raw_api_response", {})
-            provider_usage = (
+            raw_provider_usage = (
                 raw_api_response.get("usage") if isinstance(raw_api_response, dict) else None
+            )
+            provider_usage = (
+                raw_provider_usage
+                if isinstance(raw_provider_usage, dict)
+                and any(
+                    isinstance(value, (int, float)) and value > 0
+                    for value in raw_provider_usage.values()
+                )
+                else None
+            )
+            gateway_diagnostics = observable_gateway_diagnostics(after_raw, exact_secrets)
+            classification = classify_provider_response(
+                raw_api_response,
+                result.get("agent_response"),
+                result.get("tool_calls"),
+                gateway_diagnostics=gateway_diagnostics,
+                exact_secrets=exact_secrets,
             )
             _merge_session_result(session_results, result)
             _emit(
@@ -192,12 +222,25 @@ def main() -> int:
                     "agent_response": result.get("agent_response", ""),
                     "tool_calls": result.get("tool_calls", []),
                     "provider_usage": provider_usage,
+                    "provider_usage_observation": (
+                        "reported_nonzero"
+                        if provider_usage is not None
+                        else "gateway_zero_or_missing_unverified"
+                    ),
+                    **classification,
+                    "gateway_diagnostics": gateway_diagnostics,
                     "public_state_before": before,
                     "public_state_after": _public_state(after_raw),
                 }
             )
     except Exception as exc:
-        _emit({"kind": "error", "error_category": type(exc).__name__})
+        _emit(
+            {
+                "kind": "error",
+                "error_category": classify_explicit_error(exc, type(exc).__name__),
+                "detail": str(redact_value(str(exc), exact_secrets).sanitized)[:1000],
+            }
+        )
         return 2
     finally:
         if runner is not None:

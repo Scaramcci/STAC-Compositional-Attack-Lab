@@ -209,6 +209,26 @@ class _RetryLoopAttacker(DeterministicConstructionAttacker):
         )
 
 
+class _FailedModelAttacker(DeterministicConstructionAttacker):
+    attacker_id = "failed-model-test-attacker"
+    last_failure_category = "construction_attacker_model_call_failed:provider_http_401"
+
+    def next_action(
+        self,
+        task: SourceInteractionTask,
+        manifest: Any,
+        observation: ConstructionObservation,
+        *,
+        seed: int,
+    ) -> ConstructionAttackerAction:
+        del task, manifest, observation, seed
+        return ConstructionAttackerAction(
+            action_id="model-error-stop",
+            action_type="stop",
+            rationale_summary="The model call failed closed.",
+        )
+
+
 class _FakeVictimDriver:
     driver_id = "fake-complete-victim"
 
@@ -475,6 +495,44 @@ def test_adaptive_collection_budgets_fail_closed(
     assert len(driver.actions) == 1
 
 
+def test_attacker_model_failure_is_not_recorded_as_complete(tmp_path: Path) -> None:
+    project, task_set = _task_project(tmp_path)
+    driver = _FakeVictimDriver()
+    adapter = SafeClawConstructionInteractionAdapter(
+        project_root=project,
+        task_set_path=task_set,
+        driver=driver,
+    )
+    task = adapter.inventory()[0]
+    attacker = _FailedModelAttacker(
+        objective_id="test-objective",
+        public_attack_goal="Exercise synthetic persistence.",
+        allowed_delivery_surfaces=["safeclaw_user_message"],
+        required_trust_boundary_crossings=["public-persistence"],
+        public_terminal_predicate_ids=["state_persisted"],
+        safety_constraint_ids=["synthetic_only"],
+        model_hash="fake-attacker",
+        prompt_hash="fake-prompt",
+    )
+
+    result = adapter.collect_adversarial(
+        task,
+        attacker.prepare(task, seed=7),
+        attacker,
+        seed=7,
+        budget=CollectionBudget(
+            max_sessions=1,
+            max_turns=1,
+            max_actions=1,
+            timeout_seconds=30,
+        ),
+    )
+
+    assert result.status == "partial"
+    assert result.failure_category == attacker.last_failure_category
+    assert driver.actions == []
+
+
 def test_construction_bridge_projects_only_token_usage() -> None:
     bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
     project_usage = bridge["_observable_usage"]
@@ -499,6 +557,100 @@ def test_construction_bridge_projects_only_token_usage() -> None:
         "output_tokens": 3,
         "total_tokens": 8,
     }
+
+
+def test_construction_bridge_classifies_empty_and_timeout_responses() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    classify = bridge["_classify_response"]
+
+    empty = classify(
+        {
+            "id": "response-1",
+            "choices": [
+                {
+                    "message": {
+                        "content": "No response from OpenClaw.",
+                        "reasoning_content": "must not be persisted",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+        },
+        "No response from OpenClaw.",
+        [],
+    )
+    timeout = classify(
+        {"timeout": True, "choices": [{"finish_reason": "timeout"}]},
+        "[TIMEOUT: Agent did not complete within the time limit]",
+        [],
+    )
+
+    assert empty["response_observation"] == "empty_response"
+    assert empty["provider_response_id"] == "response-1"
+    assert "reasoning_content" not in empty["provider_response_projection"]
+    assert "must not be persisted" not in empty["provider_response_projection"]
+    assert timeout["response_observation"] == "timeout"
+
+
+def test_construction_bridge_projects_explicit_gateway_auth_failure_without_secret() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    state = bridge["_observable_state"](
+        {
+            "gateway_log": (
+                "normal prompt line must not be retained\n"
+                "provider error HTTP 401 Authorization: Bearer secret-provider-token-123\n"
+            )
+        },
+        ["secret-provider-token-123"],
+    )
+    diagnostics = state["gateway_log_provenance"]
+    classified = bridge["_classify_response"](
+        {"choices": [{"finish_reason": "stop"}]},
+        "No response from OpenClaw.",
+        [],
+        diagnostics,
+        ["secret-provider-token-123"],
+    )
+
+    assert diagnostics["failure_category"] == "authentication_error"
+    assert diagnostics["diagnostic_line_count"] == 1
+    assert "normal prompt line" not in str(diagnostics)
+    assert "secret-provider-token-123" not in str(diagnostics)
+    assert classified["response_observation"] == "authentication_error"
+
+
+def test_construction_bridge_transcript_provenance_counts_without_retaining_text() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    provenance = bridge["_transcript_provenance"](
+        {
+            "session_transcript_raw": (
+                "ordinary line\n"
+                "TOOL_CALL:memory.search\n"
+                "TOOL_RESULT:synthetic result secret-provider-token-123\n"
+            )
+        },
+        ["secret-provider-token-123"],
+    )
+
+    assert provenance["line_count"] == 3
+    assert provenance["tool_call_lines"] == 1
+    assert provenance["tool_result_lines"] == 1
+    assert "secret-provider-token-123" not in str(provenance)
+
+
+@pytest.mark.parametrize(
+    ("detail", "expected"),
+    [
+        ("Gateway API error 401", "authentication_error"),
+        ("provider_http_429", "rate_limited"),
+        ("request timed out", "timeout"),
+        ("connection reset", "provider_or_gateway_error"),
+    ],
+)
+def test_safeclaw_explicit_error_classification(detail: str, expected: str) -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+
+    assert bridge["classify_explicit_error"](detail) == expected
 
 
 def test_construction_driver_rejects_unimplemented_surface_before_bridge_call() -> None:

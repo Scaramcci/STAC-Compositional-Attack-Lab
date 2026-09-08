@@ -21,7 +21,7 @@ index 466b14e..b4128df 100755
 
      p = _get_platform()
 
-@@ -458,13 +470,17 @@ def _apply_model_config(config_path: str):
+@@ -458,17 +470,30 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{cfg_path}','w'),indent=2)"
              f"\""
          )
@@ -31,16 +31,30 @@ index 466b14e..b4128df 100755
 
      # Write provider config to openclaw.json (models.providers.openai)
      if api_key and api_base_url:
++        is_gemini_openai = api_base_url.rstrip("/").endswith("/openai")
          provider_config = json.dumps({
 -            "baseUrl": api_base_url.rstrip("/") + "/v1",
 +            "baseUrl": (
 +                api_base_url.rstrip("/")
-+                if api_base_url.rstrip("/").endswith("/openai")
++                if is_gemini_openai
 +                else api_base_url.rstrip("/") + "/v1"
 +            ),
              "api": "openai-completions",
              "apiKey": api_key,
              "models": [{"id": model_id, "name": f"{model_id} (proxy)",
+                         "contextWindow": 200000, "maxTokens": 16384,
+                         "input": ["text"],
+                         "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+-                        "reasoning": False}],
++                        "reasoning": False,
++                        **({
++                            "compat": {
++                                "supportsStore": False,
++                                "supportsUsageInStreaming": False,
++                                "maxTokensField": "max_tokens",
++                                "supportsStrictMode": False,
++                            },
++                        } if is_gemini_openai else {})}],
 @@ -494,11 +510,84 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{config_path}','w'),indent=2)"
              f"\""

@@ -158,6 +158,49 @@ def test_unknown_memory_retrieval_does_not_create_state_dependency() -> None:
     assert graph.edges == []
 
 
+def test_legacy_empty_victim_response_is_not_normalized_as_passed() -> None:
+    trajectory = RawInteractionTrajectory(
+        trajectory_id="empty-response",
+        source_adapter_id="safeclaw",
+        source_adapter_version="1",
+        source_environment_family="safeclaw",
+        source_environment_version="1",
+        source_task_id="task",
+        source_split="synthetic",
+        episode_id="episode",
+        session_ids=["s1"],
+        event_refs=[],
+        checkpoint_refs=[],
+        provenance={},
+        model_hashes={},
+        config_hash="config",
+        collection_seed=1,
+        collection_status="complete",
+    )
+    graph, audit = normalize_source_events(
+        trajectory,
+        [
+            {
+                "event_id": "response-1",
+                "session_id": "s1",
+                "sequence_no": 1,
+                "actor_role": "victim_agent",
+                "event_type": "message",
+                "component_role": "agent_context",
+                "operation": "extract_victim_response",
+                "status": "passed",
+                "public_payload": {"response": "No response from OpenClaw."},
+                "evidence_ref_ids": ["bridge:s1:response"],
+            }
+        ],
+        audit_ref="empty-response-audit",
+    )
+
+    assert audit.passed is True
+    assert graph.events[0].status.value == "not_observable"
+    assert graph.events[0].public_payload["observation"] == "empty_response"
+
+
 def test_orphan_request_is_explicitly_unresolved() -> None:
     trajectory = RawInteractionTrajectory(
         trajectory_id="orphan-trajectory",

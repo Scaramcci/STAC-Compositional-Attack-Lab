@@ -12,6 +12,7 @@ from stac_attack_lab.interactions.base import SourceInteractionTask
 from stac_attack_lab.interactions.models import ConstructionManifest
 from stac_attack_lab.models.base import ModelCallError, ModelClient
 from stac_attack_lab.prompts.loader import PromptAsset, load_prompt
+from stac_attack_lab.recording.model_calls import ObservableModelCallRecorder
 
 
 class ConstructionObservation(StrictModel):
@@ -164,6 +165,7 @@ class ModelConstructionAttacker:
         public_terminal_predicate_ids: list[str],
         safety_constraint_ids: list[str],
         model_hash: str,
+        recorder: ObservableModelCallRecorder | None = None,
     ) -> None:
         self.client = client
         self.prompt: PromptAsset = load_prompt(prompt_path)
@@ -174,6 +176,8 @@ class ModelConstructionAttacker:
         self.public_terminal_predicate_ids = public_terminal_predicate_ids
         self.safety_constraint_ids = safety_constraint_ids
         self.model_hash = model_hash
+        self.recorder = recorder
+        self.last_failure_category: str | None = None
 
     def prepare(self, task: SourceInteractionTask, *, seed: int) -> ConstructionManifest:
         del seed
@@ -197,22 +201,36 @@ class ModelConstructionAttacker:
         *,
         seed: int,
     ) -> ConstructionAttackerAction:
+        self.last_failure_category = None
         payload = {
             "construction_task": task.model_dump(mode="json"),
             "construction_manifest": manifest.model_dump(mode="json"),
             "public_observation": observation.model_dump(mode="json"),
         }
         try:
-            value = self.client.generate(
-                [
-                    {"role": "system", "content": self.prompt.body},
-                    {"role": "user", "content": json.dumps(payload, sort_keys=True)},
-                ],
-                ConstructionAttackerAction,
-                seed=seed + observation.action_index,
-                timeout=60,
-            )
-        except ModelCallError:
+            messages = [
+                {"role": "system", "content": self.prompt.body},
+                {"role": "user", "content": json.dumps(payload, sort_keys=True)},
+            ]
+            if self.recorder is None:
+                value = self.client.generate(
+                    messages,
+                    ConstructionAttackerAction,
+                    seed=seed + observation.action_index,
+                    timeout=60,
+                )
+            else:
+                value = self.recorder.generate(
+                    self.client,
+                    messages,
+                    ConstructionAttackerAction,
+                    seed=seed + observation.action_index,
+                    timeout=60,
+                    lineage_refs=[task.source_task_id, manifest.construction_objective_id],
+                )
+        except ModelCallError as exc:
+            category = str(exc)[:80] or "unknown"
+            self.last_failure_category = f"construction_attacker_model_call_failed:{category}"
             return ConstructionAttackerAction(
                 action_id=f"model-error-stop-{observation.session_index}",
                 action_type="stop",
@@ -220,6 +238,7 @@ class ModelConstructionAttacker:
             )
         except ValidationError as exc:
             error_code = str(exc.errors()[0].get("type", "validation_error"))[:80]
+            self.last_failure_category = f"construction_attacker_schema_invalid:{error_code}"
             return ConstructionAttackerAction(
                 action_id=f"model-invalid-stop-{observation.session_index}",
                 action_type="stop",
@@ -229,19 +248,39 @@ class ModelConstructionAttacker:
                 ),
             )
         if not isinstance(value, ConstructionAttackerAction):
+            if self.recorder is not None:
+                self.recorder.mark_semantic_validation(
+                    passed=False, reason_codes=["response_type_mismatch"]
+                )
             raise TypeError("construction_attacker_response_type_mismatch")
         if (
             value.delivery_surface is not None
             and value.delivery_surface not in manifest.allowed_delivery_surfaces
         ):
+            if self.recorder is not None:
+                self.recorder.mark_semantic_validation(
+                    passed=False, reason_codes=["disallowed_surface"]
+                )
             raise ValueError("construction_attacker_used_disallowed_surface")
         if value.retry_id is not None and value.retry_id not in observation.legal_retry_ids:
+            if self.recorder is not None:
+                self.recorder.mark_semantic_validation(passed=False, reason_codes=["illegal_retry"])
             raise ValueError("construction_attacker_used_illegal_retry")
         if value.reroute_id is not None and value.reroute_id not in observation.legal_reroute_ids:
+            if self.recorder is not None:
+                self.recorder.mark_semantic_validation(
+                    passed=False, reason_codes=["illegal_reroute"]
+                )
             raise ValueError("construction_attacker_used_illegal_reroute")
         if (
             value.expected_public_predicate_id is not None
             and value.expected_public_predicate_id not in manifest.public_terminal_predicate_ids
         ):
+            if self.recorder is not None:
+                self.recorder.mark_semantic_validation(
+                    passed=False, reason_codes=["unknown_public_predicate"]
+                )
             raise ValueError("construction_attacker_referenced_unknown_public_predicate")
+        if self.recorder is not None:
+            self.recorder.mark_semantic_validation(passed=True, reason_codes=[])
         return value
