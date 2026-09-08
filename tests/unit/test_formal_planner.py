@@ -19,6 +19,7 @@ from stac_attack_lab.execution.sample_generation import (
 )
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.models.base import ModelClient
+from stac_attack_lab.planning.binding_planner import build_benchmark_binding
 from stac_attack_lab.planning.formal_base import (
     FormalBudget,
     FormalPlannerInput,
@@ -218,6 +219,69 @@ def test_selector_and_binding_use_only_public_compatible_fields(tmp_path: Path) 
     serialized = plan.model_dump_json().lower()
     assert "snapshot:memory-post" not in serialized
     assert "private_oracle" not in serialized
+
+
+def test_binding_rejects_ambiguous_task_components_instead_of_taking_first(
+    tmp_path: Path,
+) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    sample = planner_input.selected_sample
+    assert sample is not None
+    roles = dict(planner_input.public_task.component_roles)
+    roles["agent_context"] = ["sim:context-a", "sim:context-b"]
+    task = planner_input.public_task.model_copy(update={"component_roles": roles})
+
+    binding = build_benchmark_binding(sample.planner_view, task)
+
+    assert binding.binding_valid is False
+    assert any(
+        reason.startswith("ambiguous_component_role:agent_context:")
+        for reason in binding.validation_reason_codes
+    )
+
+
+def test_core_node_without_primary_role_does_not_fallback_to_first_macro(
+    tmp_path: Path,
+) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    sample = planner_input.selected_sample
+    assert sample is not None
+    core = sample.planner_view.core_nodes[0].model_copy(update={"primary_component_role": None})
+    view = sample.planner_view.model_copy(
+        update={"core_nodes": [core, *sample.planner_view.core_nodes[1:]]}
+    )
+
+    binding = build_benchmark_binding(view, planner_input.public_task)
+
+    assert binding.binding_valid is False
+    assert f"core_node_primary_component_missing:{core.node_id}" in binding.validation_reason_codes
+    assert core.node_id not in binding.node_component_mapping
+
+
+def test_macro_session_binding_uses_its_last_observed_core_occurrence(
+    tmp_path: Path,
+) -> None:
+    planner_input, _ = _planner_input(tmp_path)
+    sample = planner_input.selected_sample
+    assert sample is not None
+
+    binding = build_benchmark_binding(sample.planner_view, planner_input.public_task)
+
+    assert binding.binding_valid is True
+    for macro_node in sample.planner_view.macro_nodes:
+        annotated = sorted(
+            (
+                core
+                for core in sample.planner_view.core_nodes
+                if macro_node.macro_primitive_ref in core.macro_annotations
+            ),
+            key=lambda item: item.position,
+        )
+        assert annotated
+        assert (
+            binding.node_session_mapping[macro_node.node_id]
+            == binding.node_session_mapping[annotated[-1].node_id]
+        )
 
 
 def test_missing_capability_or_slot_causes_rejection_or_abstention(tmp_path: Path) -> None:

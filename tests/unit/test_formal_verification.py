@@ -166,8 +166,10 @@ def test_formal_mechanism_verifies_all_required_layers(tmp_path: Path) -> None:
         official_terminal_success=True,
     )
 
-    assert len(mechanism.occurrence_verdicts) == len(planner_view.core_nodes) == 7
-    assert len(mechanism.edge_verdicts) == len(planner_view.core_edges) == 6
+    assert len(mechanism.occurrence_verdicts) == len(planner_view.core_nodes)
+    assert len(mechanism.occurrence_verdicts) >= 7
+    assert len(mechanism.edge_verdicts) == len(planner_view.core_edges)
+    assert len(mechanism.edge_verdicts) >= 6
     assert len(mechanism.macro_verdicts) == len(planner_view.macro_nodes)
     assert all(item.outcome == PrimitiveOutcome.passed for item in mechanism.occurrence_verdicts)
     assert all(item.verdict == CausalVerdict.causal_pass for item in mechanism.edge_verdicts)

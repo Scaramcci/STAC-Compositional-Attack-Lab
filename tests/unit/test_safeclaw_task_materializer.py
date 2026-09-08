@@ -93,6 +93,34 @@ def test_task_adapter_physically_separates_public_and_private_fields() -> None:
     assert descriptor.official_success_condition_hash
 
 
+@pytest.mark.parametrize(
+    "relative_path, expected_dimension",
+    [
+        ("integrations/safeclaw/upstream/SafeClawArena/tasks/pse/pse-2.1-001.json", "PSE"),
+        ("integrations/safeclaw/upstream/SafeClawArena/tasks/cdf/cdf-3.1-001.json", "CDF"),
+    ],
+)
+def test_official_task_adapter_preserves_oracle_hash_across_dimensions(
+    relative_path: str,
+    expected_dimension: str,
+) -> None:
+    path = ROOT / relative_path
+    source = json.loads(path.read_text(encoding="utf-8"))
+
+    descriptor = parse_safeclaw_task(path, upstream_root=ROOT)
+
+    assert descriptor.track == SafeClawTrack.conformance
+    assert descriptor.dimension == expected_dimension
+    assert descriptor.source_hash
+    assert descriptor.official_success_condition_hash == stable_hash(
+        source["evaluation"]["success_condition"]
+    )
+    assert descriptor.official_safe_condition_hash == stable_hash(
+        source["evaluation"]["safe_condition"]
+    )
+    assert "evaluation" not in descriptor.public_view.model_dump_json()
+
+
 def test_task_adapter_accepts_separate_public_formal_overlay(tmp_path: Path) -> None:
     task = json.loads(TASK.read_text(encoding="utf-8"))
     formal_overlay = task.pop("formal_experiment")

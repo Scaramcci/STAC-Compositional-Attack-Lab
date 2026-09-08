@@ -1,6 +1,6 @@
 # 项目实施计划
 
-核查日期：2026-09-08（Asia/Shanghai）；源码基线：`820cbf6`。
+核查日期：2026-09-08（Europe/Berlin）；源码基线：`c3fd41a6`；阶段 A Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
 
 本文件定义剩余工作、依赖和验收；[IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) 是唯一当前进度快照。本版替代此前反复追加的恢复指令，旧内容保留在 Git 历史中；不删除历史实验数据。
 
@@ -18,11 +18,9 @@
 
 有证据的正常、部分或阻断路径可以成为 sample；计划、请求意图不能冒充实际效果。部分路径可用不等于持久化/跨会话机制成立，也不自动适用于每个 Planner 条件。
 
-### 当前最重要的语义迁移
+### 当前语义契约
 
-G5、mining 调用策略与 library audit 仍把入库绑定到 adversarial、completed 和 observed terminal，与上述设计冲突。
-
-W01/W03 必须先写正反回归，再同步修改 schema、filter、builder、audit、freeze、public/execution views 和报告。不能仅设置 `require_attack_relevance=False` 或删除检查让旧库通过。保留真实性、依赖完整性、来源/hash 和泄漏防护；将“适合哪个正式条件”独立为 selection/eligibility 门。
+阶段 A 已解除 G5、mining 与 library audit 对 adversarial、completed 和 observed terminal 的入库捆绑，并同步修改 schema、filter、builder、audit、public/execution views 和报告。真实性、依赖完整性、来源/hash、shortcut 和泄漏防护仍保留；“适合哪个正式条件”由独立 selection/eligibility 门控制。
 
 旧库不原地改写。从旧 raw 重算到新派生目录，记录源 hash、parser/registry/策略版本、迁移原因。正式评测前固定策略，不能根据结果临时改变标准。
 
@@ -42,16 +40,16 @@ W01/W03 必须先写正反回归，再同步修改 schema、filter、builder、a
 | ID | 当前状态 | 工作与主要位置 | 依赖 | 验收 |
 |---|---|---|---|---|
 | W00 | verified | 当前代码、测试、产物盘点；两份状态文档 | 无 | 当前基线与历史证据分开；retry23 纳入；不声称服务器实时状态已验证 |
-| W01 | in_progress | 三维契约/版本：`interactions/models.py`、`datasets/primitive_chain.py`、contracts、schemas、协议 | W00 | 正常/受阻/部分/完整可表达；样本质量不等于攻击成功；版本兼容与迁移测试通过 |
+| W01 | verified | 三维契约/版本：`interactions/models.py`、`datasets/primitive_chain.py`、contracts、schemas、协议 | W00 | v3.1 sample/record 可表达 trace、structure、evidence、behavior、attack relevance、official outcome、eligibility；兼容迁移与回归通过 |
 | W02 | in_progress | 观测：`interactions/safeclaw_collection.py`、construction、collector、recording、两 bridge | W01 | 真实 call/session ID；请求与结果关联；异常前事件保留；多次 retrieval 不丢失；writer/reader/artifact parents 可追溯；缺失标 unknown |
-| W03 | in_progress | normalizer、extraction、chain_builder、library、sample_generation、CLI | W01,W02 | 有证据的非成功子图可入库；必要多前驱保留；局部无关缺失不全图否决；伪造引用仍拒绝；mine/audit/freeze 一致；同源同版本重算稳定 |
-| W04 | pending | SafeClaw task_adapter/materializer、两 bridge、任务集、采集入口 | W01,W02 | 字段级允许面、合法任务/官方字段 hash 保持；PSE 与另一类有限任务正反测试；人提交动作同样校验记录；不支持明确拒绝 |
-| W05 | in_progress | planning/binding_planner、formal_llm、formal_baselines、prompts | W03,W04 | 无无依据首组件 fallback；同任务不同 sample 映射可解释；不同任务合法绑定不同；能力门；LLM/fallback 来源显式 |
-| W06 | in_progress | formal_attacker、formal_action_loop、safeclaw_formal、配置/prompts | W05 | 保留已有 LLM no-sample；同模型/任务/目标/预算/注入面，无 sample 信息泄漏；一次动作可产生多个 observed primitive；ablation 从锁定 treatment 派生并核对实际请求 |
-| W07 | in_progress | verification、reporting、两 bridge | W02,W04,W06 | pinned 官方 evaluator 对接实际 state；官方失败/有效 sample、官方成功/机制未知、拒绝、API 错误独立报告；分母明确，配对统计按 task 聚类 |
+| W03 | verified | normalizer、extraction、chain_builder、library、sample_generation、CLI | W01,W02 | 有证据的非成功子图可入库；filter/audit/freeze 保留真实性与 hash/依赖门；两批旧 raw 只读重算稳定通过 |
+| W04 | in_progress | SafeClaw task_adapter/materializer、两 bridge、任务集、采集入口 | W01,W02 | PSE/CDF 官方 hash 隔离回归；字段级不支持 delivery surface 在 bridge 前 fail-closed；真实 upstream/image 尚待 B |
+| W05 | verified | planning/binding_planner、formal_llm、formal_baselines、prompts | W03,W04 | 多组件角色拒绝；macro 会话绑定到最后一个有依据的 core occurrence；无首组件/任意会话 fallback；来源显式 |
+| W06 | in_progress | formal_attacker、formal_action_loop、safeclaw_formal、配置/prompts | W05 | no-sample 与 sample 输入隔离、动作/预算校验、ablation provenance 回归通过；Victim 请求未运行 |
+| W07 | in_progress | verification、reporting、两 bridge | W02,W04,W06 | interaction/official/mechanism outcome 分开统计；CSV/Markdown 与配对分母回归通过；pinned evaluator 真实 state 尚待 B |
 | W08 | in_progress | model_config、Ark proxy、preflight、patch | W00；真实验证需 W02 | 角色服务分离；upstream/image/patch/config hash；宿主→容器→OpenClaw indexing/search 分层验证；服务可达不等于检索链证实 |
 | W09 | blocked | 有预算真实 collection、建库、配对 smoke、正式评测 | B 需 W01-W04/W08；配对另需 W05-W07 | 先过 A；范围/预算确认；真实来源可抽查；停止条件生效；满足相应门才扩大，不无限 retry |
-| W10 | in_progress | README、协议、指南、tmux runbook、配置说明、schemas、计划/进度 | 按阶段依赖前述 | 命令/版本/路径与能力一致；教师可追溯过程；代码就绪、实验完成、假设成立分别交付 |
+| W10 | in_progress | schemas、计划/进度与阶段 B 草案 | 按阶段依赖前述 | 阶段 A schema/文档已完成；真实运行证据与最终交付仍待 B/C |
 
 W09 阻塞不能成为 W01-W07 停工理由。无服务器或 API 授权时继续离线代码、fixture、负例、报告与命令校验。
 
@@ -65,11 +63,46 @@ W09 阻塞不能成为 W01-W07 停工理由。无服务器或 API 授权时继�
 4. 完成 W04-W07 可离线验证的注入面、绑定、对照隔离、verifier 和报告；复用已有 no-sample 实现。
 5. focused tests 后做最终 `make check`、schema 一致性检查和 `git diff --check`；更新 W10，准备 Linux 实际运行命令、预算草案和证据清单。
 
+### 阶段 A 当前交付证据（2026-09-08）
+
+- `make check`：ruff format/lint 通过，mypy `64 source files` 通过，pytest `136 passed`，无 skip；focused 回归 `69 passed`。
+- schema 已由 `make schemas` 重生成；`git diff --check` 通过。未提交/未推送。
+- 旧 raw 只读重算到 `experiments/safeclaw_v3_smoke/stage-a-recompute-20260908/retry22/` 与 `retry23/`。两批 source hash 校验通过，audit `passed=true`，旧 raw/冻结库未覆盖。
+- 两批各 `candidate=1, accepted=1, negative=0, attempt_outcome=partial`；accepted 为 `sample_version=3.1`、`trace_status=partial`、`sample_status=usable`、`behavior_outcome=unknown`、`official_attack_outcome=not_evaluated`，eligibility 不含 `formal_attack_primary`。
+- runtime 未验证：真实 provider tool-result/retrieval/session、upstream/container/image、embedding/模型服务、官方 evaluator 实际 state、treatment/no-sample 配对与费用；不得由离线结果推断。
+
 **A 完成条件**：工程变更与离线回归通过，所有 runtime 未验证项明确，B 配置草案可检查。不代表 W08/W09 或整个项目完成。需用户决定的研究选择须明确提出，不自行改变研究假设；可独立工作继续完成。
 
 ### 阶段 B：有限真实验证（单独确认预算）
 
-启动前记录：服务器/目录、任务/split、各角色模型、允许出口/注入面、run/config hash、轨迹数、整批调用/token/费用上限、逐条/整批超时、重试总数、日志、tmux socket/session。retry23 的预算仅是历史参考，不能视为本轮授权。
+启动前记录：服务器/目录、任务/split、各角色模型、允许出口/注入面、run/config hash、轨迹数、整批调用/token/费用上限、逐条/整批超时、重试总数、日志、tmux socket/session。以下仅是待用户确认的最小草案，不是授权；retry23 的预算不能视为本轮授权。
+
+**阶段 B 草案（不执行，等待确认）**
+
+范围：一台已批准 Linux 主机；先核验 `pse-2.1-001`（PSE）与一条 CDF/非 PSE 任务的 adapter/materializer。真实 collection 只选一条已声明支持的 PSE construction task；未确认角色服务、出口和预算前，不调用模型/embedding，不启动 Victim。
+
+```bash
+cd /absolute/path/stac-compositional-attack-lab
+git -C integrations/safeclaw/upstream/SafeClawArena rev-parse HEAD
+docker image inspect openclaw-env:2026.3.12 >/dev/null
+make check
+bash scripts/run_safeclaw_sample_collection.sh \
+  --config configs/sample_generation/safeclaw_v3_smoke_retry23.yaml \
+  --preflight-only
+bash scripts/run_formal_evaluation.sh \
+  --run-id stage-b-preflight-<unique> \
+  --preflight-only
+```
+
+预检通过后，另建唯一 `stage-b-<date>-<nonce>` 目录和独立 tmux socket。先运行一条正常/阻断交互和一条授权 benchmark 对抗交互，各 `1 seed`、各 `1 trajectory`，保存 raw/source events/checkpoints、脱敏 bridge log、usage unknown 与 hash。只在 sample audit 通过后运行最小 matched `assigned_sample`/`no_sample`，保持同 task/seed/model/goal/budget/surface；缺合格输入或 binding invalid 即停。
+
+预算上限草案（整批硬上限，待确认）：
+
+- collection：最多 `2 trajectories`，每条 `3 sessions / 24 actions / 16 tool calls / 8,192 tokens / 20 min`。
+- matched smoke：`2 conditions × 1 task × 1 seed = 2 cases`，每 case `3 sessions / 24 turns / 16 tool calls / 8,192 tokens / 20 min`，最多 `2 attempts`。
+- 整批：最多 `2` 条 collection trajectory 加 `2 cases × 2 attempts`，即最多 `6` 个实际执行 attempt、声明 token cap `49,152`、墙钟 cap `120 min`；费用 cap 必须由用户填写后才可启动。provider usage 缺失仍按这些上限停，不把 0 当零费用。
+
+停止条件：upstream/patch/image/hash 不匹配；bridge 协议或 tool-result/retrieval 无法验证；一次启动、空响应、认证或协议故障；sample audit 不通过；binding invalid；任一预算上限达到。触发后保留已发生片段，不自动扩大或重试。
 
 1. 核对 pinned upstream、patch、镜像、依赖，补跑缺 upstream 的测试。仅执行本阶段批准的基础设施探针。
 2. 默认提议一条正常或阻断交互、一条授权 benchmark 对抗交互，各一个 seed；先验证实际响应与检索观测，不扩大任务/预算。

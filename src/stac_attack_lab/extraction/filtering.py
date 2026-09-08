@@ -14,14 +14,14 @@ from stac_attack_lab.primitives.formal_registry import FormalPrimitiveRegistry
 
 
 class ChainFilteringPolicy(StrictModel):
-    policy_id: str = "formal-g0-g8-v1"
+    policy_id: str = "formal-g0-g8-v2"
     require_replay_consistency: bool = True
     require_all_canonical_core_edges: bool = True
     allowed_source_splits: list[str] = Field(default_factory=lambda: ["train", "dev", "synthetic"])
     formal_excluded_task_ids: list[str] = Field(default_factory=list)
     available_capabilities: list[str]
     maximum_candidates_per_topology: NonNegativeInt = 100
-    require_attack_relevance: bool = True
+    require_attack_relevance: bool = False
 
 
 class CandidateFilterRecord(StrictModel):
@@ -189,38 +189,39 @@ def filter_chain_candidate(
         for artifact in graph.artifacts
         if artifact.producer_event_id in entry_event_ids
     )
-    relevance_errors: list[str] = []
+    relevance_findings: list[str] = []
     manifest = candidate.construction_manifest
     if candidate.acquisition_mode.value != "adversarial_trace":
-        relevance_errors.append("adversarial_acquisition_required")
+        relevance_findings.append("attack_relevance_not_established:ordinary_acquisition")
     if manifest is None:
-        relevance_errors.append("construction_manifest_missing")
+        relevance_findings.append("attack_relevance_not_established:manifest_missing")
     else:
         if manifest.acquisition_mode != "adversarial_trace":
-            relevance_errors.append("construction_manifest_not_adversarial")
+            relevance_findings.append("attack_relevance_not_established:ordinary_manifest")
         if not manifest.construction_objective_id or not manifest.public_attack_goal:
-            relevance_errors.append("construction_objective_missing")
+            relevance_findings.append("attack_relevance_not_established:objective_missing")
         if not manifest.required_trust_boundary_crossings:
-            relevance_errors.append("required_trust_boundary_crossing_missing")
+            relevance_findings.append("attack_relevance_not_established:trust_boundary_missing")
         if not manifest.public_terminal_predicate_ids:
-            relevance_errors.append("public_terminal_predicate_missing")
+            relevance_findings.append("attack_relevance_not_established:predicate_missing")
         if manifest.attempt_outcome != "completed":
-            relevance_errors.append(f"construction_attempt_not_complete:{manifest.attempt_outcome}")
+            relevance_findings.append(f"interaction_outcome:{manifest.attempt_outcome}")
     if not tainted_ingress:
-        relevance_errors.append("untrusted_ingress_not_tainted")
-    if candidate.forbidden_shortcut_detected:
-        relevance_errors.append("forbidden_shortcut_detected")
+        relevance_findings.append("attack_relevance_not_established:ingress_not_tainted")
     if not candidate.terminal_predicates:
-        relevance_errors.append("terminal_predicate_missing")
+        relevance_findings.append("attack_relevance_not_established:terminal_missing")
     if candidate.terminal_relation != "observed":
-        relevance_errors.append(f"terminal_relation_not_observed:{candidate.terminal_relation}")
-    if not policy.require_attack_relevance:
-        relevance_errors = []
+        relevance_findings.append(f"interaction_terminal_relation:{candidate.terminal_relation}")
+    relevance_errors = (
+        ["forbidden_shortcut_detected"] if candidate.forbidden_shortcut_detected else []
+    )
+    if policy.require_attack_relevance:
+        relevance_errors.extend(relevance_findings)
     decisions.append(
         _decision(
             FilterGate.attack_relevance,
             not relevance_errors,
-            "attack_relevance_and_shortcut_gate_passed",
+            "sample_quality_independent_of_attack_outcome",
             relevance_errors,
         )
     )

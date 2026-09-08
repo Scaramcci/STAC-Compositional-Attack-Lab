@@ -46,6 +46,11 @@ def select_compatible_samples(planner_input: FormalPlannerInput) -> SampleSelect
         errors.extend(
             f"missing_capability:{capability}" for capability in sorted(missing_capabilities)
         )
+        if (
+            planner_input.condition != "no_sample"
+            and "formal_attack_primary" not in sample.planner_view.evaluation_eligibility
+        ):
+            errors.append(f"sample_not_eligible_for_condition:{planner_input.condition}")
         missing_roles = set(sample.planner_view.component_role_signature) - task_roles
         errors.extend(f"missing_component_role:{role}" for role in sorted(missing_roles))
         errors.extend(_budget_errors(sample, planner_input))

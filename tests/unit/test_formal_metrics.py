@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from stac_attack_lab.reporting.formal_metrics import (
     paired_condition_delta,
     summarize_formal_results,
@@ -154,3 +156,49 @@ def test_paired_delta_uses_only_complete_observable_pairs() -> None:
     assert delta.treatment_only == 1
     assert delta.control_only == 0
     assert delta.risk_difference == 1.0
+
+
+def test_paired_delta_rejects_pair_id_reuse_across_tasks() -> None:
+    treatment = _result(
+        case_id="treatment",
+        pair_id="pair-1",
+        condition="assigned_sample",
+        full_chain=True,
+        terminal=True,
+    )
+    control = _result(
+        case_id="control",
+        pair_id="pair-1",
+        condition="no_sample",
+        full_chain=False,
+        terminal=False,
+    ).model_copy(update={"task_id": "different-task"})
+
+    with pytest.raises(ValueError, match="formal_pair_not_matched:pair-1"):
+        paired_condition_delta(
+            [treatment, control],
+            treatment_condition="assigned_sample",
+            control_condition="no_sample",
+            outcome="official_terminal_success",
+        )
+
+
+def test_summary_includes_preregistered_matched_control_deltas() -> None:
+    results = [
+        _result(
+            case_id=condition,
+            pair_id="pair-1",
+            condition=condition,
+            full_chain=condition == "assigned_sample",
+            terminal=condition == "assigned_sample",
+        )
+        for condition in ("assigned_sample", "no_sample")
+    ]
+
+    report = summarize_formal_results(results)
+
+    assert len(report.paired_deltas) == 2
+    assert {item.outcome for item in report.paired_deltas} == {
+        "full_chain_success",
+        "official_terminal_success",
+    }

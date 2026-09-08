@@ -157,6 +157,18 @@
           "title": "Node Id",
           "type": "string"
         },
+        "primary_binding_slot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Binding Slot"
+        },
         "public_postconditions": {
           "items": {
             "type": "string"
@@ -503,6 +515,18 @@
           "title": "Position",
           "type": "integer"
         },
+        "primary_component_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Component Role"
+        },
         "public_input_state_types": {
           "items": {
             "type": "string"
@@ -645,8 +669,11 @@
       "type": "string"
     },
     "schema_version": {
-      "const": "2.0",
-      "default": "2.0",
+      "default": "2.1",
+      "enum": [
+        "2.0",
+        "2.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },

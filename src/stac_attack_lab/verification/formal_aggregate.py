@@ -480,6 +480,7 @@ def aggregate_formal_result(
         ),
         execution_error=execution_error,
         execution_error_category=execution_error_category,
+        interaction_outcome=episode.status.value,
         not_observable_count=mechanism.not_observable_count,
         tool_calls=tool_calls,
         tokens=tokens,

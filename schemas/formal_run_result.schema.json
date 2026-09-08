@@ -628,6 +628,21 @@
       "title": "Full Chain Success",
       "type": "boolean"
     },
+    "interaction_outcome": {
+      "default": "unknown",
+      "enum": [
+        "completed",
+        "rejected",
+        "blocked",
+        "timeout",
+        "environment_error",
+        "api_error",
+        "invalid_binding",
+        "unknown"
+      ],
+      "title": "Interaction Outcome",
+      "type": "string"
+    },
     "library_version": {
       "title": "Library Version",
       "type": "string"

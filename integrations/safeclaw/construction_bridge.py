@@ -20,6 +20,8 @@ from typing import Any
 
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
 
+SUPPORTED_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
+
 
 def _load_judge(upstream: Path) -> ModuleType:
     path = upstream / "scripts/judge.py"
@@ -175,6 +177,8 @@ def main() -> int:
                 continue
             if action_type != "deliver_message":
                 raise RuntimeError("safeclaw_bridge_action_not_executable")
+            if action.get("delivery_surface") not in SUPPORTED_DELIVERY_SURFACES:
+                raise RuntimeError("safeclaw_bridge_delivery_surface_not_implemented")
             session_index += 1
             session = {
                 "session_id": f"construction-s{session_index}",

@@ -316,6 +316,13 @@ def _public_core_views(
                     | ({"state_ref"} if occurrence.post_state_refs else set())
                 ),
                 session_id=session_id,
+                primary_component_role=(
+                    occurrence.target_component_roles[0]
+                    if len(occurrence.target_component_roles) == 1
+                    else occurrence.source_component_roles[0]
+                    if len(occurrence.source_component_roles) == 1
+                    else None
+                ),
                 session_boundary_before=(
                     previous_session is not None and session_id != previous_session
                 ),
@@ -385,6 +392,7 @@ def _macro_views(
                     if arc.target_id in occurrence_ids
                 ],
                 binding_slots=spec.binding_slots,
+                primary_binding_slot=spec.binding_slots[-1] if spec.binding_slots else None,
                 allowed_outcomes=list(PrimitiveOutcome),
                 evidence_requirement=[
                     EvidenceGrade.direct,

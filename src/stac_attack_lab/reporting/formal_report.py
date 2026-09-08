@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from pathlib import Path
 
 from stac_attack_lab.recording.events import read_jsonl
@@ -11,6 +12,38 @@ from stac_attack_lab.recording.formal_run_recorder import (
 )
 from stac_attack_lab.reporting.formal_metrics import summarize_formal_results
 from stac_attack_lab.verification.formal_models import FormalRunResult
+
+
+def _official_outcome(result: FormalRunResult) -> str:
+    if not result.official_verdict.execution_complete:
+        return "not_evaluated"
+    if result.official_verdict.attack_succeeded is True:
+        return "success"
+    if result.official_verdict.attack_succeeded is False:
+        return "failure"
+    return "not_evaluated"
+
+
+def _mechanism_outcome(result: FormalRunResult) -> str:
+    if result.execution_error:
+        return "error"
+    if result.sample_id is None:
+        return "not_evaluated"
+    if result.not_observable_count:
+        return "unknown"
+    if (
+        result.all_required_occurrences_passed
+        and result.all_required_edges_passed
+        and result.all_required_macros_passed
+        and result.action_lineage_complete
+        and not result.forbidden_shortcut
+    ):
+        return "success"
+    return "failure"
+
+
+def _count(values: list[str]) -> dict[str, int]:
+    return dict(sorted(Counter(values).items()))
 
 
 def build_formal_report(run_root: Path) -> dict[str, object]:
@@ -29,12 +62,18 @@ def build_formal_report(run_root: Path) -> dict[str, object]:
     for result in results:
         for gap in result.official_verdict.instrumentation_gaps:
             gap_counts[gap] = gap_counts.get(gap, 0) + 1
+    outcome_counts = {
+        "interaction": _count([result.interaction_outcome for result in results]),
+        "official_attack": _count([_official_outcome(result) for result in results]),
+        "mechanism": _count([_mechanism_outcome(result) for result in results]),
+    }
     payload: dict[str, object] = {
         "schema_version": "2.0",
         "run_id": manifest.run_id,
         "result_count": len(results),
         "metrics": metrics.model_dump(mode="json"),
         "instrumentation_gap_counts": dict(sorted(gap_counts.items())),
+        "outcome_counts": outcome_counts,
         "provenance": {
             "config_hash": manifest.config_hash,
             "library_version": manifest.library_version,
@@ -63,6 +102,9 @@ def build_formal_report(run_root: Path) -> dict[str, object]:
                 "seed",
                 "task_id",
                 "binding_valid",
+                "interaction_outcome",
+                "official_attack_outcome",
+                "mechanism_outcome",
                 "full_chain_success",
                 "official_terminal_success",
                 "forbidden_shortcut",
@@ -91,6 +133,9 @@ def build_formal_report(run_root: Path) -> dict[str, object]:
                     "forbidden_shortcut": result.forbidden_shortcut,
                     "execution_error": result.execution_error,
                     "not_observable_count": result.not_observable_count,
+                    "interaction_outcome": result.interaction_outcome,
+                    "official_attack_outcome": _official_outcome(result),
+                    "mechanism_outcome": _mechanism_outcome(result),
                     "duration_ms": result.duration_ms,
                     "cost": result.cost,
                 }
@@ -117,6 +162,18 @@ def build_formal_report(run_root: Path) -> dict[str, object]:
     ):
         rate = "NA" if metric.rate is None else f"{metric.rate:.4f}"
         lines.append(f"| {label} | {metric.numerator} | {metric.denominator} | {rate} |")
+    lines.extend(
+        [
+            "",
+            "## Outcome Separation",
+            "",
+            "| Dimension | Outcome | Count |",
+            "|---|---|---:|",
+        ]
+    )
+    for dimension, counts in outcome_counts.items():
+        for outcome, count in counts.items():
+            lines.append(f"| {dimension} | {outcome} | {count} |")
     lines.extend(
         [
             "",

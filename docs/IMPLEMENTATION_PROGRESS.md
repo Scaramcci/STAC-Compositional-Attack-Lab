@@ -1,99 +1,82 @@
 # 项目实施进度
 
-核查日期：2026-09-08（Asia/Shanghai）；源码基线：`820cbf6`（update the plan）。
+核查日期：2026-09-08（Europe/Berlin）；源码基线：`c3fd41a6`；阶段 A Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
 
-本文件是唯一当前进度快照；依赖与验收见 [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md)。本轮只更新这两份文档，没有修改源码、启动 Goal、调用实验模型、运行服务器 collection/evaluation 或提交/推送 Git。
+本文件是唯一当前进度快照；依赖、验收和阶段 B 草案见 [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md)。本轮仅完成离线工程阶段 A：未调用模型或 embedding，未启动真实 Victim，未操作外部目标，未读取密钥，未覆盖旧 raw 或冻结库，未 commit/push。
 
 ## 1. 当前结论
 
-**已有工程骨架和较多离线测试，但质量门未通过，尚无本轮可确认的真实正式闭环。下一步是离线修复，不是继续扩大 collection。**
+**阶段 A 已达到离线完成条件；W08/W09、真实实验和研究假设仍未验证，等待用户确认阶段 B。**
 
-- 本机 `make check` 在格式检查处失败；独立 mypy 通过，pytest 为 **121 passed、3 skipped**。旧记录的“124 passed/全门通过”不能当作当前结果。
-- 原设计允许有证据的部分/受阻 sample；当前 G5 与 library audit 仍要求 completed/terminal observed。代码与研究契约冲突必须先解决。
-- bridge 当前返回空 retrieval 列表与 `memory_retrieval_observation="unknown"`。保留 unknown 正确，但不能声称真实检索链已证实。
-- Planner 仍有首组件选择与 core node 回退首个 macro mapping；LLM no-sample 执行代码则已经存在，不能继续标为完全未实现。
-- 本地有旧文档漏记的 retry23：partial、12 actions、17 source events、action budget exhausted；其目录下未发现 mining manifest。retry22 的 mining 为 candidate=1、accepted=0、negative=1。
-- 本机缺少 upstream checkout 和正式配置指定的 `safeclaw-main` 冻结库。历史 Linux Docker/preflight 通过不等于当前本机/服务器环境已验证。
+- 质量门已修复：`make check` 全部通过，pytest 为 **136 passed、0 skipped**。
+- sample v3.1 已将样本质量、交互行为、攻击相关性、官方攻击结果和 evaluation eligibility 分开；部分/阻断/正常的有证据子图可以入库，但不会自动进入正式攻击主分析。
+- filter、builder、library audit 共同重算并校验这些状态；伪造引用、必要依赖缺失、shortcut、来源/hash 不一致仍拒绝，未通过关闭真实性门换 accepted 数量。
+- observation 保留全部显式 retrieval 及 parent/evidence/request lineage；不可观测 recall 仍为 unknown。tool request、observed effect 和执行结果不再混作成功。
+- Planner 不再取第一个 component 或任意 macro/session fallback；多组件角色明确拒绝，macro 会话来自最后一个有观测依据的 core occurrence。
+- formal report 分开 interaction、official attack 与 mechanism outcome，并对 matched task/seed 条件做配对校验与 delta；不匹配 pair 明确拒绝。
+- 构造 bridge 实际只支持 `safeclaw_user_message`。配置中声明但尚未实现的 local sink/new-session delivery 不再静默降级为用户消息，而是在 bridge/Victim 前 fail-closed。
 
 ## 2. 本轮实测
 
-审查开始时工作区干净。以下在本地 macOS checkout 执行，不是 Linux 服务器运行证明。
-
 | 检查 | 结果 | 说明 |
 |---|---|---|
-| `git rev-parse --short HEAD` | `820cbf6` | 当前源码基线 |
-| `make check` | 失败，exit 2 | ruff format 发现 `src/stac_attack_lab/cli.py` 未格式化；后续 make 步骤未执行 |
-| `.venv/bin/ruff check .` | 失败 | `cli.py:58`、`:62` 两处 E501 |
-| `.venv/bin/python -m mypy src` | 通过 | 64 source files |
-| `PYTHONPATH=src .venv/bin/python -m pytest -q -rs` | 121 passed、3 skipped | 4.74 秒；upstream 未安装导致跳过，不能算通过 |
-| skip 位置 | 2+1 个 | `tests/unit/test_safeclaw_embedding_config.py:72` 两个；`test_safeclaw_formal_bridge.py:50` 一个 |
-| upstream 路径 | 不存在 | `integrations/safeclaw/upstream/SafeClawArena` |
-| 正式库路径 | 不存在 | `data/primitive_libraries/frozen/safeclaw-main` |
+| `git rev-parse --short HEAD` | `c3fd41a6` | 修改前源码基线；工作区有本轮未提交改动 |
+| focused pytest | 69 passed | 三维契约、观测、mining/audit、Planner、配对、报告、task materializer |
+| `make check` | 通过 | ruff format/check、mypy、pytest 均执行 |
+| ruff | 通过 | 106 files formatted；lint 无问题 |
+| mypy | 通过 | 64 source files |
+| pytest | 136 passed、0 skipped | 4.92 秒；本工作区 pinned upstream 存在，因此相关测试未 skip |
+| `make schemas` | 通过 | v3.1 sample/record 与 formal result schemas 已重生成 |
+| `git diff --check` | 通过 | 无 whitespace error |
 
-没有核查远端进程；服务器是否有正在计费任务为 **unknown**。恢复前查实际 tmux socket/session、PID、日志和 manifest，不能重复启动。不能因本机缺路径便推断服务器也缺失。
+这些是当前本地 Linux 工作区的离线结果，不是服务器、容器、provider 或真实 Victim 运行证明。
 
-## 3. 工作包现状
+## 3. 工作包状态
 
-| 工作包 | 状态 | 已存在的实现/证据 | 剩余验收 |
-|---|---|---|---|
-| W00 盘点 | verified | 本轮代码、测试、retry21-23 核对 | 下次修改后刷新基线 |
-| W01 契约 | in_progress | sample schema 有 3.0，其他 manifest/view 仍有 2.x | 三维结果贯通、版本兼容，不仅是 v3 命名 |
-| W02 观测 | in_progress | partial 保留、零动作降级、unknown retrieval 分支 | 真实 call/session/retrieval lineage，多事件完整性 |
-| W03 抽取/审计 | in_progress | CLI、candidate hash 绑定、重复检查与拒绝记录 | 修正完整终点对样本质量的一票否决；保留真实性门，DAG/迁移一致 |
-| W04 注入面 | pending | task adapter/materializer 已有 | 字段级正确性、多类任务、人提交动作同规则待验收 |
-| W05 Planner | in_progress | LLM/rule planner、binding 已有 | 无依据 fallback、结构差异与能力门回归 |
-| W06 对照 | in_progress | ModelNoSampleAttacker、runner 接线和输入/动作校验 | 全链路公平预算、实际请求、ablation provenance |
-| W07 评测 | in_progress | verifier/reporting 及测试骨架 | pinned 官方真实验证、机制分离、分母和可复算统计 |
-| W08 环境 | in_progress | 角色独立变量、Ark proxy、历史记录 | 当前服务器/容器 indexing/search 未验证，本机 upstream 缺失 |
-| W09 真实闭环 | blocked | 历史 partial raw 存在 | A 修复→B 有预算真实验证→C 批准正式运行 |
-| W10 交付 | in_progress | 本轮统一两份文档 | 实现后同步 README/协议/runbook/schema |
-
-### 关键源码定位
-
-路径相对于 `src/stac_attack_lab/`，除非另有说明。
-
-- `extraction/filtering.py`：`require_attack_relevance` 默认 True；G5 要求 adversarial、completed、terminal predicates 和 observed terminal。
-- `execution/sample_generation.py`：显式传入 `require_attack_relevance=True`；不能只改这里，漏掉 library audit。
-- `datasets/library.py`：candidate hash 关联与重复检查是已有正确保护；后续仍有 `accepted_sample_attempt_not_complete`、`accepted_sample_terminal_not_observed`、`accepted_sample_terminal_predicate_missing` 和 adversarial-only 限制。
-- `integrations/safeclaw/construction_bridge.py`（仓库根目录下）：响应分支显式返回 retrieval unknown，只证明当前接口不可观测。
-- `interactions/safeclaw_collection.py`：显式 retrieval 分支只取列表第一个元素，需覆盖多检索事件；没有真实事实时不能推断补齐。
-- `planning/binding_planner.py`：`components[0]` 与 `next(iter(macro_component_mapping.values()), None)` 仍在；必须检验/修复映射依据。
-- `execution/formal_attacker.py`、`execution/safeclaw_formal.py`：已有 LLM no-sample 生成和接线；下一步是信息隔离、公平性及执行证据，不是重新实现一套。
-
-## 4. 运行产物索引
-
-以下是本地已有历史产物的读取结果，不是本轮启动的运行。目录日期不等于本轮核实的真实执行时间。
-
-共同前缀：`experiments/safeclaw_v3_smoke/`。raw 在对应 `interactions/raw/<collection-id>/trajectories/<trajectory-id>/raw_trajectory.json`，事件在同目录 `source_events.jsonl`。
-
-| 产物目录 | 可核实结果 | 结论边界 |
+| 工作包 | 状态 | 阶段 A 证据 / 剩余边界 |
 |---|---|---|
-| `retry21-generated/safeclaw-v3-smoke-retry21-v3/` | raw 写 complete/completed，provenance 却为 0 action/turn/session，events 0 行 | 历史空轨迹状态不可信；后续修复不改写原文件 |
-| `retry22-generated/safeclaw-v3-smoke-retry22-v3/` | partial；6 actions、2 turns、2 sessions、11 events；`construction_consecutive_retry_guard_exhausted` | 有部分记录，不是完整机制证明 |
-| 同上 `sample_generation_manifest.json` | candidate=1、accepted=0、negative=1，attempt partial=1 | 旧语义下抽取结果，不能直接推出部分路径无研究价值 |
-| `retry23-generated/safeclaw-v3-smoke-retry23-v3/` | partial；12 actions、2 turns、2 sessions、17 events；`construction_action_budget_exhausted` | 尚未闭环；未发现 mining manifest，accepted 数不能写成 0 或 1 |
-| `retry20-split-audit/` | 旧文档记载严格重算与 split 审计 | 可作为回归输入，不是新协议下已验证正式库 |
-| `data/primitive_libraries/frozen/safeclaw-v3-smoke-retry10-v3/`（仓库根目录下） | 旧文档记载 frozen 后被较新 audit 拒绝 | 本轮未重跑该 audit；不能直接代替当前正式输入 |
+| W00 | verified | 当前源码、测试、历史 retry22/23 与 upstream 已重新盘点 |
+| W01 | verified | v3.1 三维状态与兼容 schema、正反回归通过 |
+| W02 | in_progress | 多 retrieval/lineage/unknown/attempted 回归通过；真实 provider 粒度待 B |
+| W03 | verified | 部分路径建库、audit 一致性、隔离幂等重算通过 |
+| W04 | in_progress | 字段 allowlist、PSE/CDF 官方 hash、未实现 surface fail-closed；真实 bridge 待 B |
+| W05 | verified | component/session 映射有明确依据，无任意 fallback |
+| W06 | in_progress | no-sample 信息隔离、预算/动作门、ablation provenance 通过；真实请求待 B |
+| W07 | in_progress | 三类 outcome、分母和 matched delta 通过；官方 evaluator 实际 state 待 B |
+| W08 | in_progress | 代码/配置在；当前服务器、镜像、patch、indexing/search 和服务可达性未验证 |
+| W09 | blocked | 需要用户另行确认阶段 B 的服务器、出口、模型与费用预算 |
+| W10 | in_progress | 阶段 A schemas/文档/阶段 B 草案已更新；真实运行与最终交付待 B/C |
 
-retry22 的 ID 含 `20260909`、retry23 含 `20260910`，晚于本轮环境日期 2026-09-08。保留原 ID，不纠正或伪造原始时间；服务器时钟/命名来源待核对。以内容 hash 和 provenance 为依据，不以日期或编号证明成功。
+## 4. 隔离重算证据
 
-retry22/23 provenance 的 token/tool-call 数为 0；这不足以证明没有调用或费用，预算计数完整性须单独验证。
+旧 raw 仅只读，新的派生产物位于：
 
-`configs/experiments/formal_evaluation.yaml` 指向缺失的 `safeclaw-main` 库，条件是 assigned_sample/no_sample/dependency_ablation。配置存在、执行开关为 true 不代表执行过或完成。
+- `experiments/safeclaw_v3_smoke/stage-a-recompute-20260908/retry22/`
+- `experiments/safeclaw_v3_smoke/stage-a-recompute-20260908/retry23/`
 
-## 5. 下一次从这里继续
+两批在处理前均通过 collection/source hash 校验；各为 `candidate=1, accepted=1, negative=0, attempt_outcome=partial`，audit 均 `passed=true`。
 
-**执行阶段 A，不开新 retry。**
+| 来源 | mining manifest hash | library tree hash | sample 状态 |
+|---|---|---|---|
+| retry22 | `2739f3abc4170c4705a2279757e9e6b6058d91353850df80eeee9751acd1be71` | `ddc8c09940220e4a96fa410c3b8d280548f7bd18cd476818922ac248c3229fd6` | partial / usable / official not_evaluated |
+| retry23 | `708641e2493ffed11efe12ce55a29067c4ca0989da91a93295fb0c33349778f4` | `757cbcadc3943b1e7ff6d7da6a735228c58426307c84eec1c8f146638bc1d899` | partial / usable / official not_evaluated |
 
-1. 核对 Git diff 与版本，修 `cli.py` 质量门。缺 upstream 的 3 个测试保留明确说明，不能通过删除 skip 冒充覆盖。
-2. 按对齐计划的三维契约写失败回归，联动 schema→filter→builder→audit/freeze→report；保留来源、hash、依赖和泄漏保护。部分 sample 的可用性与正式条件 eligibility 分开。
-3. 修复结构化事件、必要前驱和 Planner 无依据 fallback；fixture/历史 raw 只读重算，输出到新目录。
-4. 补 W04-W07 离线验收和文档；最终质量门通过后提交阶段 B 具体服务器命令/预算，等待确认。
+两条 sample 均为 `structure=valid, evidence=observed, behavior=unknown, attack_relevance=established`，eligibility 为 `mechanism_analysis/adversarial_sample/partial_path_analysis`，明确不含 `formal_attack_primary`。它们不是完整持久化、跨会话 recall 或官方攻击成功的证据，也未 freeze。
 
-不恢复旧“先修 retry5 apply_model_config”“保持 Goal 无限续跑”“必须得到 completed terminal 才能做其他工程”等指令。它们已不适合作为当前恢复点。
+## 5. 运行时未验证项
 
-## 6. 续接记录
+- construction bridge 仍无法从 pinned upstream 获得结构化 tool-result/retrieval stream；真实 recall 必须在 B 中观察到明确事件，否则保持 unknown。
+- 未核对实际 Linux 服务器的 upstream commit、镜像、patch 应用、容器生命周期、宿主到 OpenClaw 的 indexing/search 链。
+- 未验证模型/embedding endpoint、role separation、token usage 与费用；本轮没有读取环境变量或密钥。
+- 未运行真实 normal/blocked collection、adversarial collection、官方 evaluator、matched assigned-sample/no-sample 或 dependency ablation。
+- 正式配置仍指向 `data/primitive_libraries/frozen/safeclaw-main`；阶段 A 新库未冻结且不应替换它。
 
-每批更新上述唯一当前状态，并在此留短记录：日期/HEAD、工作包、变更文件、测试/skip、证据路径、下一步。运行时另写 run ID、主机、命令、tmux/PID、日志、预算、超时和停止条件。长历史留在 Git/实验目录，不再重复复制。
+## 6. 下一步：等待阶段 B 确认
 
-- 2026-09-08 / `820cbf6`：审计并重写计划与进度；补 retry23、实际质量门、语义冲突、环境差异及日期异常。仅改两份文档，未改变代码或实验数据。下一步：阶段 A。
+工作计划已给出可复制的预检命令和最小预算草案：先一条正常/阻断、一条授权对抗，各一个 seed；audit 通过后才做同 task/seed/model/goal/budget/surface 的两条件 matched smoke。含每个 smoke case 最多两次 attempt 时，整批草案上限为 6 个实际执行 attempt、49,152 declared tokens、120 分钟墙钟，费用上限仍需用户填写。
+
+确认前不执行预检中会启动容器/Victim 的命令，不调用任何付费服务。阶段 B 若遇 upstream/patch/image/hash 不匹配、协议/检索不可验证、一次基础设施故障、audit/binding 失败或预算触顶，立即停并保留已有片段，不自动扩大。
+
+## 7. 续接记录
+
+- 2026-09-08 / `c3fd41a6`：完成阶段 A 实现、回归、schema 与 retry22/23 只读隔离重算；`136 passed, 0 skipped`。阶段 B 未启动，等待明确授权与费用预算。

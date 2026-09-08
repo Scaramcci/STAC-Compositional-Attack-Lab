@@ -560,11 +560,16 @@ def _validate_mining_stage(
     return stage
 
 
-def mine_sample_collection(project_root: Path, collection_root: Path) -> Path:
+def mine_sample_collection(
+    project_root: Path,
+    collection_root: Path,
+    *,
+    output_root: Path | None = None,
+) -> Path:
     collection_root = collection_root.resolve()
     collection_stage = _validate_collection_stage(collection_root)
     config = collection_stage.config
-    build_root = collection_root.parents[2]
+    build_root = output_root.resolve() if output_root is not None else collection_root.parents[2]
     mining_stage_path = build_root / MINING_STAGE_MANIFEST
     if mining_stage_path.is_file():
         _validate_mining_stage(
@@ -574,6 +579,9 @@ def mine_sample_collection(project_root: Path, collection_root: Path) -> Path:
         return build_root / "library"
     normalized_root = build_root / "interactions/normalized"
     extraction_root = build_root / "extraction"
+    if output_root is not None and build_root.exists() and any(build_root.iterdir()):
+        raise ValueError("sample_mining_output_not_empty")
+    build_root.mkdir(parents=True, exist_ok=True)
     library_root = build_root / "library"
     registry = load_formal_registry(project_root / config.registry_path)
     if registry.registry_hash != collection_stage.registry_hash:
@@ -631,7 +639,7 @@ def mine_sample_collection(project_root: Path, collection_root: Path) -> Path:
         occurrences_by_graph,
         registry,
         ChainFilteringPolicy(
-            require_attack_relevance=True,
+            require_attack_relevance=False,
             allowed_source_splits=config.allowed_source_splits,
             formal_excluded_task_ids=config.formal_excluded_task_ids,
             available_capabilities=config.available_capabilities,

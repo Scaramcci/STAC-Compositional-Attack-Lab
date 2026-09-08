@@ -59,6 +59,16 @@ def test_raw_to_library_build_has_physically_separated_views(tmp_path: Path) -> 
     assert "prompt" not in execution_payload.lower()
     assert "SYNTHETIC_MARKER" not in execution_payload
     accepted_payload = (library_path / "accepted_samples.jsonl").read_text(encoding="utf-8")
+    accepted = json.loads(accepted_payload.splitlines()[0])
+    assert accepted["schema_version"] == "3.1"
+    assert accepted["trace_status"] == "complete"
+    assert accepted["structure_status"] == "valid"
+    assert accepted["evidence_status"] == "observed"
+    assert accepted["sample_status"] == "usable"
+    assert accepted["official_attack_outcome"] == "not_evaluated"
+    assert accepted["attack_relevance"] == "established"
+    assert "formal_attack_primary" in accepted["evaluation_eligibility"]
+    assert "success" not in accepted["evaluation_eligibility"]
     assert '"planner_view":' not in accepted_payload
     assert '"execution_view":' not in accepted_payload
     assert '"private_evidence_view":' not in accepted_payload
@@ -150,6 +160,46 @@ def test_explicit_sample_stages_are_hash_bound_resume_safe_and_model_free(
     frozen = freeze_audited_sample_library(library_root, version, project_root)
     assert frozen == project_root / "data/primitive_libraries/frozen" / version
     assert audit_primitive_library(frozen) == []
+
+
+def test_mining_can_recompute_read_only_raw_into_isolated_output(tmp_path: Path) -> None:
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
+    config = base.model_copy(
+        update={
+            "library_version": "isolated-recompute-v1",
+            "output_root": str(tmp_path / "generated"),
+        }
+    )
+    collection_root = collect_sample_interactions(ROOT, config)
+    source_bytes = {
+        path: path.read_bytes() for path in collection_root.rglob("*") if path.is_file()
+    }
+    output_root = tmp_path / "isolated-recompute"
+
+    library_root = mine_sample_collection(
+        ROOT,
+        collection_root,
+        output_root=output_root,
+    )
+
+    assert library_root == output_root / "library"
+    assert audit_primitive_library(library_root) == []
+    assert source_bytes == {
+        path: path.read_bytes() for path in collection_root.rglob("*") if path.is_file()
+    }
+    assert mine_sample_collection(ROOT, collection_root, output_root=output_root) == library_root
+
+
+def test_isolated_mining_rejects_nonempty_untracked_output(tmp_path: Path) -> None:
+    base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
+    config = base.model_copy(update={"output_root": str(tmp_path / "generated")})
+    collection_root = collect_sample_interactions(ROOT, config)
+    output_root = tmp_path / "nonempty"
+    output_root.mkdir()
+    (output_root / "unrelated.txt").write_text("preserve", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="sample_mining_output_not_empty"):
+        mine_sample_collection(ROOT, collection_root, output_root=output_root)
 
 
 def test_mining_rejects_tampered_collection(tmp_path: Path) -> None:

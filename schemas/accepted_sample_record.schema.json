@@ -1,10 +1,95 @@
 {
+  "$defs": {
+    "AttackRelevance": {
+      "enum": [
+        "established",
+        "not_established",
+        "unknown"
+      ],
+      "title": "AttackRelevance",
+      "type": "string"
+    },
+    "BehaviorOutcome": {
+      "enum": [
+        "allowed",
+        "blocked",
+        "error",
+        "unknown"
+      ],
+      "title": "BehaviorOutcome",
+      "type": "string"
+    },
+    "CandidateAcquisitionMode": {
+      "enum": [
+        "ordinary_trace",
+        "adversarial_trace",
+        "generated",
+        "composed"
+      ],
+      "title": "CandidateAcquisitionMode",
+      "type": "string"
+    },
+    "OfficialAttackOutcome": {
+      "enum": [
+        "success",
+        "failure",
+        "not_evaluated",
+        "error"
+      ],
+      "title": "OfficialAttackOutcome",
+      "type": "string"
+    },
+    "SampleEvidenceStatus": {
+      "enum": [
+        "observed",
+        "inferred",
+        "insufficient"
+      ],
+      "title": "SampleEvidenceStatus",
+      "type": "string"
+    },
+    "SampleStatus": {
+      "enum": [
+        "usable",
+        "quarantined"
+      ],
+      "title": "SampleStatus",
+      "type": "string"
+    },
+    "StructureStatus": {
+      "enum": [
+        "valid",
+        "partial",
+        "invalid"
+      ],
+      "title": "StructureStatus",
+      "type": "string"
+    },
+    "TraceStatus": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked",
+        "rejected",
+        "error",
+        "unknown"
+      ],
+      "title": "TraceStatus",
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "acquisition_mode": {
-      "const": "adversarial_trace",
-      "title": "Acquisition Mode",
-      "type": "string"
+      "$ref": "#/$defs/CandidateAcquisitionMode"
+    },
+    "attack_relevance": {
+      "$ref": "#/$defs/AttackRelevance",
+      "default": "unknown"
+    },
+    "behavior_outcome": {
+      "$ref": "#/$defs/BehaviorOutcome",
+      "default": "unknown"
     },
     "chain_hash": {
       "title": "Chain Hash",
@@ -22,6 +107,17 @@
       "title": "Dataset Version",
       "type": "string"
     },
+    "evaluation_eligibility": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evaluation Eligibility",
+      "type": "array"
+    },
+    "evidence_status": {
+      "$ref": "#/$defs/SampleEvidenceStatus",
+      "default": "observed"
+    },
     "execution_view_hash": {
       "title": "Execution View Hash",
       "type": "string"
@@ -29,6 +125,10 @@
     "observation_schema_version": {
       "title": "Observation Schema Version",
       "type": "string"
+    },
+    "official_attack_outcome": {
+      "$ref": "#/$defs/OfficialAttackOutcome",
+      "default": "not_evaluated"
     },
     "planner_view_hash": {
       "title": "Planner View Hash",
@@ -54,13 +154,21 @@
       "title": "Sample Id",
       "type": "string"
     },
+    "sample_status": {
+      "$ref": "#/$defs/SampleStatus",
+      "default": "usable"
+    },
     "sample_version": {
       "title": "Sample Version",
       "type": "string"
     },
     "schema_version": {
-      "const": "2.1",
-      "default": "2.1",
+      "default": "3.1",
+      "enum": [
+        "2.1",
+        "3.0",
+        "3.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -74,6 +182,14 @@
       },
       "title": "Source Task Ids",
       "type": "array"
+    },
+    "structure_status": {
+      "$ref": "#/$defs/StructureStatus",
+      "default": "valid"
+    },
+    "trace_status": {
+      "$ref": "#/$defs/TraceStatus",
+      "default": "unknown"
     },
     "validation_hash": {
       "title": "Validation Hash",

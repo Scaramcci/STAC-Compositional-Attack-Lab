@@ -45,6 +45,7 @@ from stac_attack_lab.interactions.safeclaw_collection import (
     ConstructionVictimStep,
     SafeClawConstructionInteractionAdapter,
     SafeClawConstructionTask,
+    SafeClawSubprocessVictimDriver,
 )
 from stac_attack_lab.planning.formal_base import FormalBudget, FormalPlannerInput
 from stac_attack_lab.planning.formal_baselines import RuleBasedFormalPlanner
@@ -498,6 +499,38 @@ def test_construction_bridge_projects_only_token_usage() -> None:
         "output_tokens": 3,
         "total_tokens": 8,
     }
+
+
+def test_construction_driver_rejects_unimplemented_surface_before_bridge_call() -> None:
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget(
+        max_sessions=1,
+        max_turns=1,
+        max_actions=1,
+        max_events=10,
+        timeout_seconds=30,
+    )
+    driver._started_at = 0.0
+    bridge_called = False
+
+    def unexpected_bridge_call(value: dict[str, Any]) -> dict[str, Any]:
+        del value
+        nonlocal bridge_called
+        bridge_called = True
+        return {}
+
+    driver._send_bridge = unexpected_bridge_call
+    action = ConstructionAttackerAction(
+        action_id="unsupported-surface",
+        action_type="deliver_message",
+        delivery_surface="safeclaw_local_action_sink",
+        public_message="Authorized synthetic content.",
+        rationale_summary="Exercise the declared but unimplemented surface.",
+    )
+
+    with pytest.raises(ValueError, match="delivery_surface_not_implemented"):
+        driver.apply(action)
+    assert bridge_called is False
 
 
 def _valid_realization(attacker_input: Any) -> FormalAttackRealization:

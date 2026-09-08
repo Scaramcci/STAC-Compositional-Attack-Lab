@@ -37,6 +37,8 @@ from stac_attack_lab.interactions.models import (
 )
 from stac_attack_lab.interactions.normalizer import normalize_source_events
 
+SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
+
 
 class SafeClawConstructionTask(StrictModel):
     source_task_id: str
@@ -534,6 +536,11 @@ class SafeClawSubprocessVictimDriver:
             raise RuntimeError("safeclaw_construction_driver_not_started")
         if self._started_at is None:
             raise RuntimeError("safeclaw_construction_wall_clock_not_started")
+        if (
+            action.action_type == "deliver_message"
+            and action.delivery_surface not in SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES
+        ):
+            raise ValueError("safeclaw_construction_delivery_surface_not_implemented")
         remaining_wall_time = self._budget.max_wall_time_seconds - (monotonic() - self._started_at)
         if remaining_wall_time <= 0:
             raise TimeoutError("construction_wall_time_budget_exhausted")
@@ -649,43 +656,54 @@ class SafeClawSubprocessVictimDriver:
                     },
                 }
             )
-        if (
-            self._new_session_pending
-            and isinstance(explicit_retrievals, list)
-            and explicit_retrievals
-        ):
-            retrieval = explicit_retrievals[0] if isinstance(explicit_retrievals[0], dict) else {}
-            retrieved_hash = str(
-                retrieval.get("content_hash") or stable_hash(post_state.get("memory_content", ""))
-            )
-            retrieved_parents = retrieval.get("parent_artifact_ids", [])
-            if not isinstance(retrieved_parents, list):
-                retrieved_parents = []
-            source_events.append(
-                {
-                    "event_id": f"state-read-memory-{action.action_id}-{action_nonce}",
-                    "session_id": session_id,
-                    "sequence_no": self._next_sequence(),
-                    "actor_role": "victim_system",
-                    "event_type": "state_read",
-                    "component_role": "persistent_memory",
-                    "operation": "memory_retrieve_later_session",
-                    "status": "passed",
-                    "read_state_refs": [memory_state_ref],
-                    "output_artifacts": [
-                        {
-                            "artifact_id": f"artifact-recall-{action.action_id}",
-                            "artifact_type": "recalled_state",
-                            "content_hash": retrieved_hash,
-                            "parent_artifact_ids": [str(item) for item in retrieved_parents],
-                            "taint_labels": ["synthetic", "persistent"],
-                            "trust_label": "derived",
-                            "source_ref_ids": [f"checkpoint:{session_id}:memory"],
-                        }
-                    ],
-                    "evidence_ref_ids": [f"checkpoint:{session_id}:memory"],
-                }
-            )
+        if isinstance(explicit_retrievals, list):
+            for retrieval_index, raw_retrieval in enumerate(explicit_retrievals):
+                if not isinstance(raw_retrieval, dict):
+                    continue
+                retrieval_id = str(
+                    raw_retrieval.get("retrieval_id")
+                    or f"{action.action_id}-{action_nonce}-{retrieval_index}"
+                )
+                retrieved_hash = str(
+                    raw_retrieval.get("content_hash")
+                    or stable_hash(post_state.get("memory_content", ""))
+                )
+                retrieved_parents = raw_retrieval.get("parent_artifact_ids", [])
+                if not isinstance(retrieved_parents, list):
+                    retrieved_parents = []
+                evidence_refs = raw_retrieval.get("evidence_ref_ids", [])
+                if not isinstance(evidence_refs, list) or not evidence_refs:
+                    evidence_refs = [f"bridge:{session_id}:memory_retrieval:{retrieval_id}"]
+                source_events.append(
+                    {
+                        "event_id": f"state-read-memory-{retrieval_id}",
+                        "session_id": session_id,
+                        "sequence_no": self._next_sequence(),
+                        "actor_role": "victim_system",
+                        "event_type": "state_read",
+                        "component_role": "persistent_memory",
+                        "operation": (
+                            "memory_retrieve_later_session"
+                            if self._new_session_pending
+                            else "memory_retrieve"
+                        ),
+                        "status": "passed",
+                        "read_state_refs": [memory_state_ref],
+                        "request_event_id": raw_retrieval.get("request_event_id"),
+                        "output_artifacts": [
+                            {
+                                "artifact_id": f"artifact-recall-{retrieval_id}",
+                                "artifact_type": "recalled_state",
+                                "content_hash": retrieved_hash,
+                                "parent_artifact_ids": [str(item) for item in retrieved_parents],
+                                "taint_labels": ["synthetic", "persistent"],
+                                "trust_label": "derived",
+                                "source_ref_ids": [str(item) for item in evidence_refs],
+                            }
+                        ],
+                        "evidence_ref_ids": [str(item) for item in evidence_refs],
+                    }
+                )
         self._new_session_pending = False
         response_text = str(session.get("agent_response", ""))
         response_artifact_id = f"artifact-response-{stable_hash(response_text)[:16]}-{action_nonce}"
@@ -716,16 +734,19 @@ class SafeClawSubprocessVictimDriver:
             }
         )
         tool_calls = session.get("tool_calls", [])
+        tool_call_event_ids: list[str] = []
         for index, tool_call in enumerate(tool_calls if isinstance(tool_calls, list) else []):
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
             provider_call_id = str(call_payload.get("id", "")) or None
+            tool_call_event_id = (
+                f"tool-call-{provider_call_id}"
+                if provider_call_id
+                else f"tool-call-{action.action_id}-{action_nonce}-{index}"
+            )
+            tool_call_event_ids.append(tool_call_event_id)
             source_events.append(
                 {
-                    "event_id": (
-                        f"tool-call-{provider_call_id}"
-                        if provider_call_id
-                        else f"tool-call-{action.action_id}-{action_nonce}-{index}"
-                    ),
+                    "event_id": tool_call_event_id,
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "actor_role": "victim_agent",
@@ -772,8 +793,8 @@ class SafeClawSubprocessVictimDriver:
                     "post_state_ref": f"{state_ref}:{after}",
                     "write_state_refs": [state_ref],
                     "request_event_id": (
-                        f"tool-call-{action.action_id}-{action_nonce}-{len(tool_calls) - 1}"
-                        if name == "external" and tool_calls
+                        tool_call_event_ids[0]
+                        if name == "external" and len(tool_call_event_ids) == 1
                         else None
                     ),
                     "evidence_ref_ids": [f"checkpoint:{session_id}:{name}"],

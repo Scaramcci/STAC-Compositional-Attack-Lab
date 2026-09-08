@@ -17,6 +17,52 @@ class CandidateAcquisitionMode(StrEnum):
     composed = "composed"
 
 
+class TraceStatus(StrEnum):
+    complete = "complete"
+    partial = "partial"
+    blocked = "blocked"
+    rejected = "rejected"
+    error = "error"
+    unknown = "unknown"
+
+
+class StructureStatus(StrEnum):
+    valid = "valid"
+    partial = "partial"
+    invalid = "invalid"
+
+
+class SampleEvidenceStatus(StrEnum):
+    observed = "observed"
+    inferred = "inferred"
+    insufficient = "insufficient"
+
+
+class SampleStatus(StrEnum):
+    usable = "usable"
+    quarantined = "quarantined"
+
+
+class BehaviorOutcome(StrEnum):
+    allowed = "allowed"
+    blocked = "blocked"
+    error = "error"
+    unknown = "unknown"
+
+
+class OfficialAttackOutcome(StrEnum):
+    success = "success"
+    failure = "failure"
+    not_evaluated = "not_evaluated"
+    error = "error"
+
+
+class AttackRelevance(StrEnum):
+    established = "established"
+    not_established = "not_established"
+    unknown = "unknown"
+
+
 class FilterGate(StrEnum):
     schema_type = "G0"
     occurrence_evidence = "G1"
@@ -47,6 +93,7 @@ class ChainNode(StrictModel):
     allowed_outcomes: list[PrimitiveOutcome]
     evidence_requirement: list[EvidenceGrade]
     required_for_full_chain: bool = True
+    primary_binding_slot: str | None = None
 
 
 class ChainEdge(StrictModel):
@@ -67,7 +114,7 @@ class ChainEdge(StrictModel):
 
 
 class PrimitiveChainCandidate(StrictModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["2.0", "2.1"] = "2.1"
     candidate_id: str
     chain_id: str
     registry_hash: str
@@ -132,6 +179,7 @@ class PublicCoreNode(StrictModel):
     session_boundary_before: bool = False
     optional: bool = False
     macro_annotations: list[str] = Field(default_factory=list)
+    primary_component_role: str | None = None
 
 
 class PublicCoreEdge(StrictModel):
@@ -162,6 +210,7 @@ class PlannerSampleView(StrictModel):
     budget_profile: dict[str, PositiveInt]
     fallback_node_ids: list[str]
     evidence_strength: Literal["direct", "deterministic", "interventional", "mixed"]
+    evaluation_eligibility: list[str] = Field(default_factory=list)
 
 
 class ExecutionBindingView(StrictModel):
@@ -202,7 +251,7 @@ class SampleValidationSummary(StrictModel):
 
 
 class PrimitiveChainSample(StrictModel):
-    schema_version: Literal["3.0"] = "3.0"
+    schema_version: Literal["3.0", "3.1"] = "3.1"
     sample_id: str
     sample_version: str
     dataset_version: str
@@ -220,6 +269,14 @@ class PrimitiveChainSample(StrictModel):
     validation: SampleValidationSummary
     source_split: str
     source_task_ids: list[str]
+    trace_status: TraceStatus = TraceStatus.unknown
+    structure_status: StructureStatus = StructureStatus.valid
+    evidence_status: SampleEvidenceStatus = SampleEvidenceStatus.observed
+    sample_status: SampleStatus = SampleStatus.usable
+    behavior_outcome: BehaviorOutcome = BehaviorOutcome.unknown
+    attack_relevance: AttackRelevance = AttackRelevance.unknown
+    official_attack_outcome: OfficialAttackOutcome = OfficialAttackOutcome.not_evaluated
+    evaluation_eligibility: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_view_identity(self) -> PrimitiveChainSample:
@@ -235,7 +292,7 @@ class PrimitiveChainSample(StrictModel):
 
 
 class AcceptedSampleRecord(StrictModel):
-    schema_version: Literal["2.1"] = "2.1"
+    schema_version: Literal["2.1", "3.0", "3.1"] = "3.1"
     sample_id: str
     sample_version: str
     dataset_version: str
@@ -246,7 +303,7 @@ class AcceptedSampleRecord(StrictModel):
     registry_hash: str
     observation_schema_version: str
     construction_pipeline_version: str
-    acquisition_mode: Literal["adversarial_trace"]
+    acquisition_mode: CandidateAcquisitionMode
     validation_level: str
     validation_hash: str
     planner_view_hash: str
@@ -254,6 +311,15 @@ class AcceptedSampleRecord(StrictModel):
     private_evidence_hash: str
     source_split: str
     source_task_ids: list[str]
+    trace_status: TraceStatus = TraceStatus.unknown
+    structure_status: StructureStatus = StructureStatus.valid
+    evidence_status: SampleEvidenceStatus = SampleEvidenceStatus.observed
+    sample_status: SampleStatus = SampleStatus.usable
+    behavior_outcome: BehaviorOutcome = BehaviorOutcome.unknown
+    official_attack_outcome: OfficialAttackOutcome = OfficialAttackOutcome.not_evaluated
+    evaluation_eligibility: list[str] = Field(default_factory=list)
+
+    attack_relevance: AttackRelevance = AttackRelevance.unknown
 
 
 class SampleLibraryManifest(StrictModel):

@@ -1,5 +1,24 @@
 {
   "$defs": {
+    "AttackRelevance": {
+      "enum": [
+        "established",
+        "not_established",
+        "unknown"
+      ],
+      "title": "AttackRelevance",
+      "type": "string"
+    },
+    "BehaviorOutcome": {
+      "enum": [
+        "allowed",
+        "blocked",
+        "error",
+        "unknown"
+      ],
+      "title": "BehaviorOutcome",
+      "type": "string"
+    },
     "BindingSlot": {
       "additionalProperties": false,
       "properties": {
@@ -207,6 +226,18 @@
           "title": "Node Id",
           "type": "string"
         },
+        "primary_binding_slot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Binding Slot"
+        },
         "public_postconditions": {
           "items": {
             "type": "string"
@@ -412,6 +443,16 @@
       "title": "JoinSemantics",
       "type": "string"
     },
+    "OfficialAttackOutcome": {
+      "enum": [
+        "success",
+        "failure",
+        "not_evaluated",
+        "error"
+      ],
+      "title": "OfficialAttackOutcome",
+      "type": "string"
+    },
     "PlannerSampleView": {
       "additionalProperties": false,
       "properties": {
@@ -456,6 +497,13 @@
             "$ref": "#/$defs/PublicCoreNode"
           },
           "title": "Core Nodes",
+          "type": "array"
+        },
+        "evaluation_eligibility": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evaluation Eligibility",
           "type": "array"
         },
         "evidence_strength": {
@@ -740,6 +788,18 @@
           "title": "Position",
           "type": "integer"
         },
+        "primary_component_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Component Role"
+        },
         "public_input_state_types": {
           "items": {
             "type": "string"
@@ -779,6 +839,23 @@
       ],
       "title": "PublicCoreNode",
       "type": "object"
+    },
+    "SampleEvidenceStatus": {
+      "enum": [
+        "observed",
+        "inferred",
+        "insufficient"
+      ],
+      "title": "SampleEvidenceStatus",
+      "type": "string"
+    },
+    "SampleStatus": {
+      "enum": [
+        "usable",
+        "quarantined"
+      ],
+      "title": "SampleStatus",
+      "type": "string"
     },
     "SampleValidationSummary": {
       "additionalProperties": false,
@@ -828,12 +905,41 @@
       ],
       "title": "SampleValidationSummary",
       "type": "object"
+    },
+    "StructureStatus": {
+      "enum": [
+        "valid",
+        "partial",
+        "invalid"
+      ],
+      "title": "StructureStatus",
+      "type": "string"
+    },
+    "TraceStatus": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked",
+        "rejected",
+        "error",
+        "unknown"
+      ],
+      "title": "TraceStatus",
+      "type": "string"
     }
   },
   "additionalProperties": false,
   "properties": {
     "acquisition_mode": {
       "$ref": "#/$defs/CandidateAcquisitionMode"
+    },
+    "attack_relevance": {
+      "$ref": "#/$defs/AttackRelevance",
+      "default": "unknown"
+    },
+    "behavior_outcome": {
+      "$ref": "#/$defs/BehaviorOutcome",
+      "default": "unknown"
     },
     "chain_hash": {
       "title": "Chain Hash",
@@ -851,12 +957,27 @@
       "title": "Dataset Version",
       "type": "string"
     },
+    "evaluation_eligibility": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evaluation Eligibility",
+      "type": "array"
+    },
+    "evidence_status": {
+      "$ref": "#/$defs/SampleEvidenceStatus",
+      "default": "observed"
+    },
     "execution_view": {
       "$ref": "#/$defs/ExecutionBindingView"
     },
     "observation_schema_version": {
       "title": "Observation Schema Version",
       "type": "string"
+    },
+    "official_attack_outcome": {
+      "$ref": "#/$defs/OfficialAttackOutcome",
+      "default": "not_evaluated"
     },
     "planner_view": {
       "$ref": "#/$defs/PlannerSampleView"
@@ -880,13 +1001,20 @@
       "title": "Sample Id",
       "type": "string"
     },
+    "sample_status": {
+      "$ref": "#/$defs/SampleStatus",
+      "default": "usable"
+    },
     "sample_version": {
       "title": "Sample Version",
       "type": "string"
     },
     "schema_version": {
-      "const": "3.0",
-      "default": "3.0",
+      "default": "3.1",
+      "enum": [
+        "3.0",
+        "3.1"
+      ],
       "title": "Schema Version",
       "type": "string"
     },
@@ -900,6 +1028,14 @@
       },
       "title": "Source Task Ids",
       "type": "array"
+    },
+    "structure_status": {
+      "$ref": "#/$defs/StructureStatus",
+      "default": "valid"
+    },
+    "trace_status": {
+      "$ref": "#/$defs/TraceStatus",
+      "default": "unknown"
     },
     "validation": {
       "$ref": "#/$defs/SampleValidationSummary"

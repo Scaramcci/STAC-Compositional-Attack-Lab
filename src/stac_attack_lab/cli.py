@@ -55,11 +55,20 @@ def _resolve_safeclaw_task_path(root: Path, upstream: Path, value: str) -> Path:
         resolved = candidate.resolve()
     else:
         root_candidate = (root / candidate).resolve()
-        resolved = root_candidate if root_candidate.is_file() or candidate.parts[:3] == ("integrations", "safeclaw", "upstream") else (upstream / candidate).resolve()
+        resolved = (
+            root_candidate
+            if root_candidate.is_file()
+            or candidate.parts[:3] == ("integrations", "safeclaw", "upstream")
+            else (upstream / candidate).resolve()
+        )
     # Keep repository-relative upstream paths stable when the optional pinned
     # checkout is absent; the command that consumes the path reports its own
     # actionable missing-input error.
-    if not resolved.is_file() and not candidate.parts[:3] == ("integrations", "safeclaw", "upstream"):
+    if not resolved.is_file() and not candidate.parts[:3] == (
+        "integrations",
+        "safeclaw",
+        "upstream",
+    ):
         raise ValueError("safeclaw_task_path_missing")
     return resolved
 
@@ -86,6 +95,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action.add_argument("--config", required=True)
     mine = sample_sub.add_parser("mine")
     mine.add_argument("--collection", required=True)
+    mine.add_argument("--output")
     audit = sample_sub.add_parser("audit")
     audit.add_argument("--library", required=True)
     freeze = sample_sub.add_parser("freeze")
@@ -137,7 +147,17 @@ def _main(argv: list[str] | None = None) -> int:
                 print(collection_root)
             return 0
         if args.sample_command == "mine":
-            print(mine_sample_collection(root, _project_scoped_path(root, args.collection)))
+            collection = _project_scoped_path(root, args.collection)
+            if args.output is None:
+                print(mine_sample_collection(root, collection))
+            else:
+                print(
+                    mine_sample_collection(
+                        root,
+                        collection,
+                        output_root=_project_scoped_path(root, args.output),
+                    )
+                )
             return 0
         library = _project_scoped_path(root, args.library)
         if args.sample_command == "audit":

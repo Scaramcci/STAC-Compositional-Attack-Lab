@@ -76,6 +76,7 @@ def _result() -> FormalRunResult:
         terminal_only_or_shortcut=False,
         mechanism_completed_terminal_failed=False,
         execution_error=False,
+        interaction_outcome="completed",
         execution_error_category=None,
         not_observable_count=0,
         tool_calls=0,
@@ -107,6 +108,11 @@ def test_formal_recorder_is_idempotent_and_reportable(tmp_path: Path) -> None:
     assert audit.result_count == 1
     assert report["result_count"] == 1
     assert (tmp_path / "run/formal_report.md").is_file()
+    assert report["outcome_counts"] == {
+        "interaction": {"completed": 1},
+        "official_attack": {"failure": 1},
+        "mechanism": {"failure": 1},
+    }
     assert (tmp_path / "run/formal_results.csv").is_file()
 
 

@@ -240,6 +240,18 @@
           "title": "Node Id",
           "type": "string"
         },
+        "primary_binding_slot": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Binding Slot"
+        },
         "public_postconditions": {
           "items": {
             "type": "string"
@@ -403,6 +415,13 @@
             "$ref": "#/$defs/PublicCoreNode"
           },
           "title": "Core Nodes",
+          "type": "array"
+        },
+        "evaluation_eligibility": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evaluation Eligibility",
           "type": "array"
         },
         "evidence_strength": {
@@ -636,6 +655,18 @@
           "minimum": 0,
           "title": "Position",
           "type": "integer"
+        },
+        "primary_component_role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Primary Component Role"
         },
         "public_input_state_types": {
           "items": {

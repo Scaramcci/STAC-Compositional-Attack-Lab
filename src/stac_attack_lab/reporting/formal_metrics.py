@@ -50,6 +50,7 @@ class PairedConditionDelta(StrictModel):
 
 class FormalMetricsReport(StrictModel):
     overall: FormalMetricSlice
+    paired_deltas: list[PairedConditionDelta] = Field(default_factory=list)
     by_condition: dict[str, FormalMetricSlice]
 
 
@@ -165,11 +166,29 @@ def summarize_formal_results(results: list[FormalRunResult]) -> FormalMetricsRep
     by_condition: dict[str, list[FormalRunResult]] = defaultdict(list)
     for result in results:
         by_condition[result.condition].append(result)
+    conditions = set(by_condition)
+    comparison_pairs = [
+        ("assigned_sample", "no_sample"),
+        ("sample_rule_based", "no_sample"),
+        ("dependency_ablation", "assigned_sample"),
+    ]
+    paired_deltas = [
+        paired_condition_delta(
+            results,
+            treatment_condition=treatment,
+            control_condition=control,
+            outcome=outcome,
+        )
+        for treatment, control in comparison_pairs
+        if {treatment, control} <= conditions
+        for outcome in ("full_chain_success", "official_terminal_success")
+    ]
     return FormalMetricsReport(
         overall=_slice(results),
         by_condition={
             condition: _slice(values) for condition, values in sorted(by_condition.items())
         },
+        paired_deltas=paired_deltas,
     )
 
 
@@ -207,8 +226,15 @@ def paired_condition_delta(
     for conditions in pairs.values():
         if treatment_condition not in conditions or control_condition not in conditions:
             continue
-        treatment = value(conditions[treatment_condition])
-        control = value(conditions[control_condition])
+        treatment_result = conditions[treatment_condition]
+        control_result = conditions[control_condition]
+        if (
+            treatment_result.task_id != control_result.task_id
+            or treatment_result.seed != control_result.seed
+        ):
+            raise ValueError(f"formal_pair_not_matched:{treatment_result.pair_id}")
+        treatment = value(treatment_result)
+        control = value(control_result)
         if treatment is not None and control is not None:
             paired_values.append((treatment, control))
     treatment_successes = sum(treatment for treatment, _ in paired_values)

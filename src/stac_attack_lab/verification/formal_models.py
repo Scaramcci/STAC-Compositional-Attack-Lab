@@ -103,6 +103,16 @@ class FormalRunResult(StrictModel):
     binding_id: str | None
     task_id: str
     binding_valid: bool
+    interaction_outcome: Literal[
+        "completed",
+        "rejected",
+        "blocked",
+        "timeout",
+        "environment_error",
+        "api_error",
+        "invalid_binding",
+        "unknown",
+    ] = "unknown"
     binding_reason_codes: list[str]
     occurrence_verdicts: list[OccurrenceVerdict]
     edge_verdicts: list[EdgeVerdict]

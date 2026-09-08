@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from stac_attack_lab.datasets.chain_builder import build_primitive_chain_sample
 from stac_attack_lab.datasets.primitive_chain import FilterGate
 from stac_attack_lab.extraction.chains import (
     ChainMiningPolicy,
@@ -155,7 +156,7 @@ def test_duplicate_candidate_enters_negative_pool(tmp_path: Path) -> None:
     assert portability.reason_codes == ["duplicate_candidate_hash"]
 
 
-def test_ordinary_trace_fails_closed_at_attack_relevance_gate(tmp_path: Path) -> None:
+def test_ordinary_trace_is_usable_without_claiming_attack_relevance(tmp_path: Path) -> None:
     graph, registry, extraction = _inputs(tmp_path)
     candidate = construct_chain_candidates(
         graph,
@@ -175,10 +176,49 @@ def test_ordinary_trace_fails_closed_at_attack_relevance_gate(tmp_path: Path) ->
         item for item in result.records[0].decisions if item.gate == FilterGate.attack_relevance
     )
 
-    assert result.accepted == []
-    assert len(result.negative) == 1
-    assert "adversarial_acquisition_required" in relevance.reason_codes
-    assert "construction_manifest_missing" in relevance.reason_codes
+    assert len(result.accepted) == 1
+    assert result.accepted[0].candidate_id == candidate.candidate_id
+    assert result.negative == []
+    assert relevance.passed is True
+    assert relevance.reason_codes == ["sample_quality_independent_of_attack_outcome"]
+
+
+def test_partial_adversarial_trace_is_usable_but_not_primary_eligible(
+    tmp_path: Path,
+) -> None:
+    graph, registry, extraction = _inputs(tmp_path)
+    partial_manifest = CONSTRUCTION_MANIFEST.model_copy(update={"attempt_outcome": "partial"})
+    candidate = construct_chain_candidates(
+        graph,
+        extraction.occurrences,
+        registry,
+        construction_manifest=partial_manifest,
+        source_split="synthetic",
+        source_task_id="construction-synthetic-001",
+    )[0]
+    result = filter_chain_candidates(
+        [candidate],
+        {graph.graph_id: graph},
+        {graph.graph_id: extraction.occurrences},
+        registry,
+        ChainFilteringPolicy(available_capabilities=CAPABILITIES),
+    )
+
+    assert len(result.accepted) == 1
+    sample = build_primitive_chain_sample(
+        result.accepted[0],
+        extraction.occurrences,
+        registry,
+        library_version="partial-contract-v1",
+    )
+    assert sample.trace_status == "partial"
+    assert sample.structure_status == "valid"
+    assert sample.evidence_status == "observed"
+    assert sample.sample_status == "usable"
+    assert sample.official_attack_outcome == "not_evaluated"
+    assert "partial_path_analysis" in sample.evaluation_eligibility
+    assert sample.attack_relevance == "established"
+    assert "formal_attack_primary" not in sample.evaluation_eligibility
 
 
 def test_nine_macro_matcher_requires_typed_outputs_and_semantic_evidence(tmp_path: Path) -> None:

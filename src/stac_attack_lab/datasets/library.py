@@ -91,7 +91,7 @@ def _content_hashes(path: Path) -> dict[str, str]:
 
 def _accepted_record(sample: PrimitiveChainSample) -> AcceptedSampleRecord:
     payload = {
-        "schema_version": "2.1",
+        "schema_version": "3.1",
         "sample_id": sample.sample_id,
         "sample_version": sample.sample_version,
         "dataset_version": sample.dataset_version,
@@ -109,6 +109,14 @@ def _accepted_record(sample: PrimitiveChainSample) -> AcceptedSampleRecord:
         "private_evidence_hash": stable_hash(sample.private_evidence_view.model_dump(mode="json")),
         "source_split": sample.source_split,
         "source_task_ids": sample.source_task_ids,
+        "trace_status": sample.trace_status,
+        "structure_status": sample.structure_status,
+        "evidence_status": sample.evidence_status,
+        "sample_status": sample.sample_status,
+        "behavior_outcome": sample.behavior_outcome,
+        "official_attack_outcome": sample.official_attack_outcome,
+        "evaluation_eligibility": sample.evaluation_eligibility,
+        "attack_relevance": sample.attack_relevance,
     }
     return AcceptedSampleRecord.model_validate({**payload, "sample_hash": stable_hash(payload)})
 
@@ -143,6 +151,7 @@ def build_primitive_chain_library(
         )
         for candidate in accepted_candidates
     ]
+    samples.sort(key=lambda sample: "formal_attack_primary" not in sample.evaluation_eligibility)
     accepted_records = [_accepted_record(sample) for sample in samples]
     _atomic_jsonl(output_dir / "candidates.jsonl", [*accepted_candidates, *negative_candidates])
     _atomic_jsonl(output_dir / "accepted_samples.jsonl", accepted_records)
@@ -261,22 +270,66 @@ def audit_primitive_library(path: Path) -> list[str]:
         matched_candidate = candidates_by_hash.get(sample.chain_hash)
         if matched_candidate is None:
             errors.append(f"accepted_sample_candidate_missing:{sample.sample_id}")
-        else:
+        elif not matched_candidate.filter_decisions or not all(
+            decision.passed for decision in matched_candidate.filter_decisions
+        ):
+            errors.append(f"accepted_sample_filter_not_passed:{sample.sample_id}")
+        if matched_candidate is not None:
             candidate_manifest = matched_candidate.construction_manifest
-            if candidate_manifest is None or candidate_manifest.attempt_outcome != "completed":
-                errors.append(f"accepted_sample_attempt_not_complete:{sample.sample_id}")
-            if matched_candidate.terminal_relation != "observed":
-                errors.append(f"accepted_sample_terminal_not_observed:{sample.sample_id}")
-            if not matched_candidate.terminal_predicates:
-                errors.append(f"accepted_sample_terminal_predicate_missing:{sample.sample_id}")
+            expected_trace = (
+                {
+                    "completed": "complete",
+                    "partial": "partial",
+                    "blocked": "blocked",
+                    "rejected": "rejected",
+                    "error": "error",
+                }.get(candidate_manifest.attempt_outcome, "unknown")
+                if candidate_manifest is not None
+                else "unknown"
+            )
+            expected_relevance = (
+                "established"
+                if matched_candidate.acquisition_mode == "adversarial_trace"
+                and candidate_manifest is not None
+                and candidate_manifest.acquisition_mode == "adversarial_trace"
+                else "not_established"
+            )
+            expected_behavior = (
+                "allowed"
+                if matched_candidate.terminal_relation == "observed"
+                else "blocked"
+                if matched_candidate.terminal_relation in {"blocked", "rejected"}
+                else "error"
+                if matched_candidate.terminal_relation in {"error", "timeout"}
+                else "unknown"
+            )
+            if sample.trace_status != expected_trace:
+                errors.append(f"accepted_sample_trace_status_mismatch:{sample.sample_id}")
+            if sample.attack_relevance != expected_relevance:
+                errors.append(f"accepted_sample_attack_relevance_mismatch:{sample.sample_id}")
+            if sample.behavior_outcome != expected_behavior:
+                errors.append(f"accepted_sample_behavior_outcome_mismatch:{sample.sample_id}")
+            primary_eligible = (
+                expected_relevance == "established"
+                and expected_trace == "complete"
+                and matched_candidate.terminal_relation == "observed"
+            )
+            if ("formal_attack_primary" in sample.evaluation_eligibility) != primary_eligible:
+                errors.append(f"accepted_sample_eligibility_mismatch:{sample.sample_id}")
         if _accepted_record_hash(sample) != sample.sample_hash:
             errors.append(f"sample_hash_mismatch:{sample.sample_id}")
         if sample.registry_hash != manifest.registry_hash:
             errors.append(f"sample_registry_hash_mismatch:{sample.sample_id}")
         if sample.source_split == "test":
             errors.append(f"formal_test_source_leak:{sample.sample_id}")
-        if sample.acquisition_mode != "adversarial_trace":
-            errors.append(f"accepted_sample_not_adversarial:{sample.sample_id}")
+        if sample.structure_status != "valid":
+            errors.append(f"accepted_sample_structure_not_valid:{sample.sample_id}")
+        if sample.evidence_status != "observed":
+            errors.append(f"accepted_sample_evidence_not_observed:{sample.sample_id}")
+        if sample.sample_status != "usable":
+            errors.append(f"accepted_sample_not_usable:{sample.sample_id}")
+        if sample.official_attack_outcome != "not_evaluated":
+            errors.append(f"mined_sample_claims_official_outcome:{sample.sample_id}")
         public_view = public_by_id.get(sample.sample_id)
         execution_view = execution_by_id.get(sample.sample_id)
         private_view = private_by_id.get(sample.sample_id)
@@ -339,7 +392,15 @@ class PrimitiveChainLibrary:
                 sample_hash=sample_hashes[sample_id],
                 planner_view=view,
             )
-            for sample_id, view in sorted(self._public.items())
+            for sample_id, view in sorted(
+                self._public.items(),
+                key=lambda item: (
+                    "formal_attack_primary" not in item[1].evaluation_eligibility,
+                    -len(item[1].macro_nodes),
+                    -len(item[1].core_nodes),
+                    item[0],
+                ),
+            )
         ]
 
     def execution_view(self, sample_id: str) -> ExecutionBindingView:
