@@ -1,0 +1,52 @@
+{
+  "duration_ms": 595,
+  "endpoint_path": "/v1beta/openai/chat/completions",
+  "finish_reason": "stop",
+  "http_status": 200,
+  "label": "01_direct_text_current",
+  "model": "gemini-2.5-flash",
+  "request": {
+    "max_tokens": 1024,
+    "messages": [
+      {
+        "content": "Reply OK.",
+        "role": "user"
+      }
+    ],
+    "model": "gemini-2.5-flash",
+    "stream": false
+  },
+  "request_keys": [
+    "max_tokens",
+    "messages",
+    "model",
+    "stream"
+  ],
+  "response": {
+    "choices": [
+      {
+        "finish_reason": "stop",
+        "index": 0,
+        "message": {
+          "content": "OK.",
+          "role": "assistant"
+        }
+      }
+    ],
+    "created": 1788937424,
+    "id": "0AShatG3BpP-vdIPtpnAuQM",
+    "model": "gemini-2.5-flash",
+    "object": "chat.completion",
+    "usage": {
+      "completion_tokens": 2,
+      "prompt_tokens": 4,
+      "total_tokens": 20
+    }
+  },
+  "tool_calls": [],
+  "usage": {
+    "completion_tokens": 2,
+    "prompt_tokens": 4,
+    "total_tokens": 20
+  }
+}

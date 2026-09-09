@@ -113,7 +113,21 @@ bash scripts/run_formal_evaluation.sh \
 
 **B 完成条件**：有真实可追溯交互、合格输入、实际配对执行与判定产物。若未达到，只交付明确诊断并停止，不能宣称闭环完成。目标拓扑没出现时记录可行性限制，不无限重跑。
 
-当前 B 完成条件未满足：真实交互可追溯，但旧 OpenClaw 请求为 HTTP 400、离线 compat patch 尚未真实验证、sample audit 输入门失败，因而没有 eligible/bound sample、冻结库、matched official/mechanism 结果。阶段 C 不准入。下一轮需要用户明确扩大同根因复测授权，以唯一新 probe 验证已准备的 patch；若仍失败，再决定是否捕获字段级 provider error 或采用兼容 upstream/image。不能自动更换模型/供应商、扩大任务或进入 main collection。
+当前 B 完成条件未满足：Gemini direct 文本、最小 function calling、tool-result 往返和 streaming 均通过，但 4 次 OpenClaw 对照在带 session key、加载新版 compat 且限制高风险工具后仍返回空/非 JSON，provider 出站 params 未观测；sample audit 输入门仍失败，因而没有 eligible/bound sample、冻结库、matched official/mechanism 结果。阶段 C 不准入。诊断证据位于 `experiments/stage-b-20260909-gemini-compat-01/`；下一步只能在明确授权后针对 gateway 响应通道做本地适配诊断，不能自动扩大 collection、替换模型/供应商或进入 main collection。
+
+### 6B. 2026-09-09 有限 Gemini 兼容诊断记录
+
+1. 使用官方 Gemini OpenAI-compatible endpoint 和 `gemini-2.5-flash`：非流式文本、最小 `add` function calling、带原始 `tool_call_id` 的结果回传、最小流式 function calling 均 HTTP 200；官方参考为 `https://ai.google.dev/gemini-api/docs/openai` 与 `https://ai.google.dev/gemini-api/docs/function-calling`。
+2. 诊断目录 `experiments/stage-b-20260909-gemini-compat-01/` 保存脱敏 request/response projections、stream events、OpenClaw 最终 provider 配置和矩阵。8 次真实尝试、无自动重试；direct 已知 usage 289 total，stream/OpenClaw usage unknown。
+3. OpenClaw 临时容器应用 patch SHA-256 `6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523`；容器内确认 `baseUrl=/v1beta/openai`、`api=openai-completions`、四项 compat 生效。带 session key 的正常文本请求仍返回空/非 JSON，gateway 启动日志无 provider 错误，`pi-ai` 投影未命中，因此未将任何单字段标为已定位。
+4. 结论：Gemini 能力本身的四类 direct 检查已证实；OpenClaw gateway/provider 层仍强怀疑但未能观测其最终出站 schema。未运行 collection、mining、freeze 或 formal evaluation，阶段 B 和阶段 C 均未完成/不准入。
+
+### 6C. 2026-09-09 兼容诊断续接
+
+1. 新目录 `experiments/stage-b-20260909-gemini-compat-02/` 保存 5 次 direct Gemini 探针和离线 OpenClaw 源码审计；direct 文本、最小 function calling、tool-result 往返和 streaming 均 HTTP 200。
+2. 官方依据仍为 Gemini OpenAI compatibility 与 function calling 文档：`https://ai.google.dev/gemini-api/docs/openai`、`https://ai.google.dev/gemini-api/docs/function-calling`。
+3. 本轮没有启动 OpenClaw live 请求，因为无法在不改动 pinned 客户端的前提下证明内部 payload、重试和工具面满足本轮严格边界；不能把离线配置或源码字段称为 runtime live 生效。上一轮 live 对照仍保留在 `experiments/stage-b-20260909-gemini-compat-01/`。
+4. 结论不改变：Stage B 输入门仍为 0 accepted，Stage C 不准入；不自动恢复 collection/evaluation。
 
 ### 阶段 C：正式实验与交付（再次确认总规模）
 

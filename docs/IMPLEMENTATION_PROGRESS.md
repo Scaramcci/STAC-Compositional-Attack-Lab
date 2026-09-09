@@ -1,12 +1,12 @@
 # 项目实施进度
 
-核查日期：2026-09-08（Europe/Berlin）；源码基线：`a4ce8940`；阶段 B Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
+核查日期：2026-09-09（Europe/Berlin）；源码基线：`a4ce8940`；阶段 B Goal：`01a07f10-044b-7691-ae85-30cdfff88f98`。
 
 本文件是唯一当前进度快照；依赖与验收见 [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md)。阶段 A 已完成；阶段 B 已在当前 Linux 项目目录做有限真实 collection 与一次诊断复测。未操作外部目标、真实账户或无关宿主文件，未输出密钥，未覆盖旧 raw/冻结库，未 commit/push。
 
 ## 1. 当前结论
 
-**阶段 B 尚未达到完成条件：Attacker 可用，但 OpenClaw/Victim 连续返回空 payload fallback；输入门为 0 accepted，因此未 freeze、未执行 matched pair，Stage C 不准入。**
+**阶段 B 尚未达到完成条件：Gemini direct 文本与最小工具链可用，但 OpenClaw gateway 对照仍返回空/非 JSON；输入门为 0 accepted，因此未 freeze、未执行 matched pair，Stage C 不准入。**
 
 - 质量门已修复：`make check` 全部通过，pytest 为 **153 passed、0 skipped**。
 - sample v3.1 已将样本质量、交互行为、攻击相关性、官方攻击结果和 evaluation eligibility 分开；部分/阻断/正常的有证据子图可以入库，但不会自动进入正式攻击主分析。
@@ -39,11 +39,11 @@
 | W01 | verified | v3.1 三维状态与兼容 schema、正反回归通过 |
 | W02 | in_progress | call/session/response ID、空/超时/认证/限流/拒绝分类与 unknown 回归通过；真实 retrieval/tool-result stream 仍不可得 |
 | W03 | verified | 部分路径建库、audit 一致性、隔离幂等重算通过 |
-| W04 | in_progress | upstream/image/patch/容器与 user-message bridge 已真实运行；gateway diagnostics 捕获 OpenClaw HTTP 400，Gemini compat patch 已离线通过但尚未真实复测 |
+| W04 | in_progress | upstream/image/patch/容器与 user-message bridge 已真实运行；新版 compat 配置已进入容器，但 OpenClaw 对照未产出可观测 provider request/JSON response |
 | W05 | verified | component/session 映射有明确依据，无任意 fallback |
 | W06 | in_progress | Attacker 真实请求及 call ledger 通过；Planner/formal Victim 因无合格 sample 未运行 |
 | W07 | in_progress | evaluator 离线探针通过；matched official/mechanism 结果因输入门未通过而未生成 |
-| W08 | blocked | direct minimal Gemini 可用；OpenClaw 默认额外字段已定位并有离线 compat patch，但同根因真实复测轮数已达上限，运行时修复未验证 |
+| W08 | blocked | Gemini direct 文本、function calling、tool-result、streaming 均通过；OpenClaw compat 配置已加载，但 gateway 返回空/非 JSON，出站字段仍未观测 |
 | W09 | blocked | 真实 collection 已停止于 0 accepted；没有 `formal_attack_primary` 输入，不能运行 matched smoke |
 | W10 | in_progress | Stage B 配置、raw、审计、handoff 与 C 准入已更新；完整 B/C 交付仍受 W08/W09 阻塞 |
 
@@ -73,6 +73,22 @@
 - 未运行 matched assigned-sample/no-sample、正式 official/mechanism evaluation 或 dependency ablation；原因是新库 0 accepted，而非执行成功或攻击失败。
 - 正式配置仍指向 `data/primitive_libraries/frozen/safeclaw-main`；阶段 A 新库未冻结且不应替换它。
 
+## 5A. 2026-09-09 Gemini/OpenClaw 有限兼容诊断
+
+- 诊断目录：`experiments/stage-b-20260909-gemini-compat-01/`；未运行 collection、mining、freeze 或 formal evaluation。共 8 次真实请求尝试（4 次 direct Gemini、4 次 OpenClaw 对照），上限 12；每次无自动重试。
+- 官方格式依据：Gemini OpenAI compatibility 的 function calling 示例使用 OpenAI `tools`/`tool_choice=auto`，官方 function-calling 文档要求工具结果携带对应 call ID。[OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai)、[Function calling](https://ai.google.dev/gemini-api/docs/function-calling)。
+- direct 结果：普通非流式文本 HTTP 200；最小 `add(a,b)` 非流式 HTTP 200 并返回结构化 tool call；保留 `tool_call_id` 回传本地结果 5 后 HTTP 200；最小流式请求 HTTP 200 并返回结构化 tool call。direct 已知 usage 为 36、123、130 total tokens；stream usage unknown。
+- OpenClaw 结果：新版 patch SHA-256 `6ea8c100...` 已应用，容器最终 provider 配置明确为 `baseUrl=/v1beta/openai`、`api=openai-completions`、`supportsStore=false`、`supportsUsageInStreaming=false`、`maxTokensField=max_tokens`、`supportsStrictMode=false`。带 session key 且限制高风险工具后，gateway 仍返回空/非 JSON，provider usage unknown；本地 `pi-ai` 序列化投影未命中，gateway 日志只有启动信息。
+- 结论边界：已证实 Gemini 基础文本、function calling、tool-result 往返和 streaming 能力正常；强怀疑问题在 OpenClaw gateway/provider 请求层。尚未证实具体单字段或字段组合，也无法声称 patch 已真实修复。诊断摘要与每次投影见 `diagnostic_summary.json` 及 `01_*` 至 `08_*` 文件。
+
+## 5B. 2026-09-09 Gemini/OpenClaw 兼容诊断续接
+
+- 新诊断目录：`experiments/stage-b-20260909-gemini-compat-02/`；本轮执行 5 次 direct Gemini 请求，未运行 collection、mining、freeze 或 formal evaluation。
+- direct 结果：非流式文本 HTTP 200/`stop`；最小 `add(a,b)` HTTP 200/结构化 `tool_calls`；保留同一 `tool_call_id` 回传本地结果 5，HTTP 200/最终文本；正确逐行解析的最小 streaming function call HTTP 200/`tool_calls`。已知 usage total 为 20、117、58；stream usage unknown。
+- compat 配置仍为 `supportsStore=false`、`supportsUsageInStreaming=false`、`maxTokensField=max_tokens`、`supportsStrictMode=false`；patch SHA-256 仍为 `6ea8c100...`。本轮离线审计 pinned `openclaw@2026.3.12`、`@mariozechner/pi-ai@0.57.1`，确认源码存在这些 compat 字段及默认 `strict:false` 生成路径。
+- 本轮未启动 OpenClaw gateway：运行时审查无法证明内部请求的完整 payload、自动重试和工具面严格受限。上一轮 4 次 live OpenClaw 对照仍是唯一 live 证据，均空/非 JSON；因此 compat patch 仍未真实验证成功。
+- 结论边界：Gemini 能力四类 direct 检查再次证实；OpenClaw gateway/provider 请求层及字段组合仍强怀疑，具体单字段、消息历史/工具 schema 差异和 patch live 效果尚未证实。
+
 ## 6. 当前：阶段 B 有限真实验证
 
 用户已授权当前 Linux 项目目录内的阶段 B。阶段 A 质量门已在当前版本复核；真实调用严格受本节清单和停止条件约束。只有新 sample 同时通过 audit、`formal_attack_primary` eligibility 与 binding 才能创建 smoke 冻结库并执行 matched `assigned_sample`/`no_sample`。
@@ -92,4 +108,4 @@
 
 ## 7. 续接记录
 
-- 2026-09-08 / `a4ce8940`：阶段 B 真实 collection、诊断复测和 2 个服务探针结束；修复 response/usage/legacy sample 误判及 call ledger。镜像审计后补充 Gemini compat patch，patch apply/compile 与 `153 passed, 0 skipped` 离线通过，真实复测未执行。direct Gemini 可用，旧 OpenClaw 请求 HTTP 400；0 accepted，未 freeze、未 matched。等待用户决定是否扩大同根因复测授权；Stage C 不准入。
+- 2026-09-09 / `a4ce8940`：按新增授权完成有限兼容诊断；4 个 direct Gemini 探针全部 HTTP 200（含工具调用、tool-result、streaming），新版 compat 在容器最终配置中可见；4 个 OpenClaw 对照均未产生可观测 provider request，最终返回空/非 JSON。共 8/12 请求，direct 已知 usage 289 total、OpenClaw usage unknown。未运行 collection/mining/freeze/formal，0 accepted、Stage C 不准入；等待是否批准进一步针对 gateway 内部响应通道的本地适配诊断。

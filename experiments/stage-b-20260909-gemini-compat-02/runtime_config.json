@@ -1,0 +1,11 @@
+{
+  "endpoint_path": "/v1beta/openai/chat/completions",
+  "model": "gemini-2.5-flash",
+  "compat": {
+    "supportsStore": false,
+    "supportsUsageInStreaming": false,
+    "maxTokensField": "max_tokens",
+    "supportsStrictMode": false
+  },
+  "api_key_loaded": true
+}

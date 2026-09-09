@@ -1,0 +1,35 @@
+{
+  "endpoint_path": "/v1beta/openai/chat/completions",
+  "model": "gemini-2.5-flash",
+  "official_docs": [
+    "https://ai.google.dev/gemini-api/docs/openai",
+    "https://ai.google.dev/gemini-api/docs/function-calling"
+  ],
+  "openclaw_process": {
+    "returncode": 1
+  },
+  "request_limit": 12,
+  "requests": [
+    {
+      "http_status": 200,
+      "label": "01_direct_nonstream_text",
+      "tool_calls": 0
+    },
+    {
+      "http_status": 200,
+      "label": "02_direct_nonstream_add",
+      "tool_calls": 1
+    },
+    {
+      "http_status": 200,
+      "label": "03_direct_tool_result_roundtrip",
+      "tool_calls": 0,
+      "tool_result": 5
+    },
+    {
+      "http_status": 200,
+      "label": "04_direct_streaming_add",
+      "tool_calls": 1
+    }
+  ]
+}

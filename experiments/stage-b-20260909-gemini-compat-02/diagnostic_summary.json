@@ -1,0 +1,97 @@
+{
+  "schema_version": "1.0",
+  "run_id": "stage-b-20260909-gemini-compat-02",
+  "scope": "bounded direct Gemini compatibility diagnosis plus offline pinned OpenClaw audit; no collection/mining/freeze/formal evaluation",
+  "request_limit": 12,
+  "real_request_attempts": 5,
+  "matrix": [
+    {
+      "label": "01_direct_text_current",
+      "http_status": 200,
+      "tool_calls": 0,
+      "finish_reason": "stop",
+      "usage_total_tokens": 20,
+      "evidence": "01_direct_text_current.json"
+    },
+    {
+      "label": "02_direct_add_current",
+      "http_status": 200,
+      "tool_calls": 1,
+      "finish_reason": "tool_calls",
+      "arguments": {
+        "a": 2,
+        "b": 3
+      },
+      "usage_total_tokens": 117,
+      "evidence": "02_direct_add_current.json"
+    },
+    {
+      "label": "03_direct_tool_result_current",
+      "http_status": 200,
+      "tool_calls": 0,
+      "finish_reason": "stop",
+      "tool_result": 5,
+      "usage_total_tokens": 58,
+      "evidence": "03_direct_tool_result_current.json"
+    },
+    {
+      "label": "04_direct_stream_add_current",
+      "status": "probe_parse_error",
+      "http_status": 200,
+      "tool_calls": "unknown_due_json_parser",
+      "evidence": "04_direct_stream_add_current.json"
+    },
+    {
+      "label": "05_direct_stream_add_events_current",
+      "http_status": 200,
+      "tool_calls": 1,
+      "finish_reason": "tool_calls",
+      "arguments": {
+        "a": 2,
+        "b": 3
+      },
+      "usage": "unknown",
+      "evidence": "05_direct_stream_add_events_current.json"
+    }
+  ],
+  "compat_runtime": {
+    "configured_fields": {
+      "supportsStore": false,
+      "supportsUsageInStreaming": false,
+      "maxTokensField": "max_tokens",
+      "supportsStrictMode": false
+    },
+    "config_loaded_by_direct_probe": true,
+    "openclaw_live_request_verified_this_round": false,
+    "patch_sha256": "6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523"
+  },
+  "openclaw_comparison": {
+    "live_request": "not_run",
+    "reason": "runtime safety gate could not prove bounded internal payload/retry/tool surface",
+    "strict_same_request_comparison": false,
+    "prior_evidence": "experiments/stage-b-20260909-gemini-compat-01/diagnostic_summary.json"
+  },
+  "conclusions": {
+    "confirmed": [
+      "Gemini normal text works",
+      "Gemini minimal non-stream function calling returns structured tool_calls",
+      "matching tool_call_id roundtrip returns final answer 5",
+      "Gemini streaming function calling returns structured tool_calls",
+      "pinned OpenClaw 2026.3.12/pi-ai 0.57.1 source accepts the compat fields and contains a strict:false generation path"
+    ],
+    "strong_suspicions": [
+      "OpenClaw gateway/provider request serialization or request sequence differs from the minimal supported Gemini request",
+      "remaining field combination or tool/message history difference may trigger HTTP 400"
+    ],
+    "not_eliminated": [
+      "exact OpenClaw live serialized request",
+      "single-field root cause",
+      "whether compat patch fixes live OpenClaw request"
+    ]
+  },
+  "stage_b_status": {
+    "collection_executed": false,
+    "matched_pair_executed": false,
+    "stage_c_admitted": false
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "applied_config": {
+    "api_base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "model": "gemini-2.5-flash"
+  },
+  "gateway_log": {
+    "line_count": 8,
+    "sha256": "fb482a6e48607e3317061da3119376bb05aa601ec355ec30cc6f293914f2577c"
+  },
+  "healthy": true,
+  "patch_sha256": "6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523",
+  "response_error": {
+    "message": "Expecting value: line 1 column 1 (char 0)",
+    "type": "JSONDecodeError"
+  },
+  "serialized_request": null,
+  "serialized_request_keys": [],
+  "serialized_request_raw_length": 0,
+  "serialized_request_raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

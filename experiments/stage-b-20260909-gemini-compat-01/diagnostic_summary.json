@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "run_id": "stage-b-20260909-gemini-compat-01",
+  "scope": "bounded Gemini/OpenClaw compatibility diagnosis; no collection/mining/freeze/formal evaluation",
+  "request_limit": 12,
+  "real_request_attempts": 9,
+  "matrix": [
+    {"label": "01_direct_nonstream_text", "status": 200, "tool_calls": 0, "evidence": "01_direct_nonstream_text.json"},
+    {"label": "02_direct_nonstream_add", "status": 200, "tool_calls": 1, "finish_reason": "tool_calls", "arguments": {"a": 2, "b": 3}, "evidence": "02_direct_nonstream_add.json"},
+    {"label": "03_direct_tool_result_roundtrip", "status": 200, "tool_calls": 0, "tool_result": 5, "evidence": "03_direct_tool_result_roundtrip.json"},
+    {"label": "04_direct_streaming_add", "status": 200, "tool_calls": 1, "arguments": {"a": 2, "b": 3}, "evidence": "04_direct_streaming_add.json", "note": "initial projection was incomplete; superseded as complete evidence by 09_direct_streaming_add_events"},
+    {"label": "09_direct_streaming_add_events", "status": 200, "tool_calls": 1, "finish_reason": "tool_calls", "arguments": {"a": 2, "b": 3}, "evidence": "09_direct_streaming_add_events.json", "note": "corrective projection retained the stream event; usage event absent and remains unknown"},
+    {"label": "05_openclaw_unpatched_local_invocation", "status": "invalid_json_response", "tool_calls": "unknown", "note": "diagnostic invocation omitted session key and did not apply compat patch", "evidence": "05_openclaw_process.json"},
+    {"label": "06_openclaw_patched_denied_tools", "status": "invalid_json_response", "tool_calls": "not_observed", "note": "compat patch loaded; deny-all policy prevented provider request projection", "evidence": "06_openclaw_patched_result.json"},
+    {"label": "07_openclaw_patched_session_key", "status": "invalid_json_response", "tool_calls": "not_observed", "note": "compat patch and session key loaded; provider request projection remained absent", "evidence": "07_openclaw_patched_session_result.json"},
+    {"label": "08_openclaw_patched_restricted_tools", "status": "invalid_json_response", "tool_calls": "not_observed", "note": "compat patch loaded; high-risk tools denied; provider request projection remained absent", "evidence": "08_openclaw_patched_restricted_result.json"}
+  ],
+  "usage": {
+    "direct_nonstream_text": {"prompt_tokens": 6, "completion_tokens": 1, "total_tokens": 36},
+    "direct_nonstream_add": {"prompt_tokens": 67, "completion_tokens": 18, "total_tokens": 123},
+    "direct_tool_result_roundtrip": {"prompt_tokens": 57, "completion_tokens": 24, "total_tokens": 130},
+    "direct_streaming_add": "unknown",
+    "openclaw": "unknown"
+  },
+  "compat_runtime": {
+    "patch_sha256": "6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523",
+    "loaded_config": {
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "api": "openai-completions",
+      "model": "gemini-2.5-flash",
+      "compat": {"supportsStore": false, "supportsUsageInStreaming": false, "maxTokensField": "max_tokens", "supportsStrictMode": false}
+    },
+    "live_request_verified": false
+  },
+  "conclusions": {
+    "confirmed": [
+      "Gemini non-streaming normal text works.",
+      "Gemini non-streaming minimal function calling works with the official OpenAI-compatible tools shape and tool_choice=auto.",
+      "Gemini tool-result roundtrip works with matching tool_call_id and a local add result of 5.",
+      "Gemini streaming minimal function calling works and returns structured tool_calls.",
+      "The new compat patch is present in the container's final provider config."
+    ],
+    "strong_suspicions": [
+      "The prior HTTP 400 is in the OpenClaw gateway/provider request path rather than Gemini's basic text, function-calling, tool-result, or streaming capability."
+    ],
+    "not_eliminated": [
+      "Exact OpenClaw serialized request schema or request sequence, because the pinned gateway returned an empty/non-JSON body before the local pi-ai projection marker was observed.",
+      "Whether a single remaining OpenClaw field or a combination of fields causes the failure."
+    ]
+  },
+  "stage_b_status": {
+    "collection_executed": false,
+    "eligible_sample": false,
+    "matched_pair_executed": false,
+    "stage_c_admitted": false
+  },
+  "official_references": [
+    "https://ai.google.dev/gemini-api/docs/openai",
+    "https://ai.google.dev/gemini-api/docs/function-calling"
+  ]
+}
