@@ -32,6 +32,17 @@ class SafeClawPreflightConfig(StrictModel):
     embedding_base_url_env: str | None = None
     embedding_api_key_env: str | None = None
     minimum_free_disk_gb: PositiveInt = 20
+    diagnostic_id: str | None = None
+    provider: Literal["ark", "gemini", "openai_compatible"] | None = None
+    api: str | None = None
+    endpoint_path: str | None = None
+    context_window: PositiveInt | None = None
+    max_output_tokens: PositiveInt | None = None
+    streaming: Literal["verified", "unverified", "unsupported"] | None = None
+    tool_call_schema: Literal["verified", "unverified", "unsupported"] | None = None
+    request_budget: PositiveInt | None = None
+    max_attempts: PositiveInt | None = None
+    request_timeout_seconds: PositiveInt | None = None
 
 
 class PreflightCheck(StrictModel):

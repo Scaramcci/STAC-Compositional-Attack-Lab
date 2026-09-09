@@ -197,3 +197,13 @@ bash scripts/run_formal_evaluation.sh \
 2. B OpenClaw 无工具对照在修正临时配置后实际发送到 Gemini，但返回 `400 status code (no body)`，gateway 外显 `No response from OpenClaw.`；证据 `b_openclaw_real_v3.json`。配置键错误的两次前置失败单独保留，不能算 provider 请求。
 3. 因 B 失败，未执行真实 Gemini 单工具 C；离线 OpenClaw v2 仅证明内置工具循环和 tool-result 续接得到 `SUM=5`，自定义 `add` 未进入 schema（20 个内置工具），不证明 strict 或受限工具面。
 4. 结论边界：Gemini direct 协议兼容已真实通过；OpenClaw 到 Gemini 的真实无工具链路仍被 400 阻塞；历史 400、空/非 JSON mock、真实 v3 400 分开记账。下一次真实验证最小变量是对比 v3 的最终 OpenClaw body（尤其 stream/消息投影）与 A 的 direct body，并保持单次请求和可保存错误 body；不得在此之前进入 collection/evaluation。
+
+
+### 6F. 2026-09-09 Ark Victim 配置与计数/工具 mock 修复
+
+- 新增 `configs/environments/safeclaw_ark.yaml`（SHA-256 `e3717ef098fb8b9d0326da0c5d0c5acdcba041b9296c46354d6af72ae639a187`），独立绑定 `SAFECLAW_MODEL`、`SAFECLAW_BASE_URL`、`SAFECLAW_API_KEY` 和 endpoint allowlist `ep-20260909180104-hmx9m`；不改变 Gemini 或 embedding 角色。
+- Ark direct A 已通过文本、SSE、`add(a,b)` 工具调用及匹配 call ID 的结果续接；证据 `experiments/stage-b-20260909-ark-01/direct_probe.json`，4/10 请求、无重试，SSE usage unknown。
+- mock 工具现在验证唯一 add、完整参数、执行次数、call ID 和结果值；未注册/错误结果/ID 不匹配/重复执行有负例。OpenClaw 本地隔离回放（新目录 `stage-b-20260909-openclaw-mock-02`）对 20 个内置工具返回 `400 unexpected_tool_list`，不再假通过。
+- provider 计数在 HTTP 边界记录所有 attempts 并硬限制预算；重试/超额 mock 证据保留 accepted 与 rejected attempts。
+- 真实 OpenClaw B/C 未启动，因为 pinned 客户端内部请求尚不能可靠计数和硬上限；一次 gateway 调用不等于一次 provider 请求，旧表述已改为 unknown。
+- 未运行 collection、mining、freeze、formal evaluation；未 commit/push。

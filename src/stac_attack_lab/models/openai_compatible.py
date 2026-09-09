@@ -5,12 +5,41 @@ import json
 import os
 import urllib.error
 import urllib.request
+from dataclasses import dataclass, field
+from time import monotonic
 from typing import Any, cast
 from urllib.parse import urlparse
 
 from pydantic import BaseModel
 
 from stac_attack_lab.models.base import ModelCallError
+
+
+@dataclass
+class ProviderRequestRecord:
+    sequence: int
+    url: str
+    payload: dict[str, object]
+    status: int | None = None
+    content_type: str | None = None
+    error_body: str | None = None
+    duration_ms: float | None = None
+    usage: dict[str, Any] | None = None
+
+
+@dataclass
+class ProviderRequestLedger:
+    """Counts requests at the urlopen boundary and enforces a hard budget."""
+
+    max_requests: int = 10
+    records: list[ProviderRequestRecord] = field(default_factory=list)
+
+    def begin(self, url: str, payload: dict[str, object]) -> ProviderRequestRecord:
+        if len(self.records) >= self.max_requests:
+            raise ModelCallError("provider_request_budget_exhausted")
+        record = ProviderRequestRecord(len(self.records) + 1, url, dict(payload))
+        self.records.append(record)
+        return record
 
 
 class OpenAICompatibleClient:
@@ -24,6 +53,7 @@ class OpenAICompatibleClient:
         use_response_format: bool = False,
         base_url_env: str = "OPENAI_BASE_URL",
         api_key_env: str = "OPENAI_API_KEY",
+        request_ledger: ProviderRequestLedger | None = None,
     ) -> None:
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
@@ -36,6 +66,7 @@ class OpenAICompatibleClient:
         self.last_usage: dict[str, Any] | None = None
         self.last_request_id: str | None = None
         self.last_retry_count = 0
+        self.request_ledger = request_ledger
 
     @property
     def endpoint_host(self) -> str:
@@ -83,11 +114,16 @@ class OpenAICompatibleClient:
                 },
             }
         try:
-            data = _post_json(url, payload, self._api_key, timeout)
+            if self.request_ledger is None:
+                data = _post_json(url, payload, self._api_key, timeout)
+            else:
+                data = _post_json(url, payload, self._api_key, timeout, ledger=self.request_ledger)
             choices = cast(list[dict[str, Any]], data["choices"])
             content = cast(str, choices[0]["message"]["content"])
             usage = data.get("usage")
             self.last_usage = dict(usage) if isinstance(usage, dict) else None
+            if self.request_ledger is not None and self.request_ledger.records:
+                self.request_ledger.records[-1].usage = self.last_usage
             request_id = data.get("id")
             self.last_request_id = str(request_id) if request_id is not None else None
             self.last_raw_response = content
@@ -106,7 +142,12 @@ class OpenAICompatibleClient:
 
 
 def _post_json(
-    url: str, payload: dict[str, object], api_key: str, timeout: int
+    url: str,
+    payload: dict[str, object],
+    api_key: str,
+    timeout: int,
+    *,
+    ledger: ProviderRequestLedger | None = None,
 ) -> dict[str, object]:
     request = urllib.request.Request(
         url,
@@ -120,8 +161,28 @@ def _post_json(
         },
         method="POST",
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        return cast(dict[str, object], json.loads(response.read().decode("utf-8")))
+    record = ledger.begin(url, payload) if ledger is not None else None
+    started = monotonic()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read()
+            if record is not None:
+                record.status = response.status
+                record.content_type = response.headers.get("Content-Type")
+                record.duration_ms = round((monotonic() - started) * 1000, 3)
+            return cast(dict[str, object], json.loads(raw.decode("utf-8")))
+    except urllib.error.HTTPError as exc:
+        if record is not None:
+            record.status = exc.code
+            record.content_type = exc.headers.get("Content-Type")
+            record.error_body = exc.read().decode("utf-8", errors="replace")[:500]
+            record.duration_ms = round((monotonic() - started) * 1000, 3)
+        raise
+    except Exception as exc:
+        if record is not None:
+            record.error_body = type(exc).__name__
+            record.duration_ms = round((monotonic() - started) * 1000, 3)
+        raise
 
 
 def _extract_json(content: str) -> str:

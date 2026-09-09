@@ -1,0 +1,229 @@
+{
+  "config_validate_returncode": 0,
+  "config_validate_stderr": "",
+  "container_start_stdout": "02074f5589bfd9193db58eae2300e7fbef42f7f963c0af2abebe69f96513359c",
+  "gateway_health_checked": true,
+  "gateway_response": "{\"id\":\"chatcmpl_0c02cf0e-4717-4c73-826e-c269b17c272e\",\"object\":\"chat.completion\",\"created\":1788951208,\"model\":\"openclaw\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"400 unexpected_tool_list\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}",
+  "gateway_response_returncode": 0,
+  "gateway_start_returncode": 0,
+  "mock_capture": {
+    "body_keys": [
+      "max_tokens",
+      "messages",
+      "model",
+      "stream",
+      "tools"
+    ],
+    "execution_count": 0,
+    "has_max_completion_tokens": false,
+    "has_max_tokens": true,
+    "has_store": false,
+    "headers": {
+      "content-type": "application/json",
+      "user-agent": "OpenAI/JS 6.26.0",
+      "x-stainless-retry-count": "0"
+    },
+    "message_roles": [
+      "system",
+      "user"
+    ],
+    "model": "mock-model",
+    "path": "/v1/chat/completions",
+    "request_count": 1,
+    "stream": true,
+    "strict_add_contract_checked": true,
+    "tool_message_projection": [],
+    "tool_schemas": [
+      {
+        "has_strict": false,
+        "name": "canvas",
+        "parameters_required": [
+          "action"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "nodes",
+        "parameters_required": [
+          "action"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "cron",
+        "parameters_required": [
+          "action"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "message",
+        "parameters_required": [
+          "action"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "tts",
+        "parameters_required": [
+          "text"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "gateway",
+        "parameters_required": [
+          "action"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "agents_list",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "sessions_list",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "sessions_history",
+        "parameters_required": [
+          "sessionKey"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "sessions_send",
+        "parameters_required": [
+          "message"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "sessions_yield",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "sessions_spawn",
+        "parameters_required": [
+          "task"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "subagents",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "session_status",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "web_search",
+        "parameters_required": [
+          "query"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "web_fetch",
+        "parameters_required": [
+          "url"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "image",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "pdf",
+        "parameters_required": [],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "memory_search",
+        "parameters_required": [
+          "query"
+        ],
+        "type": "function"
+      },
+      {
+        "has_strict": false,
+        "name": "memory_get",
+        "parameters_required": [
+          "path"
+        ],
+        "type": "function"
+      }
+    ],
+    "tools_count": 20
+  },
+  "mock_capture_returncode": 0,
+  "mock_health": "OK",
+  "mock_start_returncode": 0,
+  "network_isolation": "docker --network none; provider mock bound to container loopback",
+  "redacted_log_markers": [
+    "{\"0\":\"{\\\"subsystem\\\":\\\"gateway\\\"}\",\"1\":\"agent model: openai/mock-model\",\"_meta\":{\"runtime\":\"node\",\"runtimeVersion\":\"22.23.2\",\"hostname\":\"02074f5589bf\",\"name\":\"{\\\"subsystem\\\":\\\"gateway\\\"}\",\"parentNames\":[\"openclaw\"],\"date\":\"2026-09-09T10:53:26.092Z\",\"logLevelId\":3,\"logLevelName\":\"INFO\",\"path\":{\"fullFilePath\":\"file:///usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150:14\",\"fileName\":\"subsystem-DVwhOlEq.js\",\"fileNameWithLine\":\"subsystem-DVwhOlEq.js:1150\",\"fileColumn\":\"14\",\"fileLine\":\"1150\",\"filePath\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js\",\"filePathWithLine\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150\",\"method\":\"logToFile\"}},\"time\":\"2026-09-09T10:53:26.092+00:00\"}",
+    "{\"0\":\"{\\\"subsystem\\\":\\\"gateway\\\"}\",\"1\":\"listening on ws://127.0.0.1:18789, ws://[::1]:18789 (PID 81)\",\"_meta\":{\"runtime\":\"node\",\"runtimeVersion\":\"22.23.2\",\"hostname\":\"02074f5589bf\",\"name\":\"{\\\"subsystem\\\":\\\"gateway\\\"}\",\"parentNames\":[\"openclaw\"],\"date\":\"2026-09-09T10:53:26.092Z\",\"logLevelId\":3,\"logLevelName\":\"INFO\",\"path\":{\"fullFilePath\":\"file:///usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150:14\",\"fileName\":\"subsystem-DVwhOlEq.js\",\"fileNameWithLine\":\"subsystem-DVwhOlEq.js:1150\",\"fileColumn\":\"14\",\"fileLine\":\"1150\",\"filePath\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js\",\"filePathWithLine\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150\",\"method\":\"logToFile\"}},\"time\":\"2026-09-09T10:53:26.093+00:00\"}",
+    "{\"0\":\"{\\\"subsystem\\\":\\\"browser/server\\\"}\",\"1\":\"Browser control listening on http://127.0.0.1:18791/ (auth=token)\",\"_meta\":{\"runtime\":\"node\",\"runtimeVersion\":\"22.23.2\",\"hostname\":\"02074f5589bf\",\"name\":\"{\\\"subsystem\\\":\\\"browser/server\\\"}\",\"parentNames\":[\"openclaw\"],\"date\":\"2026-09-09T10:53:26.104Z\",\"logLevelId\":3,\"logLevelName\":\"INFO\",\"path\":{\"fullFilePath\":\"file:///usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150:14\",\"fileName\":\"subsystem-DVwhOlEq.js\",\"fileNameWithLine\":\"subsystem-DVwhOlEq.js:1150\",\"fileColumn\":\"14\",\"fileLine\":\"1150\",\"filePath\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js\",\"filePathWithLine\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1150\",\"method\":\"logToFile\"}},\"time\":\"2026-09-09T10:53:26.105+00:00\"}",
+    "{\"0\":\"{\\\"subsystem\\\":\\\"agent/embedded\\\"}\",\"1\":{\"event\":\"embedded_run_agent_end\",\"tags\":[\"error_handling\",\"lifecycle\",\"agent_end\",\"assistant_error\"],\"runId\":\"chatcmpl_0c02cf0e-4717-4c73-826e-c269b17c272e\",\"isError\":true,\"error\":\"400 unexpected_tool_list\",\"failoverReason\":null,\"model\":\"mock-model\",\"provider\":\"openai\",\"rawErrorPreview\":\"400 unexpected_tool_list\",\"rawErrorHash\":\"sha256:f2651f75b6e4\"},\"2\":\"embedded run agent end\",\"_meta\":{\"runtime\":\"node\",\"runtimeVersion\":\"22.23.2\",\"hostname\":\"02074f5589bf\",\"name\":\"{\\\"subsystem\\\":\\\"agent/embedded\\\"}\",\"parentNames\":[\"openclaw\"],\"date\":\"2026-09-09T10:53:28.965Z\",\"logLevelId\":4,\"logLevelName\":\"WARN\",\"path\":{\"fullFilePath\":\"file:///usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1149:51\",\"fileName\":\"subsystem-DVwhOlEq.js\",\"fileNameWithLine\":\"subsystem-DVwhOlEq.js:1149\",\"fileColumn\":\"51\",\"fileLine\":\"1149\",\"filePath\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js\",\"filePathWithLine\":\"usr/lib/node_modules/openclaw/dist/subsystem-DVwhOlEq.js:1149\",\"method\":\"logToFile\"}},\"time\":\"2026-09-09T10:53:28.978+00:00\"}"
+  ],
+  "startup_commands": {
+    "client": [
+      "curl",
+      "POST",
+      "/v1/chat/completions"
+    ],
+    "container": [
+      "docker",
+      "run",
+      "-d",
+      "--network",
+      "none",
+      "openclaw-env:2026.3.12",
+      "sleep",
+      "infinity"
+    ],
+    "gateway": [
+      "openclaw",
+      "gateway",
+      "run",
+      "--port",
+      "18789",
+      "--bind",
+      "loopback",
+      "--auth",
+      "token"
+    ],
+    "mock": [
+      "python3",
+      "/tmp/mock.py"
+    ]
+  },
+  "status": "completed"
+}

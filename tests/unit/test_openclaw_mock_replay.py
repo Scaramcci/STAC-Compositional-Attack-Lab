@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from stac_attack_lab.diagnostics.openclaw_mock import (
+    AddToolLedger,
     MockProviderServer,
     MockResponse,
     parse_provider_response,
     request_with_retries,
+    validate_and_execute_add,
 )
 
 
@@ -142,7 +146,10 @@ def test_transient_errors_retry_but_budget_rejects_extra_attempts() -> None:
         assert result.kind == "http_error"
         assert attempts == 3
         assert len(server.state.requests) == 2
+        assert server.state.request_count == 3
         assert len(server.state.rejected_attempts) == 1
+        assert server.state.attempts[-1].accepted is False
+        assert server.state.attempts[-1].status == 429
 
 
 def test_transport_failure_is_bounded_without_provider() -> None:
@@ -154,3 +161,61 @@ def test_transport_failure_is_bounded_without_provider() -> None:
     )
     assert result.kind == "transport_error"
     assert attempts == 2
+
+
+def add_tool_schema() -> list[dict[str, object]]:
+    return [
+        {
+            "type": "function",
+            "function": {"name": "add", "parameters": {"type": "object", "required": ["a", "b"]}},
+        }
+    ]
+
+
+def add_messages(
+    *, call_id: str = "call-add-1", result: str = "5", name: str = "add"
+) -> list[dict[str, object]]:
+    return [
+        {
+            "role": "assistant",
+            "tool_calls": [
+                {
+                    "id": call_id,
+                    "type": "function",
+                    "function": {"name": name, "arguments": '{"a":2,"b":3}'},
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": call_id, "content": result},
+    ]
+
+
+def test_add_tool_executes_once_only_after_full_validation() -> None:
+    ledger = AddToolLedger()
+    assert validate_and_execute_add(
+        tools=add_tool_schema(), messages=add_messages(), ledger=ledger
+    ) == (True, "SUM=5")
+    assert ledger.execution_count == 1
+    assert ledger.executions == [(2, 3)]
+    assert validate_and_execute_add(
+        tools=add_tool_schema(), messages=add_messages(), ledger=ledger
+    ) == (False, "duplicate_execution")
+    assert ledger.execution_count == 1
+
+
+@pytest.mark.parametrize(
+    ("tools", "messages", "reason"),
+    [
+        ([], add_messages(), "unexpected_tool_list"),
+        (add_tool_schema(), add_messages(call_id="wrong"), "tool_call_id_mismatch"),
+        (add_tool_schema(), add_messages(result="tool missing"), "tool_result_not_five"),
+        (
+            add_tool_schema() + [{"type": "function", "function": {"name": "other"}}],
+            add_messages(),
+            "unexpected_tool_list",
+        ),
+    ],
+)
+def test_add_tool_negative_cases_fail_closed(tools: object, messages: object, reason: str) -> None:
+    ok, detail = validate_and_execute_add(tools=tools, messages=messages, ledger=AddToolLedger())
+    assert (ok, detail) == (False, reason)

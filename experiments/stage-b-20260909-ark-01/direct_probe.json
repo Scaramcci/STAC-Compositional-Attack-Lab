@@ -1,0 +1,770 @@
+{
+  "schema_version": "1.0",
+  "run_id": "stage-b-20260909-ark-01",
+  "model": "ep-20260909180104-hmx9m",
+  "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+  "request_limit": 10,
+  "request_count": 4,
+  "max_attempts": 1,
+  "timeout_seconds": 90,
+  "records": [
+    {
+      "label": "direct_text",
+      "request": {
+        "model": "ep-20260909180104-hmx9m",
+        "max_tokens": 1024
+      },
+      "message_roles": [
+        "user"
+      ],
+      "request_index": 1,
+      "http_status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "elapsed_ms": 2882.892,
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "logprobs": null,
+            "message": {
+              "content": "OK",
+              "reasoning_content": "\nGot it, The required response is OK, which I will output.\n",
+              "encrypted_content": "djGS/oaJMCmfyL0Pj+VrjUVCpilnhRz4fToi74b71gjGxCpldMLIm9WAXTvwCrIvqsbN0ZNeVsBBxOQYzwOQGtup/hssDu+/5gVOyLNFy87+UwjCcjaawRAc739jmPq0ClBz50wklIDeKt1mVX4YKEVkRgLhbh6Ax7beA90Xn+VANXakP8ae70OWZtwjxgZ0C7FoWckFRdLyaKajIkvfmw66PVFE2XnH2jiPAhzjnQUmHXNACQ5olUoJwzfYl7biKCsJZXZq4I4H45hIPMNJC9aPIo6Tha1OlH4wDxyl/K8CQsXY/TClEtWSq2CsSeirpXunXMQ=",
+              "role": "assistant"
+            }
+          }
+        ],
+        "created": 1788950527,
+        "id": "02178895052486214713b2deea0810671b986a10f293e39809384",
+        "model": "doubao-seed-2-0-lite-260428",
+        "service_tier": "default",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 60,
+          "prompt_tokens": 37,
+          "total_tokens": 97,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 59
+          }
+        }
+      },
+      "usage": {
+        "completion_tokens": 60,
+        "prompt_tokens": 37,
+        "total_tokens": 97,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 59
+        }
+      },
+      "tool_calls": [],
+      "content": "OK"
+    },
+    {
+      "label": "direct_stream_text",
+      "request": {
+        "model": "ep-20260909180104-hmx9m",
+        "stream": true,
+        "max_tokens": 1024
+      },
+      "message_roles": [
+        "user"
+      ],
+      "request_index": 2,
+      "http_status": 200,
+      "content_type": "text/event-stream",
+      "elapsed_ms": 4251.408,
+      "sse_raw": "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"\\n\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Got\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" it\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\",\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"It\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" has\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" been\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" confirmed\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" that\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" the\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" user\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"'s\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" request\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" is\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" clear\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\",\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" and\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" I\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" will\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" output\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" ST\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"REAM\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"_OK\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" as\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\" required\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\".\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"reasoning_content\":\"\\n\",\"encrypted_content\":\"djHGl3BcNYb0rU0BRKZfOy2oO1fYjaifeYUfBn9gfqCgpKvfcf/6/ztb1rBvHtWqbjxQ5lsEbuv/JGG2pED3WU7u9/JGJStJwHTgFxiWxxxt9cny47/reZxPBx3mCJysyDX/sa32Dip8z+/li7o8DORFtK9fSsEM22p2OYtyGCrh79l7j3Q6w092jqeWo+W6Xy6QqHW8o0z5LdIgvuvqjUDyfRGlRUPSg/eWAQQcKBTzj4hcaU7ngdMLSSJJPG5NEsg9Qw5/UOy5nMBkP+JepxcDAsT617rIb4tpltlPj62R/Dol15GwtNGcukXVDAfAPLdztfqHODIaRG2Kp71+86nQ6V1VwCzID0Pebc4LeSwmbVjBkG2uNMEiHeURD0i/y9orltXu27dvvqfVLg==\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"STREAM\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"_OK\",\"role\":\"assistant\"},\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"\",\"role\":\"assistant\"},\"finish_reason\":\"stop\",\"index\":0}],\"created\":1788950528,\"id\":\"0217889505276713694b53d1b7644bc84f9058822e8eff259742b\",\"model\":\"doubao-seed-2-0-lite-260428\",\"service_tier\":\"default\",\"object\":\"chat.completion.chunk\",\"usage\":null}\n\ndata: [DONE]\n\n",
+      "events": [
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "\n",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "Got",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " it",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": ",",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "It",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " has",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " been",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " confirmed",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " that",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " the",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " user",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "'s",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " request",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " is",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " clear",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": ",",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " and",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " I",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " will",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " output",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " ST",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "REAM",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "_OK",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " as",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": " required",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": ".",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "reasoning_content": "\n",
+                "encrypted_content": "djHGl3BcNYb0rU0BRKZfOy2oO1fYjaifeYUfBn9gfqCgpKvfcf/6/ztb1rBvHtWqbjxQ5lsEbuv/JGG2pED3WU7u9/JGJStJwHTgFxiWxxxt9cny47/reZxPBx3mCJysyDX/sa32Dip8z+/li7o8DORFtK9fSsEM22p2OYtyGCrh79l7j3Q6w092jqeWo+W6Xy6QqHW8o0z5LdIgvuvqjUDyfRGlRUPSg/eWAQQcKBTzj4hcaU7ngdMLSSJJPG5NEsg9Qw5/UOy5nMBkP+JepxcDAsT617rIb4tpltlPj62R/Dol15GwtNGcukXVDAfAPLdztfqHODIaRG2Kp71+86nQ6V1VwCzID0Pebc4LeSwmbVjBkG2uNMEiHeURD0i/y9orltXu27dvvqfVLg==",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "content": "STREAM",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "content": "_OK",
+                "role": "assistant"
+              },
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        },
+        {
+          "choices": [
+            {
+              "delta": {
+                "content": "",
+                "role": "assistant"
+              },
+              "finish_reason": "stop",
+              "index": 0
+            }
+          ],
+          "created": 1788950528,
+          "id": "0217889505276713694b53d1b7644bc84f9058822e8eff259742b",
+          "model": "doubao-seed-2-0-lite-260428",
+          "service_tier": "default",
+          "object": "chat.completion.chunk",
+          "usage": null
+        }
+      ],
+      "tool_calls": []
+    },
+    {
+      "label": "direct_add_tool_call",
+      "request": {
+        "model": "ep-20260909180104-hmx9m",
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "add",
+              "description": "Add two integers locally",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "a": {
+                    "type": "integer"
+                  },
+                  "b": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "a",
+                  "b"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        ],
+        "tool_choice": "required",
+        "max_tokens": 1024
+      },
+      "message_roles": [
+        "user"
+      ],
+      "request_index": 3,
+      "http_status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "elapsed_ms": 2018.139,
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "tool_calls",
+            "index": 0,
+            "logprobs": null,
+            "message": {
+              "content": "",
+              "role": "assistant",
+              "tool_calls": [
+                {
+                  "function": {
+                    "arguments": "{\"a\": 2, \"b\": 3}",
+                    "name": "add"
+                  },
+                  "id": "call_8uqnoyyja06f5uku3z967rop",
+                  "type": "function"
+                }
+              ]
+            }
+          }
+        ],
+        "created": 1788950533,
+        "id": "02178895053194206836341896f8585700baa60fd8566b5880555",
+        "model": "doubao-seed-2-0-lite-260428",
+        "service_tier": "default",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 39,
+          "prompt_tokens": 499,
+          "total_tokens": 538,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          }
+        }
+      },
+      "usage": {
+        "completion_tokens": 39,
+        "prompt_tokens": 499,
+        "total_tokens": 538,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0
+        }
+      },
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"a\": 2, \"b\": 3}",
+            "name": "add"
+          },
+          "id": "call_8uqnoyyja06f5uku3z967rop",
+          "type": "function"
+        }
+      ],
+      "content": ""
+    },
+    {
+      "label": "direct_tool_result_roundtrip",
+      "request": {
+        "model": "ep-20260909180104-hmx9m",
+        "max_tokens": 1024
+      },
+      "message_roles": [
+        "user",
+        "assistant",
+        "tool"
+      ],
+      "request_index": 4,
+      "http_status": 200,
+      "content_type": "application/json; charset=utf-8",
+      "elapsed_ms": 3135.773,
+      "response": {
+        "choices": [
+          {
+            "finish_reason": "stop",
+            "index": 0,
+            "logprobs": null,
+            "message": {
+              "content": "The result of 2 + 3 calculated using the add function is **5**.",
+              "reasoning_content": "Okay,It has been confirmed that 2+3 equals 5.\n",
+              "encrypted_content": "djFzWVNV/kersOXYRU0Up0aFZlgiBxpnweVrs2kjmPAs9zmT2i+NYrcxjmRDgcc4lekaYtSN5GfHjWd4/8aIvPsdzxSCvW+hMwCJLuim1e1o80KshTxk9axUk875HibAk+Y/IWsf54wycbwKm89r6/5AvyjVTyFw3KGyMrElO/V2nmoimodJFBKTc7ByQ43h3+wG+7lg6N/B0XA7zq3wthsKF0psQujP5sWk5PruDbzAJENFzQxMNqLPW9FsLvh6BFJIj9fBvDHEdBnv/dRJ8gf7pjgC8grD",
+              "role": "assistant"
+            }
+          }
+        ],
+        "created": 1788950536,
+        "id": "021788950534184cd226039e9cdd284b6568180b30f64bf1b8678",
+        "model": "doubao-seed-2-0-lite-260428",
+        "service_tier": "default",
+        "object": "chat.completion",
+        "usage": {
+          "completion_tokens": 71,
+          "prompt_tokens": 98,
+          "total_tokens": 169,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 54
+          }
+        }
+      },
+      "usage": {
+        "completion_tokens": 71,
+        "prompt_tokens": 98,
+        "total_tokens": 169,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 54
+        }
+      },
+      "tool_calls": [],
+      "content": "The result of 2 + 3 calculated using the add function is **5**."
+    }
+  ],
+  "tool_validation": {
+    "call_id": "call_8uqnoyyja06f5uku3z967rop",
+    "arguments": {
+      "a": 2,
+      "b": 3
+    },
+    "local_execution": "not performed by model; add result fixed to 5"
+  }
+}

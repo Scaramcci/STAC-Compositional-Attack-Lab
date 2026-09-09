@@ -11,8 +11,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "experiments/stage-b-20260909-openclaw-mock-01"
-CONTAINER = "stac-openclaw-mock-01"
+OUT = ROOT / "experiments/stage-b-20260909-openclaw-mock-02"
+CONTAINER = "stac-openclaw-mock-02"
 IMAGE = "openclaw-env:2026.3.12"
 
 
@@ -100,34 +100,58 @@ def main() -> int:
 """
     mock_code = r"""import json, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+executions = 0
+expected_call_id = "call-add-1"
+
+def error(message):
+  body=json.dumps({"error":{"message":message}}).encode()
+  return body, "application/json", 400
+
+def valid_add_tool(tools):
+  if not isinstance(tools,list) or len(tools)!=1: return False
+  t=tools[0]; f=t.get("function") if isinstance(t,dict) else None
+  p=f.get("parameters") if isinstance(f,dict) else None
+  return (isinstance(f,dict) and t.get("type")=="function" and f.get("name")=="add"
+          and isinstance(p,dict) and p.get("type")=="object" and p.get("required")==["a","b"])
+
 class H(BaseHTTPRequestHandler):
   def log_message(self,*a): pass
   def do_GET(self):
     self.send_response(200); self.send_header("Content-Length","2"); self.end_headers(); self.wfile.write(b"OK")
   def do_POST(self):
+    global executions
     n=int(self.headers.get("content-length","0")); raw=self.rfile.read(n)
-    body=json.loads(raw)
-    safe={"path":self.path,"headers":{k.lower():v for k,v in self.headers.items() if k.lower() not in ("authorization","proxy-authorization")},"body":body,"received_at":time.time()}
-    try:
-      captures=json.load(open("/tmp/mock-captures.json"))
-except Exception:
-      captures=[]
-    captures.append({"path":safe["path"],"headers":safe["headers"],"body":body,"received_at":safe["received_at"]})
+    try: body=json.loads(raw)
+    except Exception:
+      b,c,status=error("request_invalid_json"); self.send_response(status); self.send_header("Content-Type",c); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b); return
+    try: captures=json.load(open("/tmp/mock-captures.json"))
+    except Exception: captures=[]
+    captures.append({"path":self.path,"headers":{k.lower():v for k,v in self.headers.items() if k.lower() not in ("authorization","proxy-authorization")},"body":body,"received_at":time.time()})
     json.dump(captures,open("/tmp/mock-captures.json","w"))
-    has_tool_result=any(isinstance(m,dict) and m.get("role")=="tool" for m in body.get("messages",[]))
-    if has_tool_result:
-      out={"id":"mock-response-final","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+    messages=body.get("messages",[]); tools=body.get("tools",[])
+    has_tool_result=any(isinstance(m,dict) and m.get("role")=="tool" for m in messages)
+    if not valid_add_tool(tools): b,c,status=error("unexpected_tool_list")
+    elif not has_tool_result:
+      out={"id":"mock-response-tool","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":None,"tool_calls":[{"id":expected_call_id,"type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+      b=json.dumps(out).encode(); c="application/json"; status=200
     else:
-      out={"id":"mock-response-tool","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":None,"tool_calls":[{"id":"call-add-1","type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-    if body.get("stream"):
-      if has_tool_result:
-        chunk={"id":"mock-response-final","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}]}
+      calls=[c for m in messages if isinstance(m,dict) and m.get("role")=="assistant" for c in (m.get("tool_calls") or []) if isinstance(c,dict)]
+      results=[m for m in messages if isinstance(m,dict) and m.get("role")=="tool"]
+      try: args=json.loads(calls[0]["function"]["arguments"])
+      except Exception: args={}
+      valid=(len(calls)==1 and len(results)==1 and calls[0].get("id")==expected_call_id and results[0].get("tool_call_id")==expected_call_id and calls[0].get("function",{}).get("name")=="add" and args=={"a":2,"b":3} and str(results[0].get("content"))=="5")
+      if not valid: b,c,status=error("tool_call_or_result_invalid")
+      elif executions: b,c,status=error("duplicate_execution")
       else:
-        chunk={"id":"mock-response-tool","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call-add-1","type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}]}
-      b=("data: "+json.dumps(chunk)+"\n\ndata: [DONE]\n\n").encode(); ctype="text/event-stream"
-    else:
-      b=json.dumps(out).encode(); ctype="application/json"
-    self.send_response(200); self.send_header("Content-Type",ctype); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
+        executions+=1
+        out={"id":"mock-response-final","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+        b=json.dumps(out).encode(); c="application/json"; status=200
+    if body.get("stream") and status==200:
+      if has_tool_result: chunk={"id":"mock-response-final","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}]}
+      else: chunk={"id":"mock-response-tool","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":expected_call_id,"type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}]}
+      b=("data: "+json.dumps(chunk)+"\n\ndata: [DONE]\n\n").encode(); c="text/event-stream"
+    json.dump({"executions":executions},open("/tmp/mock-state.json","w"))
+    self.send_response(status); self.send_header("Content-Type",c); self.send_header("Content-Length",str(len(b))); self.end_headers(); self.wfile.write(b)
 ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
 """
     try:
@@ -242,6 +266,15 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
         captured = json.loads(capture.stdout) if capture.stdout.strip() else []
         if isinstance(captured, dict):
             captured = [captured]
+        state_capture = run(
+            "exec",
+            CONTAINER,
+            "sh",
+            "-c",
+            "cat /tmp/mock-state.json 2>/dev/null || true",
+            timeout=10,
+        )
+        mock_state = json.loads(state_capture.stdout) if state_capture.stdout.strip() else {}
         body = captured[-1].get("body", {}) if captured else {}
         log_text = logs.stdout[-12000:]
         log_lines = [
@@ -300,6 +333,8 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
             "gateway_response_returncode": response.returncode if response else None,
             "mock_capture": {
                 "request_count": len(captured),
+                "execution_count": mock_state.get("executions"),
+                "strict_add_contract_checked": True,
                 "path": captured[-1].get("path") if captured else None,
                 "headers": {
                     k: (captured[-1].get("headers", {}) if captured else {}).get(k)

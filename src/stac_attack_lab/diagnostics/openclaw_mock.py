@@ -30,6 +30,11 @@ class CapturedRequest:
     body: dict[str, Any] | None
     body_raw_length: int
     received_at: float
+    accepted: bool = True
+    status: int | None = None
+    response_content_type: str | None = None
+    error_body: str | None = None
+    duration_ms: float | None = None
 
 
 @dataclass
@@ -37,8 +42,14 @@ class MockProviderState:
     responses: list[MockResponse]
     max_requests: int = 5
     requests: list[CapturedRequest] = field(default_factory=list)
+    attempts: list[CapturedRequest] = field(default_factory=list)
     rejected_attempts: list[dict[str, Any]] = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    @property
+    def request_count(self) -> int:
+        """Number of HTTP attempts that reached the provider boundary."""
+        return len(self.attempts)
 
     def next_response(self) -> MockResponse:
         index = len(self.requests) - 1
@@ -57,6 +68,7 @@ class _MockHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         state = self.server.state
+        started_at = time.monotonic()
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length)
         try:
@@ -69,8 +81,22 @@ class _MockHandler(BaseHTTPRequestHandler):
             if key.lower() not in {"authorization", "proxy-authorization"}
         }
         with state._lock:
-            sequence = len(state.requests) + 1
+            sequence = len(state.attempts) + 1
             if sequence > state.max_requests:
+                error_body = json.dumps({"error": {"message": "mock request budget exhausted"}})
+                captured = CapturedRequest(
+                    sequence,
+                    self.path,
+                    safe_headers,
+                    body if isinstance(body, dict) else None,
+                    len(raw),
+                    time.time(),
+                    accepted=False,
+                    status=429,
+                    response_content_type="application/json",
+                    error_body=error_body,
+                )
+                state.attempts.append(captured)
                 state.rejected_attempts.append(
                     {"sequence": sequence, "path": self.path, "body_length": len(raw)}
                 )
@@ -78,16 +104,16 @@ class _MockHandler(BaseHTTPRequestHandler):
                     {"error": {"message": "mock request budget exhausted"}}, status=429
                 )
             else:
-                state.requests.append(
-                    CapturedRequest(
-                        sequence=sequence,
-                        path=self.path,
-                        headers=safe_headers,
-                        body=body if isinstance(body, dict) else None,
-                        body_raw_length=len(raw),
-                        received_at=time.time(),
-                    )
+                captured = CapturedRequest(
+                    sequence=sequence,
+                    path=self.path,
+                    headers=safe_headers,
+                    body=body if isinstance(body, dict) else None,
+                    body_raw_length=len(raw),
+                    received_at=time.time(),
                 )
+                state.requests.append(captured)
+                state.attempts.append(captured)
                 response = state.next_response()
         if response.delay_seconds:
             time.sleep(response.delay_seconds)
@@ -96,6 +122,12 @@ class _MockHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(response.body)))
         self.end_headers()
         self.wfile.write(response.body)
+        with state._lock:
+            captured.status = response.status
+            captured.response_content_type = response.content_type
+            captured.duration_ms = round((time.monotonic() - started_at) * 1000, 3)
+            if response.status >= 400:
+                captured.error_body = response.body.decode("utf-8", errors="replace")[:500]
 
 
 class _MockHTTPServer(ThreadingHTTPServer):
@@ -263,3 +295,81 @@ def request_with_retries(
             if attempts >= max_attempts:
                 return ReplayResult("transport_error", None, error=type(exc).__name__), attempts
     return ReplayResult("transport_error", None, error="retry_budget_exhausted"), attempts
+
+
+@dataclass
+class AddToolLedger:
+    """Offline proof ledger for the single explicitly registered local add tool."""
+
+    expected_call_id: str = "call-add-1"
+    execution_count: int = 0
+    executions: list[tuple[int, int]] = field(default_factory=list)
+
+
+def validate_and_execute_add(
+    *, tools: Any, messages: Any, ledger: AddToolLedger | None = None
+) -> tuple[bool, str]:
+    """Validate the complete add round-trip before executing local arithmetic once."""
+    active = ledger or AddToolLedger()
+    if not isinstance(tools, list) or len(tools) != 1:
+        return False, "unexpected_tool_list"
+    tool = tools[0]
+    function = tool.get("function") if isinstance(tool, dict) else None
+    if (
+        not isinstance(function, dict)
+        or tool.get("type") != "function"
+        or function.get("name") != "add"
+    ):
+        return False, "add_not_registered"
+    parameters = function.get("parameters")
+    if (
+        not isinstance(parameters, dict)
+        or parameters.get("type") != "object"
+        or parameters.get("required") != ["a", "b"]
+    ):
+        return False, "add_schema_invalid"
+    if not isinstance(messages, list):
+        return False, "messages_invalid"
+    assistant_calls = [
+        call
+        for message in messages
+        if isinstance(message, dict) and message.get("role") == "assistant"
+        for call in (message.get("tool_calls") or [])
+        if isinstance(call, dict)
+    ]
+    if len(assistant_calls) != 1:
+        return False, "tool_call_missing_or_duplicate"
+    call = assistant_calls[0]
+    call_function = call.get("function")
+    if call.get("id") != active.expected_call_id or not isinstance(call_function, dict):
+        return False, "tool_call_id_mismatch"
+    if call_function.get("name") != "add":
+        return False, "unexpected_tool_call"
+    try:
+        arguments = json.loads(call_function.get("arguments", ""))
+    except (TypeError, json.JSONDecodeError):
+        return False, "tool_arguments_invalid"
+    if (
+        not isinstance(arguments, dict)
+        or set(arguments) != {"a", "b"}
+        or arguments.get("a") != 2
+        or arguments.get("b") != 3
+    ):
+        return False, "tool_arguments_unexpected"
+    results = [
+        message
+        for message in messages
+        if isinstance(message, dict) and message.get("role") == "tool"
+    ]
+    if len(results) != 1:
+        return False, "tool_result_missing_or_duplicate"
+    result = results[0]
+    if result.get("tool_call_id") != active.expected_call_id:
+        return False, "tool_result_call_id_mismatch"
+    if str(result.get("content", "")) != "5":
+        return False, "tool_result_not_five"
+    if active.execution_count:
+        return False, "duplicate_execution"
+    active.executions.append((2, 3))
+    active.execution_count += 1
+    return True, "SUM=5"

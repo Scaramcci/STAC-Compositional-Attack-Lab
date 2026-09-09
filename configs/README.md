@@ -3,6 +3,7 @@
 | 路径 | 用途 |
 |---|---|
 | `environments/safeclaw.yaml` | Pinned upstream、Docker、模型和 embedding preflight |
+| `environments/safeclaw_ark.yaml` | 独立 Ark Victim 诊断 preflight；使用 `SAFECLAW_*` chat 变量，不替换 Gemini |
 | `experiments/formal_evaluation.yaml` | Formal matrix、budget、library 和输出路径 |
 | `models/formal_attacker.yaml` | Construction/Formal Attacker 模型 |
 | `models/formal_planner.yaml` | 可选 LLM Planner 模型 |
