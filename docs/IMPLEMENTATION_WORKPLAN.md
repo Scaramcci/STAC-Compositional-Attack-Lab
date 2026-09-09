@@ -118,7 +118,7 @@ bash scripts/run_formal_evaluation.sh \
 ### 6B. 2026-09-09 有限 Gemini 兼容诊断记录
 
 1. 使用官方 Gemini OpenAI-compatible endpoint 和 `gemini-2.5-flash`：非流式文本、最小 `add` function calling、带原始 `tool_call_id` 的结果回传、最小流式 function calling 均 HTTP 200；官方参考为 `https://ai.google.dev/gemini-api/docs/openai` 与 `https://ai.google.dev/gemini-api/docs/function-calling`。
-2. 诊断目录 `experiments/stage-b-20260909-gemini-compat-01/` 保存脱敏 request/response projections、stream events、OpenClaw 最终 provider 配置和矩阵。8 次真实尝试、无自动重试；direct 已知 usage 289 total，stream/OpenClaw usage unknown。
+2. 诊断目录 `experiments/stage-b-20260909-gemini-compat-01/` 保存脱敏 request/response projections、stream events、OpenClaw 最终 provider 配置和矩阵。实际为 9 次真实尝试（含 09 号 SSE 纠正投影）、无自动重试；direct 已知 usage 289 total，stream/OpenClaw usage unknown。
 3. OpenClaw 临时容器应用 patch SHA-256 `6ea8c100063adfa30a9ce03e02a09a3cf9f2ad27c5ef62fc60b423a85a90b523`；容器内确认 `baseUrl=/v1beta/openai`、`api=openai-completions`、四项 compat 生效。带 session key 的正常文本请求仍返回空/非 JSON，gateway 启动日志无 provider 错误，`pi-ai` 投影未命中，因此未将任何单字段标为已定位。
 4. 结论：Gemini 能力本身的四类 direct 检查已证实；OpenClaw gateway/provider 层仍强怀疑但未能观测其最终出站 schema。未运行 collection、mining、freeze 或 formal evaluation，阶段 B 和阶段 C 均未完成/不准入。
 
@@ -128,6 +128,15 @@ bash scripts/run_formal_evaluation.sh \
 2. 官方依据仍为 Gemini OpenAI compatibility 与 function calling 文档：`https://ai.google.dev/gemini-api/docs/openai`、`https://ai.google.dev/gemini-api/docs/function-calling`。
 3. 本轮没有启动 OpenClaw live 请求，因为无法在不改动 pinned 客户端的前提下证明内部 payload、重试和工具面满足本轮严格边界；不能把离线配置或源码字段称为 runtime live 生效。上一轮 live 对照仍保留在 `experiments/stage-b-20260909-gemini-compat-01/`。
 4. 结论不改变：Stage B 输入门仍为 0 accepted，Stage C 不准入；不自动恢复 collection/evaluation。
+
+
+### 6D. OpenClaw 本地请求捕获与响应回放
+
+1. 新增 `src/stac_attack_lab/diagnostics/openclaw_mock.py` 与 `tests/unit/test_openclaw_mock_replay.py`；默认离线运行，5 个 focused tests 覆盖文本、tool_calls、SSE、错误 body/空 body/非法 JSON/截断 SSE、暂时错误重试与预算拒绝。
+2. `scripts/diagnostics/run_openclaw_mock_integration.py` 在 pinned `openclaw-env:2026.3.12`、`docker --network none` 中启动 fake 配置与容器内 loopback mock；最终捕获真实 provider 请求并返回 `MOCK_OK`。
+3. 实际出站请求为 `/v1/chat/completions`、`OpenAI/JS 6.26.0`、`stream=true`、`x-stainless-retry-count=0`；compat 生效体现为 `max_tokens` 存在、`store`/`max_completion_tokens` 缺失、工具 `strict` 未出现。
+4. 初始空 mock 结果由 JSON/SSE 协议不匹配导致；初始未到 provider 的独立原因是 mock `contextWindow` 低于 OpenClaw 最低 16000。两者均与历史 Gemini HTTP 400 分开，不合并为同一证据。
+5. 本地链路证明可开始独立合成工具/检索观测测试，但不解除 0 accepted 对正式配对评测的阻塞，也不证明真实 Gemini 已修复。
 
 ### 阶段 C：正式实验与交付（再次确认总规模）
 

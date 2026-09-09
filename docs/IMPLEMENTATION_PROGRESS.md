@@ -75,7 +75,7 @@
 
 ## 5A. 2026-09-09 Gemini/OpenClaw 有限兼容诊断
 
-- 诊断目录：`experiments/stage-b-20260909-gemini-compat-01/`；未运行 collection、mining、freeze 或 formal evaluation。共 8 次真实请求尝试（4 次 direct Gemini、4 次 OpenClaw 对照），上限 12；每次无自动重试。
+- 诊断目录：`experiments/stage-b-20260909-gemini-compat-01/`；未运行 collection、mining、freeze 或 formal evaluation。共 9 次真实请求尝试（5 次 direct Gemini、4 次 OpenClaw 对照；含 09 号 SSE 纠正投影），上限 12；每次无自动重试。
 - 官方格式依据：Gemini OpenAI compatibility 的 function calling 示例使用 OpenAI `tools`/`tool_choice=auto`，官方 function-calling 文档要求工具结果携带对应 call ID。[OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai)、[Function calling](https://ai.google.dev/gemini-api/docs/function-calling)。
 - direct 结果：普通非流式文本 HTTP 200；最小 `add(a,b)` 非流式 HTTP 200 并返回结构化 tool call；保留 `tool_call_id` 回传本地结果 5 后 HTTP 200；最小流式请求 HTTP 200 并返回结构化 tool call。direct 已知 usage 为 36、123、130 total tokens；stream usage unknown。
 - OpenClaw 结果：新版 patch SHA-256 `6ea8c100...` 已应用，容器最终 provider 配置明确为 `baseUrl=/v1beta/openai`、`api=openai-completions`、`supportsStore=false`、`supportsUsageInStreaming=false`、`maxTokensField=max_tokens`、`supportsStrictMode=false`。带 session key 且限制高风险工具后，gateway 仍返回空/非 JSON，provider usage unknown；本地 `pi-ai` 序列化投影未命中，gateway 日志只有启动信息。
@@ -88,6 +88,16 @@
 - compat 配置仍为 `supportsStore=false`、`supportsUsageInStreaming=false`、`maxTokensField=max_tokens`、`supportsStrictMode=false`；patch SHA-256 仍为 `6ea8c100...`。本轮离线审计 pinned `openclaw@2026.3.12`、`@mariozechner/pi-ai@0.57.1`，确认源码存在这些 compat 字段及默认 `strict:false` 生成路径。
 - 本轮未启动 OpenClaw gateway：运行时审查无法证明内部请求的完整 payload、自动重试和工具面严格受限。上一轮 4 次 live OpenClaw 对照仍是唯一 live 证据，均空/非 JSON；因此 compat patch 仍未真实验证成功。
 - 结论边界：Gemini 能力四类 direct 检查再次证实；OpenClaw gateway/provider 请求层及字段组合仍强怀疑，具体单字段、消息历史/工具 schema 差异和 patch live 效果尚未证实。
+
+
+## 5C. 2026-09-09 OpenClaw 本地 mock 捕获与回放
+
+- 新增离线 mock/replay 实现：`src/stac_attack_lab/diagnostics/openclaw_mock.py`；focused tests：`tests/unit/test_openclaw_mock_replay.py`（5 passed）。覆盖非流式文本/tool_calls、空正文带 tool_calls、普通/SSE 文本、分片 arguments、400 可读错误、空 body、非法 JSON、截断 SSE、超时/暂时错误与显式重试上限。
+- 新增隔离集成命令：`python3 scripts/diagnostics/run_openclaw_mock_integration.py`。使用 `openclaw-env:2026.3.12`、`docker --network none`、容器内 loopback mock、fake token、独立临时配置；证据：`experiments/stage-b-20260909-openclaw-mock-01/integration_result.json`。
+- 首次集成未到 provider 的原因已证实为合成模型 `contextWindow=4096` 小于 pinned OpenClaw 最低 16000，gateway 日志为 `Model context window too small`；提高临时值到 200000 后，mock 收到 1 次真实请求。
+- 捕获请求：路径 `/v1/chat/completions`，客户端 `OpenAI/JS 6.26.0`，`x-stainless-retry-count=0`，消息角色为 `system,user`，`stream=true`。加载四项 compat 后最终 body keys 为 `max_tokens,messages,model,stream,tools`，明确无 `store`、无 `max_completion_tokens`、无工具 `strict:false`。mock 返回合法 SSE 后 gateway 正确返回 `MOCK_OK`。
+- 对照回放：同一路径若 mock 返回普通 JSON 而请求 `stream=true`，OpenClaw 对外返回 `No response from OpenClaw.`；因此“空响应”可由流式协议响应不匹配产生，不能直接等同 Gemini HTTP 400。
+- 该本地 mock 只证明 OpenClaw gateway 请求/响应链路和协议处理，不证明 Gemini 接受相同请求；历史真实 HTTP 400、上一轮空/非 JSON 与本地 mock 结果分开记录。
 
 ## 6. 当前：阶段 B 有限真实验证
 
@@ -108,4 +118,4 @@
 
 ## 7. 续接记录
 
-- 2026-09-09 / `a4ce8940`：按新增授权完成有限兼容诊断；4 个 direct Gemini 探针全部 HTTP 200（含工具调用、tool-result、streaming），新版 compat 在容器最终配置中可见；4 个 OpenClaw 对照均未产生可观测 provider request，最终返回空/非 JSON。共 8/12 请求，direct 已知 usage 289 total、OpenClaw usage unknown。未运行 collection/mining/freeze/formal，0 accepted、Stage C 不准入；等待是否批准进一步针对 gateway 内部响应通道的本地适配诊断。
+- 2026-09-09 / `a4ce8940`：按新增授权完成有限兼容诊断；5 个 direct Gemini 探针 HTTP 200（含工具调用、tool-result、streaming，含一次 SSE 纠正解析），4 个 OpenClaw 对照均未产生可观测 provider request，最终返回空/非 JSON。共 9/12 请求，direct 已知 usage 289 total、OpenClaw usage unknown。未运行 collection/mining/freeze/formal，0 accepted、Stage C 不准入。
