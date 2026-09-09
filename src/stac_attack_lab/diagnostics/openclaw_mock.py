@@ -161,7 +161,8 @@ def parse_provider_response(status: int, body: bytes, content_type: str) -> Repl
                 events.append(value)
         if not events or not events[-1].get("done"):
             return ReplayResult("truncated_sse", status, error="sse_done_missing")
-        calls: list[dict[str, Any]] = []
+        calls_by_key: dict[tuple[Any, Any], dict[str, Any]] = {}
+        active_key: tuple[Any, Any] | None = None
         text_parts: list[str] = []
         finish_reason = None
         for event in events:
@@ -174,7 +175,33 @@ def parse_provider_response(status: int, body: bytes, content_type: str) -> Repl
                 if isinstance(delta.get("content"), str):
                     text_parts.append(delta["content"])
                 if isinstance(delta.get("tool_calls"), list):
-                    calls.extend(delta["tool_calls"])
+                    for call in delta["tool_calls"]:
+                        if not isinstance(call, dict):
+                            continue
+                        function = call.get("function") or {}
+                        if "index" in call:
+                            index = call["index"]
+                        elif call.get("id") is None and active_key is not None:
+                            index = active_key[0]
+                        else:
+                            index = len(calls_by_key)
+                        key = (index, call.get("id") or (active_key[1] if active_key else None))
+                        active_key = key
+                        merged = calls_by_key.setdefault(
+                            key,
+                            {
+                                "index": index,
+                                "id": call.get("id"),
+                                "type": call.get("type", "function"),
+                                "function": {"name": "", "arguments": ""},
+                            },
+                        )
+                        if isinstance(function, dict):
+                            if isinstance(function.get("name"), str):
+                                merged["function"]["name"] = function["name"]
+                            if isinstance(function.get("arguments"), str):
+                                merged["function"]["arguments"] += function["arguments"]
+        calls = list(calls_by_key.values())
         kind = "tool_calls" if calls else "text"
         return ReplayResult(kind, status, "".join(text_parts), tuple(calls), finish_reason)
     try:

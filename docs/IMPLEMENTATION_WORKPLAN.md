@@ -190,3 +190,10 @@ bash scripts/run_formal_evaluation.sh \
 
 使用确认的 main 配置而不是 pilot，冻结审计合格的新库，运行预定配对条件和 ablation。记录版本/hash、真实请求响应、工具/状态证据及官方/机制结果。拒绝、缺失、unknown 不能算成功；不得为正结果修改条件或挑 seed。交付可复算报告、教师阅读入口与状态文档；未执行项明确列出。Git 提交/推送另行确认并先脱敏。
 ```
+
+### 6E. 有限真实 Gemini/OpenClaw 证据（2026-09-09）
+
+1. A direct 回放已通过：真实 `gemini-2.5-flash` 接受合成请求并返回合法 SSE；证据 `experiments/stage-b-20260909-gemini-compat-03/a_direct_replay.json`。
+2. B OpenClaw 无工具对照在修正临时配置后实际发送到 Gemini，但返回 `400 status code (no body)`，gateway 外显 `No response from OpenClaw.`；证据 `b_openclaw_real_v3.json`。配置键错误的两次前置失败单独保留，不能算 provider 请求。
+3. 因 B 失败，未执行真实 Gemini 单工具 C；离线 OpenClaw v2 仅证明内置工具循环和 tool-result 续接得到 `SUM=5`，自定义 `add` 未进入 schema（20 个内置工具），不证明 strict 或受限工具面。
+4. 结论边界：Gemini direct 协议兼容已真实通过；OpenClaw 到 Gemini 的真实无工具链路仍被 400 阻塞；历史 400、空/非 JSON mock、真实 v3 400 分开记账。下一次真实验证最小变量是对比 v3 的最终 OpenClaw body（尤其 stream/消息投影）与 A 的 direct body，并保持单次请求和可保存错误 body；不得在此之前进入 collection/evaluation。

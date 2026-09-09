@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "container_start_returncode": 0,
+  "gateway_start_returncode": 0,
+  "gateway_health_returncode": 0,
+  "gateway_response": "{\"id\":\"chatcmpl_32e1fe52-6ea2-40e4-a205-3f28187d368c\",\"object\":\"chat.completion\",\"created\":1788946519,\"model\":\"openclaw\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"No response from OpenClaw.\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0,\"total_tokens\":0}}",
+  "gateway_response_returncode": 0,
+  "gateway_log_tail": "2026-09-09T09:35:16.915+00:00 [canvas] host mounted at http://127.0.0.1:18789/__openclaw__/canvas/ (root /root/.openclaw/canvas)\n2026-09-09T09:35:16.941+00:00 [heartbeat] started\n2026-09-09T09:35:16.943+00:00 [health-monitor] started (interval: 300s, startup-grace: 60s, channel-connect-grace: 120s)\n2026-09-09T09:35:16.945+00:00 [gateway] agent model: openai/gemini-2.5-flash\n2026-09-09T09:35:16.945+00:00 [gateway] listening on ws://127.0.0.1:18789, ws://[::1]:18789 (PID 32)\n2026-09-09T09:35:16.946+00:00 [gateway] log file: /tmp/openclaw/openclaw-2026-09-09.log\n2026-09-09T09:35:17.110+00:00 [browser/server] Browser control listening on http://127.0.0.1:18791/ (auth=token)\n2026-09-09T09:35:17.293+00:00 [gateway] update available (latest): v2026.9.3 (current v2026.3.12). Run: openclaw update\n2026-09-09T09:35:19.332+00:00 [gateway] device pairing auto-approved device=07a477766c273a7660920537fe426830bf897e8b61d9967b367656148a463652 role=operator\n2026-09-09T09:35:19.876+00:00 [agent/embedded] embedded run agent end: runId=chatcmpl_32e1fe52-6ea2-40e4-a205-3f28187d368c isError=true model=gemini-2.5-flash provider=openai error=400 status code (no body)\n2026-09-09T09:35:19.881+00:00 [compaction-safeguard] Compaction safeguard: cancelling compaction with no real conversation messages to summarize.\n2026-09-09T09:35:19.889+00:00 No reply from agent.\n",
+  "provider_request_count": "unknown (no proxy; one outer gateway request, OpenClaw internal retry not exposed)",
+  "model": "gemini-2.5-flash",
+  "endpoint_path": "/v1beta/openai/chat/completions",
+  "compat": {
+    "supportsStore": false,
+    "supportsUsageInStreaming": false,
+    "maxTokensField": "max_tokens",
+    "supportsStrictMode": false
+  }
+}

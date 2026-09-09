@@ -1,0 +1,18 @@
+{
+  "status": "completed",
+  "container_start_returncode": 0,
+  "gateway_start_returncode": 0,
+  "gateway_health_returncode": 1,
+  "gateway_response": "",
+  "gateway_response_returncode": null,
+  "gateway_log_tail": "Invalid config at /root/.openclaw/openclaw.json:\\n- agents.defaults: Unrecognized key: \"contextWindow\"\n\u2502\n\u25c7  Config \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                                                            \u2502\n\u2502  Config invalid; doctor will run with best-effort config.  \u2502\n\u2502                                                            \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\u2502\n\u25c7  Unknown config keys \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                                   \u2502\n\u2502  - agents.defaults.contextWindow  \u2502\n\u2502                                   \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\n\u2502\n\u25c7  Doctor \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                                                     \u2502\n\u2502  Run \"openclaw doctor --fix\" to remove these keys.  \u2502\n\u2502                                                     \u2502\n\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nConfig invalid\nFile: ~/.openclaw/openclaw.json\nProblem:\n  - agents.defaults: Unrecognized key: \"contextWindow\"\n\nRun: openclaw doctor --fix\n",
+  "provider_request_count": "unknown (no proxy; one outer gateway request, OpenClaw internal retry not exposed)",
+  "model": "gemini-2.5-flash",
+  "endpoint_path": "/v1beta/openai/chat/completions",
+  "compat": {
+    "supportsStore": false,
+    "supportsUsageInStreaming": false,
+    "maxTokensField": "max_tokens",
+    "supportsStrictMode": false
+  }
+}

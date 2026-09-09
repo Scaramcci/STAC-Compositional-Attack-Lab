@@ -60,7 +60,7 @@ def sse_response(*, truncated: bool = False, tool: bool = False) -> MockResponse
         event2 = {
             "choices": [
                 {
-                    "delta": {"tool_calls": [{"function": {"arguments": "2,"}}]},
+                    "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "2,"}}]},
                     "finish_reason": None,
                 }
             ]
@@ -68,7 +68,7 @@ def sse_response(*, truncated: bool = False, tool: bool = False) -> MockResponse
         event3 = {
             "choices": [
                 {
-                    "delta": {"tool_calls": [{"function": {"arguments": '"b":3}'}}]},
+                    "delta": {"tool_calls": [{"index": 0, "function": {"arguments": '"b":3}'}}]},
                     "finish_reason": "tool_calls",
                 }
             ]
@@ -113,11 +113,9 @@ def test_streaming_text_and_fragmented_tool_arguments_replay() -> None:
     result = parse_provider_response(200, tool.body, tool.content_type)
     assert result.kind == "tool_calls"
     assert result.finish_reason == "tool_calls"
-    assert [call["function"]["arguments"] for call in result.tool_calls] == [
-        '{"a":',
-        "2,",
-        '"b":3}',
-    ]
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0]["id"] == "call-1"
+    assert json.loads(result.tool_calls[0]["function"]["arguments"]) == {"a": 2, "b": 3}
 
 
 def test_errors_empty_invalid_and_truncated_are_not_empty_success() -> None:
@@ -145,3 +143,14 @@ def test_transient_errors_retry_but_budget_rejects_extra_attempts() -> None:
         assert attempts == 3
         assert len(server.state.requests) == 2
         assert len(server.state.rejected_attempts) == 1
+
+
+def test_transport_failure_is_bounded_without_provider() -> None:
+    result, attempts = request_with_retries(
+        "http://127.0.0.1:1/v1/chat/completions",
+        {"model": "mock"},
+        max_attempts=2,
+        timeout_seconds=0.1,
+    )
+    assert result.kind == "transport_error"
+    assert attempts == 2

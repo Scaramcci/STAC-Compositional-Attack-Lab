@@ -119,3 +119,12 @@
 ## 7. 续接记录
 
 - 2026-09-09 / `a4ce8940`：按新增授权完成有限兼容诊断；5 个 direct Gemini 探针 HTTP 200（含工具调用、tool-result、streaming，含一次 SSE 纠正解析），4 个 OpenClaw 对照均未产生可观测 provider request，最终返回空/非 JSON。共 9/12 请求，direct 已知 usage 289 total、OpenClaw usage unknown。未运行 collection/mining/freeze/formal，0 accepted、Stage C 不准入。
+
+## 5D. 2026-09-09 有限真实 Gemini/OpenClaw 验证
+
+- 本轮未重复 direct Gemini；先补离线 parser 回归（6 passed），确认 SSE tool-call 按 index/ID 合并为单一调用，`json.loads(arguments)=={"a":2,"b":3}`，并覆盖 transport failure 的显式重试上限。
+- 隔离 pinned `openclaw-env:2026.3.12` 工具实验：`tool_integration_result_v2.json` 中 gateway 真实执行一次本地工具循环，provider 捕获 2 轮消息角色含 `assistant,tool`，最终 `SUM=5`；但出站 schema 是 20 个内置工具，未出现自定义 `add`，故只能证明结果续接，不证明 add 白名单注册或 strict 语义。v3 保留了一次 mock 启动失败（0 provider 请求）作为负证据。
+- A direct 结构回放（`experiments/stage-b-20260909-gemini-compat-03/a_direct_replay.json`）使用合成 system/user、`tools=[]`、`stream=true`、`max_tokens=1024`，真实 Gemini `gemini-2.5-flash` 返回 HTTP 200、`Content-Type: text/event-stream`、`finish_reason=stop`、`[DONE]`，1 次请求；raw SSE 在 `a_direct_replay_sse.raw`，未保存认证信息。
+- B OpenClaw 无工具对照：首次临时配置错误（`agents.defaults.contextWindow`）在 provider 前失败，保留于 `b_openclaw_real.json`/`v2`；修正后 `b_openclaw_real_v3.json` 的 gateway 健康且实际到达 Gemini，OpenClaw 日志为 `400 status code (no body)`，对外 `No response from OpenClaw.`。这是已证实的真实 Gemini 400，不能与本地 JSON/SSE 不匹配或历史 400 证据合并。
+- 真实 provider 请求计数：A=1，B 修正后=1；两次配置前置失败均 provider=0；本轮未执行 C（真实单工具）以遵守前一步失败停止规则。OpenClaw 内部 retry 在无 provider proxy 时不能观测，故不宣称可控；此前 mock 成功请求的 `x-stainless-retry-count=0` 仅为本地证据。
+- compat 四字段在临时配置层存在且模型配置读取成功；本地 mock 无工具请求最终体现 `store`/`max_completion_tokens` 省略、`max_tokens` 存在、空工具无法验证 strict。真实 B 的 400 尚不能归因到单字段或证明组合修复无效。0 accepted 仍阻止正式配对评测，但不阻止独立合成工具/检索观测测试。

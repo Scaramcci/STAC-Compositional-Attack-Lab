@@ -7,7 +7,6 @@ from __future__ import annotations
 import base64
 import json
 import subprocess
-import sys
 import time
 from pathlib import Path
 
@@ -24,12 +23,11 @@ def run(*args: str, check: bool = False, timeout: int = 30) -> subprocess.Comple
 
 
 def main() -> int:
-    with_tool = "--with-tool" in sys.argv
     OUT.mkdir(parents=True, exist_ok=True)
     run("rm", "-f", CONTAINER)
     started = run("run", "-d", "--network", "none", "--name", CONTAINER, IMAGE, "sleep", "infinity")
     if started.returncode != 0:
-        (OUT / "integration_result.json").write_text(
+        (OUT / "tool_integration_result_v3.json").write_text(
             json.dumps(
                 {"status": "container_start_failed", "stderr": started.stderr[-500:]}, indent=2
             )
@@ -80,9 +78,26 @@ def main() -> int:
                 }
             },
         },
-        "tools": {"deny": ["*"]},
+        "tools": {
+            "allow": ["add"],
+            "deny": ["exec", "process", "read", "write", "edit", "browser"],
+        },
+        "plugins": {"load": {"paths": ["/tmp/add-plugin.js"]}},
     }
     config_json = json.dumps(config)
+    plugin_code = r"""module.exports = {
+  id: "local-add",
+  name: "local-add",
+  register(api) {
+    api.registerTool({
+      name: "add",
+      description: "Add two numbers locally",
+      parameters: {type: "object", properties: {a: {type: "number"}, b: {type: "number"}}, required: ["a", "b"]},
+      async execute(_id, params) { return {content: [{type: "text", text: String(Number(params.a) + Number(params.b))}]}; }
+    });
+  }
+};
+"""
     mock_code = r"""import json, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class H(BaseHTTPRequestHandler):
@@ -93,10 +108,22 @@ class H(BaseHTTPRequestHandler):
     n=int(self.headers.get("content-length","0")); raw=self.rfile.read(n)
     body=json.loads(raw)
     safe={"path":self.path,"headers":{k.lower():v for k,v in self.headers.items() if k.lower() not in ("authorization","proxy-authorization")},"body":body,"received_at":time.time()}
-    json.dump(safe,open("/tmp/mock-capture.json","w"))
-    out={"id":"mock-response-1","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":"MOCK_OK"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+    try:
+      captures=json.load(open("/tmp/mock-captures.json"))
+except Exception:
+      captures=[]
+    captures.append({"path":safe["path"],"headers":safe["headers"],"body":body,"received_at":safe["received_at"]})
+    json.dump(captures,open("/tmp/mock-captures.json","w"))
+    has_tool_result=any(isinstance(m,dict) and m.get("role")=="tool" for m in body.get("messages",[]))
+    if has_tool_result:
+      out={"id":"mock-response-final","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+    else:
+      out={"id":"mock-response-tool","object":"chat.completion","model":"mock-model","choices":[{"index":0,"message":{"role":"assistant","content":None,"tool_calls":[{"id":"call-add-1","type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
     if body.get("stream"):
-      chunk={"id":"mock-response-1","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","content":"MOCK_OK"},"finish_reason":"stop"}]}
+      if has_tool_result:
+        chunk={"id":"mock-response-final","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","content":"SUM=5"},"finish_reason":"stop"}]}
+      else:
+        chunk={"id":"mock-response-tool","object":"chat.completion.chunk","model":"mock-model","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call-add-1","type":"function","function":{"name":"add","arguments":"{\"a\":2,\"b\":3}"}}]},"finish_reason":"tool_calls"}]}
       b=("data: "+json.dumps(chunk)+"\n\ndata: [DONE]\n\n").encode(); ctype="text/event-stream"
     else:
       b=json.dumps(out).encode(); ctype="application/json"
@@ -122,6 +149,17 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
             "python3",
             "-c",
             "import base64; open('/tmp/mock.py','wb').write(base64.b64decode('" + mock_b64 + "'))",
+            timeout=10,
+        )
+        plugin_b64 = base64.b64encode(plugin_code.encode()).decode()
+        run(
+            "exec",
+            CONTAINER,
+            "python3",
+            "-c",
+            "import base64; open('/tmp/add-plugin.js','wb').write(base64.b64decode('"
+            + plugin_b64
+            + "'))",
             timeout=10,
         )
         mock_start = run(
@@ -179,36 +217,7 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
                     "-H",
                     "Content-Type: application/json",
                     "-d",
-                    json.dumps(
-                        {
-                            "model": "openclaw",
-                            "messages": [{"role": "user", "content": "Reply with one word."}],
-                            "stream": False,
-                            **(
-                                {
-                                    "tools": [
-                                        {
-                                            "type": "function",
-                                            "function": {
-                                                "name": "add",
-                                                "description": "Add two numbers",
-                                                "parameters": {
-                                                    "type": "object",
-                                                    "properties": {
-                                                        "a": {"type": "number"},
-                                                        "b": {"type": "number"},
-                                                    },
-                                                    "required": ["a", "b"],
-                                                },
-                                            },
-                                        }
-                                    ]
-                                }
-                                if with_tool
-                                else {}
-                            ),
-                        }
-                    ),
+                    '{"model":"openclaw","messages":[{"role":"user","content":"Use the add tool to calculate 2+3, then report the result."}],"stream":false}',
                     "http://127.0.0.1:18789/v1/chat/completions",
                     timeout=30,
                 )
@@ -219,7 +228,7 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
             CONTAINER,
             "sh",
             "-c",
-            "cat /tmp/mock-capture.json 2>/dev/null || true",
+            "cat /tmp/mock-captures.json 2>/dev/null || true",
             timeout=10,
         )
         logs = run(
@@ -230,8 +239,10 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
             "find /tmp /root/.openclaw/logs -maxdepth 2 -type f 2>/dev/null | sort | while read f; do echo FILE:$f; tail -80 $f; done",
             timeout=10,
         )
-        captured = json.loads(capture.stdout) if capture.stdout.strip() else None
-        body = captured.get("body", {}) if isinstance(captured, dict) else {}
+        captured = json.loads(capture.stdout) if capture.stdout.strip() else []
+        if isinstance(captured, dict):
+            captured = [captured]
+        body = captured[-1].get("body", {}) if captured else {}
         log_text = logs.stdout[-12000:]
         log_lines = [
             line
@@ -288,11 +299,12 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
             "gateway_response": response.stdout if response else "",
             "gateway_response_returncode": response.returncode if response else None,
             "mock_capture": {
-                "path": captured.get("path") if isinstance(captured, dict) else None,
+                "request_count": len(captured),
+                "path": captured[-1].get("path") if captured else None,
                 "headers": {
-                    k: captured.get("headers", {}).get(k)
+                    k: (captured[-1].get("headers", {}) if captured else {}).get(k)
                     for k in ("content-type", "user-agent", "x-stainless-retry-count")
-                    if isinstance(captured, dict)
+                    if captured
                 },
                 "body_keys": sorted(body) if isinstance(body, dict) else [],
                 "model": body.get("model") if isinstance(body, dict) else None,
@@ -324,11 +336,23 @@ ThreadingHTTPServer(("127.0.0.1",19090),H).serve_forever()
                 ]
                 if isinstance(body, dict)
                 else [],
+                "tool_message_projection": [
+                    {
+                        "role": m.get("role"),
+                        "tool_call_id": m.get("tool_call_id"),
+                        "name": m.get("name"),
+                        "content_length": len(str(m.get("content", ""))),
+                    }
+                    for m in body.get("messages", [])
+                    if isinstance(m, dict) and m.get("role") in {"assistant", "tool"}
+                ]
+                if isinstance(body, dict)
+                else [],
             },
             "mock_capture_returncode": capture.returncode,
             "redacted_log_markers": log_lines[-80:],
         }
-        (OUT / "integration_result.json").write_text(
+        (OUT / "tool_integration_result_v3.json").write_text(
             json.dumps(result, indent=2, sort_keys=True) + "\n"
         )
         return 0
