@@ -1,0 +1,141 @@
+{
+  "decisions": [
+    {
+      "emitted_occurrence_id": "occ-a8999aef0df53385",
+      "event_id": "control-construction-a1-83",
+      "hard_fact": true,
+      "matched_primitive_ref": "core.control.branch@1",
+      "reason_codes": [
+        "deterministic_match"
+      ],
+      "semantic_labels": {}
+    },
+    {
+      "emitted_occurrence_id": "occ-0e7a0e43d1710f85",
+      "event_id": "control-construction-a2-84",
+      "hard_fact": true,
+      "matched_primitive_ref": "core.control.branch@1",
+      "reason_codes": [
+        "deterministic_match"
+      ],
+      "semantic_labels": {}
+    },
+    {
+      "emitted_occurrence_id": "occ-5959ea114f996277",
+      "event_id": "control-construction-a3-85",
+      "hard_fact": true,
+      "matched_primitive_ref": "core.control.branch@1",
+      "reason_codes": [
+        "deterministic_match"
+      ],
+      "semantic_labels": {}
+    }
+  ],
+  "extraction_hash": "2c81abb0342e1c95870e06aaee2b9390a32b683db325eb7ed3f1c5775ec82c40",
+  "graph_id": "graph-trajectory-pse-2.1-004-124279de38f3d8b3",
+  "occurrences": [
+    {
+      "confidence": 1.0,
+      "evidence_grades": [
+        "E1",
+        "E2"
+      ],
+      "evidence_ref_ids": [
+        "control-construction-a1-83",
+        "bridge:construction-a1"
+      ],
+      "family": "CONTROL",
+      "graph_id": "graph-trajectory-pse-2.1-004-124279de38f3d8b3",
+      "hard_fact": true,
+      "input_artifact_ids": [],
+      "occurrence_id": "occ-a8999aef0df53385",
+      "outcome": "passed",
+      "output_artifact_ids": [],
+      "post_state_refs": [],
+      "pre_state_refs": [],
+      "primitive_ref": "core.control.branch@1",
+      "reason_codes": [],
+      "schema_version": "2.0",
+      "semantic_labels": {},
+      "source_component_roles": [
+        "session_lifecycle"
+      ],
+      "source_event_ids": [
+        "control-construction-a1-83"
+      ],
+      "subtype": "branch",
+      "target_component_roles": [
+        "session_lifecycle"
+      ]
+    },
+    {
+      "confidence": 1.0,
+      "evidence_grades": [
+        "E1",
+        "E2"
+      ],
+      "evidence_ref_ids": [
+        "control-construction-a2-84",
+        "bridge:construction-a2"
+      ],
+      "family": "CONTROL",
+      "graph_id": "graph-trajectory-pse-2.1-004-124279de38f3d8b3",
+      "hard_fact": true,
+      "input_artifact_ids": [],
+      "occurrence_id": "occ-0e7a0e43d1710f85",
+      "outcome": "passed",
+      "output_artifact_ids": [],
+      "post_state_refs": [],
+      "pre_state_refs": [],
+      "primitive_ref": "core.control.branch@1",
+      "reason_codes": [],
+      "schema_version": "2.0",
+      "semantic_labels": {},
+      "source_component_roles": [
+        "session_lifecycle"
+      ],
+      "source_event_ids": [
+        "control-construction-a2-84"
+      ],
+      "subtype": "branch",
+      "target_component_roles": [
+        "session_lifecycle"
+      ]
+    },
+    {
+      "confidence": 1.0,
+      "evidence_grades": [
+        "E1",
+        "E2"
+      ],
+      "evidence_ref_ids": [
+        "control-construction-a3-85",
+        "bridge:construction-a3"
+      ],
+      "family": "CONTROL",
+      "graph_id": "graph-trajectory-pse-2.1-004-124279de38f3d8b3",
+      "hard_fact": true,
+      "input_artifact_ids": [],
+      "occurrence_id": "occ-5959ea114f996277",
+      "outcome": "passed",
+      "output_artifact_ids": [],
+      "post_state_refs": [],
+      "pre_state_refs": [],
+      "primitive_ref": "core.control.branch@1",
+      "reason_codes": [],
+      "schema_version": "2.0",
+      "semantic_labels": {},
+      "source_component_roles": [
+        "session_lifecycle"
+      ],
+      "source_event_ids": [
+        "control-construction-a3-85"
+      ],
+      "subtype": "branch",
+      "target_component_roles": [
+        "session_lifecycle"
+      ]
+    }
+  ],
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf"
+}

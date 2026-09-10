@@ -1,0 +1,11 @@
+{
+  "artifact_count": 4,
+  "edge_count": 2,
+  "normalized_event_count": 10,
+  "passed": true,
+  "reason_counts": {},
+  "schema_version": "2.0",
+  "source_event_count": 10,
+  "trajectory_id": "trajectory-pse-2.3-004-0daaf81e01ca953a",
+  "unresolved_count": 0
+}

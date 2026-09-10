@@ -1,0 +1,116 @@
+{
+  "artifacts": [],
+  "edges": [],
+  "events": [
+    {
+      "action_journal_ref": null,
+      "actor_role": "construction_attacker",
+      "attacker_action_id": null,
+      "attacker_call_id": null,
+      "component_role": "session_lifecycle",
+      "episode_id": "construction-episode-pse-2.1-004",
+      "event_id": "control-construction-a1-83",
+      "event_type": "lifecycle",
+      "evidence_ref_ids": [
+        "bridge:construction-a1"
+      ],
+      "input_artifact_ids": [],
+      "lifecycle_id": "construction-a1",
+      "logical_time": 83,
+      "operation": "branch_reroute",
+      "output_artifact_ids": [],
+      "plan_id": null,
+      "plan_stage_id": null,
+      "post_state_ref": null,
+      "pre_state_ref": null,
+      "public_payload": {
+        "transition": "reroute"
+      },
+      "read_state_refs": [],
+      "request_event_id": null,
+      "schema_version": "2.0",
+      "sequence_no": 83,
+      "session_id": "construction-control",
+      "source_event_ref": "control-construction-a1-83",
+      "status": "passed",
+      "trajectory_id": "trajectory-pse-2.1-004-124279de38f3d8b3",
+      "write_state_refs": []
+    },
+    {
+      "action_journal_ref": null,
+      "actor_role": "construction_attacker",
+      "attacker_action_id": null,
+      "attacker_call_id": null,
+      "component_role": "session_lifecycle",
+      "episode_id": "construction-episode-pse-2.1-004",
+      "event_id": "control-construction-a2-84",
+      "event_type": "lifecycle",
+      "evidence_ref_ids": [
+        "bridge:construction-a2"
+      ],
+      "input_artifact_ids": [],
+      "lifecycle_id": "construction-a2",
+      "logical_time": 84,
+      "operation": "branch_reroute",
+      "output_artifact_ids": [],
+      "plan_id": null,
+      "plan_stage_id": null,
+      "post_state_ref": null,
+      "pre_state_ref": null,
+      "public_payload": {
+        "transition": "reroute"
+      },
+      "read_state_refs": [],
+      "request_event_id": null,
+      "schema_version": "2.0",
+      "sequence_no": 84,
+      "session_id": "construction-control",
+      "source_event_ref": "control-construction-a2-84",
+      "status": "passed",
+      "trajectory_id": "trajectory-pse-2.1-004-124279de38f3d8b3",
+      "write_state_refs": []
+    },
+    {
+      "action_journal_ref": null,
+      "actor_role": "construction_attacker",
+      "attacker_action_id": null,
+      "attacker_call_id": null,
+      "component_role": "session_lifecycle",
+      "episode_id": "construction-episode-pse-2.1-004",
+      "event_id": "control-construction-a3-85",
+      "event_type": "lifecycle",
+      "evidence_ref_ids": [
+        "bridge:construction-a3"
+      ],
+      "input_artifact_ids": [],
+      "lifecycle_id": "construction-a3",
+      "logical_time": 85,
+      "operation": "branch_reroute",
+      "output_artifact_ids": [],
+      "plan_id": null,
+      "plan_stage_id": null,
+      "post_state_ref": null,
+      "pre_state_ref": null,
+      "public_payload": {
+        "transition": "reroute"
+      },
+      "read_state_refs": [],
+      "request_event_id": null,
+      "schema_version": "2.0",
+      "sequence_no": 85,
+      "session_id": "construction-control",
+      "source_event_ref": "control-construction-a3-85",
+      "status": "passed",
+      "trajectory_id": "trajectory-pse-2.1-004-124279de38f3d8b3",
+      "write_state_refs": []
+    }
+  ],
+  "graph_hash": "70beb50f81fb110c55ef685ad921a1fa5f3875e805b893282c068ae9f1b294bf",
+  "graph_id": "graph-trajectory-pse-2.1-004-124279de38f3d8b3",
+  "normalization_audit_ref": "trajectory-pse-2.1-004-124279de38f3d8b3/normalization_audit.json",
+  "observable_projection_version": "formal-observable-v1",
+  "schema_version": "2.0",
+  "source_trajectory_hash": "3020b009b683a0c958e6f83c686aabb8755441ac82a856f4330088db54e811af",
+  "trajectory_id": "trajectory-pse-2.1-004-124279de38f3d8b3",
+  "unresolved_links": []
+}

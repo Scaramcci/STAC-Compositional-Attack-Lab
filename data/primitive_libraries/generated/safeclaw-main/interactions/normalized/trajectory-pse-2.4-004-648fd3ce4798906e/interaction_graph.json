@@ -1,0 +1,49 @@
+{
+  "artifacts": [],
+  "edges": [],
+  "events": [
+    {
+      "action_journal_ref": null,
+      "actor_role": "collector",
+      "attacker_action_id": null,
+      "attacker_call_id": null,
+      "component_role": "session_lifecycle",
+      "episode_id": "error-trajectory-pse-2.4-004-648fd3ce4798906e",
+      "event_id": "collection-error-trajectory-pse-2.4-004-648fd3ce4798906e",
+      "event_type": "lifecycle",
+      "evidence_ref_ids": [
+        "collection_failure:trajectory-pse-2.4-004-648fd3ce4798906e"
+      ],
+      "input_artifact_ids": [],
+      "lifecycle_id": "trajectory-pse-2.4-004-648fd3ce4798906e",
+      "logical_time": 1,
+      "operation": "stop_collection_error",
+      "output_artifact_ids": [],
+      "plan_id": null,
+      "plan_stage_id": null,
+      "post_state_ref": null,
+      "pre_state_ref": null,
+      "public_payload": {
+        "failure_category": "ValidationError",
+        "failure_message": "1 validation error for ConstructionAttackerAction\n  Value error, construction_surface_required_only_for_delivery [type=value_error, input_value={'action_id': 'constructi...rom the previous turn.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/value_error"
+      },
+      "read_state_refs": [],
+      "request_event_id": null,
+      "schema_version": "2.0",
+      "sequence_no": 1,
+      "session_id": "collection-error",
+      "source_event_ref": "collection-error-trajectory-pse-2.4-004-648fd3ce4798906e",
+      "status": "error",
+      "trajectory_id": "trajectory-pse-2.4-004-648fd3ce4798906e",
+      "write_state_refs": []
+    }
+  ],
+  "graph_hash": "d1b563937fc8a3e2944ddd59645303a3011a2259d301ae9871b4fc304ada9bbf",
+  "graph_id": "graph-trajectory-pse-2.4-004-648fd3ce4798906e",
+  "normalization_audit_ref": "trajectory-pse-2.4-004-648fd3ce4798906e/normalization_audit.json",
+  "observable_projection_version": "formal-observable-v1",
+  "schema_version": "2.0",
+  "source_trajectory_hash": "2218d0732db7890e3f628e42feef09581b3b6a9ebcd009de7b58e8dcf4cb5217",
+  "trajectory_id": "trajectory-pse-2.4-004-648fd3ce4798906e",
+  "unresolved_links": []
+}

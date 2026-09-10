@@ -1,0 +1,53 @@
+{
+  "decisions": [
+    {
+      "emitted_occurrence_id": "occ-b59ac2d4419c60f0",
+      "event_id": "collection-error-trajectory-pse-2.1-003-3e08c4d786ae8bc2",
+      "hard_fact": true,
+      "matched_primitive_ref": "core.control.stop@1",
+      "reason_codes": [
+        "deterministic_match"
+      ],
+      "semantic_labels": {}
+    }
+  ],
+  "extraction_hash": "30c0ac7d95ef1859b13745687993d11cbd0bfb1afd5cd095b59cb707754e52c6",
+  "graph_id": "graph-trajectory-pse-2.1-003-3e08c4d786ae8bc2",
+  "occurrences": [
+    {
+      "confidence": 1.0,
+      "evidence_grades": [
+        "E1",
+        "E2"
+      ],
+      "evidence_ref_ids": [
+        "collection-error-trajectory-pse-2.1-003-3e08c4d786ae8bc2",
+        "collection_failure:trajectory-pse-2.1-003-3e08c4d786ae8bc2"
+      ],
+      "family": "CONTROL",
+      "graph_id": "graph-trajectory-pse-2.1-003-3e08c4d786ae8bc2",
+      "hard_fact": true,
+      "input_artifact_ids": [],
+      "occurrence_id": "occ-b59ac2d4419c60f0",
+      "outcome": "error",
+      "output_artifact_ids": [],
+      "post_state_refs": [],
+      "pre_state_refs": [],
+      "primitive_ref": "core.control.stop@1",
+      "reason_codes": [],
+      "schema_version": "2.0",
+      "semantic_labels": {},
+      "source_component_roles": [
+        "session_lifecycle"
+      ],
+      "source_event_ids": [
+        "collection-error-trajectory-pse-2.1-003-3e08c4d786ae8bc2"
+      ],
+      "subtype": "stop",
+      "target_component_roles": [
+        "session_lifecycle"
+      ]
+    }
+  ],
+  "registry_hash": "a23474b5967c8efde66ca5d97ff10c6b2cccf9d3c7c0a29710390cb1748f18bf"
+}
