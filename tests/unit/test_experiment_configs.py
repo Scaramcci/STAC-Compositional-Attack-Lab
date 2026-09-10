@@ -92,7 +92,7 @@ def test_formal_matrix_is_three_condition_and_coverage_limited() -> None:
         "dependency_ablation",
     ]
     assert len(formal.conditions) * len(formal.seeds) * len(task_set.tasks) == 15
-    assert formal.allowed_target_models == ["gemini-2.5-flash"]
+    assert formal.allowed_target_models == ["ep-20260909180104-hmx9m"]
     assert environment.allowed_target_models == formal.allowed_target_models
     assert environment.embedding_policy == "required_endpoint"
     assert environment.embedding_provider == "ark_multimodal"

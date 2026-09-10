@@ -105,8 +105,11 @@ class SampleGenerationConfig(StrictModel):
     target_accepted_samples: PositiveInt = 1
     max_events: PositiveInt = 200
     timeout_seconds: PositiveInt = 1200
+    provider_request_budget: PositiveInt = 128
+    provider_timeout_seconds: PositiveInt = 90
+    provider_allowed_tools: list[str] | None = None
     minimum_free_disk_gb: PositiveInt = 20
-    output_root: str = "data/primitive_libraries/generated"
+    output_root: str = "experiments/runs"
 
     @model_validator(mode="after")
     def validate_adapter_configuration(self) -> SampleGenerationConfig:
@@ -134,6 +137,10 @@ class SampleGenerationConfig(StrictModel):
             raise ValueError("sample_target_exceeds_trajectory_cap")
         if len(self.source_task_ids) != len(set(self.source_task_ids)):
             raise ValueError("duplicate_sample_source_task_id")
+        if self.provider_allowed_tools is not None and len(self.provider_allowed_tools) != len(
+            set(self.provider_allowed_tools)
+        ):
+            raise ValueError("duplicate_sample_provider_allowed_tool")
         if self.source_adapter == "jsonl_authorized_fixture":
             if self.source_fixture_path is None:
                 raise ValueError("fixture_adapter_requires_source_fixture_path")
@@ -479,6 +486,9 @@ def _collection_components(
             api_key_env=str(embedding_api_key_env),
         ),
         model_hash=str(config.victim_model_hash),
+        provider_request_budget=config.provider_request_budget,
+        provider_timeout_seconds=config.provider_timeout_seconds,
+        provider_allowed_tools=config.provider_allowed_tools,
         environment=env,
     )
     live_adapter = SafeClawConstructionInteractionAdapter(

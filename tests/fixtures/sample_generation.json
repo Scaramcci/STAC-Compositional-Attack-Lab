@@ -47,5 +47,5 @@
     "persistent_state_read",
     "effectful_sandbox_action"
   ],
-  "output_root": "data/primitive_libraries/generated"
+  "output_root": "experiments/runs"
 }

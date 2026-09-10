@@ -11,14 +11,11 @@ integrations/safeclaw/upstream/
 .pytest_cache/
 .ruff_cache/
 # Generated evidence and run artifacts
-data/primitive_libraries/generated/*
-!data/primitive_libraries/generated/.gitkeep
-experiments/safeclaw_runs/*
-!experiments/safeclaw_runs/.gitkeep
+experiments/runs/*
+!experiments/runs/.gitkeep
 # Local virtual environments
 .venv-vllm/
 
-# Generated libraries, frozen artifacts, and experiment runs
+# Generated libraries and frozen artifacts
 data/frozen/*
 !data/frozen/.gitkeep
-experiments/runs/*

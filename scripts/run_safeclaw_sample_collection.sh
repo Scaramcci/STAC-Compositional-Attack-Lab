@@ -4,8 +4,15 @@ set -Eeuo pipefail
 umask 077
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${PROJECT_ROOT}/.env"
+  set +a
+fi
 CONFIG="configs/sample_generation/pilot_collection.yaml"
-PYTHON_BIN="${STAC_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"
+RUN_ID=""
+PYTHON_BIN="${STAC_PYTHON:-python3}"
 PREFLIGHT_ONLY=false
 PRINT_OUTPUT=false
 
@@ -15,6 +22,7 @@ usage() {
     "" \
     "Options:" \
     "  --config PATH          Versioned sample-generation config." \
+    "  --run-id ID            Unique output id; reuse explicitly to resume." \
     "  --preflight-only       Run deterministic preflight and exit." \
     "  --print-output-dir     Print the configured collection directory and exit." \
     "  -h, --help             Show this help."
@@ -25,6 +33,11 @@ while [[ $# -gt 0 ]]; do
     --config)
       [[ $# -ge 2 ]] || { echo "Missing value for --config" >&2; exit 2; }
       CONFIG="$2"
+      shift 2
+      ;;
+    --run-id)
+      [[ $# -ge 2 ]] || { echo "Missing value for --run-id" >&2; exit 2; }
+      RUN_ID="$2"
       shift 2
       ;;
     --preflight-only)
@@ -47,7 +60,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -x "${PYTHON_BIN}" ]]; then
+if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
   echo "Python environment not found: ${PYTHON_BIN}" >&2
   exit 2
 fi
@@ -55,9 +68,29 @@ if [[ ! -f "${PROJECT_ROOT}/${CONFIG}" ]]; then
   echo "Sample collection config not found: ${CONFIG}" >&2
   exit 2
 fi
+if [[ -z "${RUN_ID}" ]]; then
+  RUN_ID="collection-$(${PYTHON_BIN} -c 'import uuid; print(uuid.uuid4().hex[:12])')"
+fi
+if [[ ! "${RUN_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Invalid run id: use only letters, numbers, dot, underscore, and hyphen." >&2
+  exit 2
+fi
+
+RUNTIME_CONFIG="$(mktemp "${TMPDIR:-/tmp}/stac-collection-config-XXXXXX.json")"
+trap 'rm -f "${RUNTIME_CONFIG}"' EXIT
+"${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" "${RUNTIME_CONFIG}" "${RUN_ID}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+source, target, run_id = map(Path, sys.argv[1:])
+value = json.loads(source.read_text(encoding="utf-8"))
+value["output_root"] = str(Path("experiments/runs") / run_id)
+target.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+PY
 
 RUN_METADATA="$(
-  PYTHONPATH="${PROJECT_ROOT}/src" "${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" <<'PY'
+  PYTHONPATH="${PROJECT_ROOT}/src" "${PYTHON_BIN}" - "${RUNTIME_CONFIG}" <<'PY'
 import sys
 from pathlib import Path
 
@@ -105,6 +138,7 @@ fi
 
 finish() {
   local status=$?
+  rm -f "${RUNTIME_CONFIG}"
   echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] finished status=${status} log=${LOG_FILE}"
 }
 trap finish EXIT
@@ -113,14 +147,15 @@ cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}/src"
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] starting library_version=${LIBRARY_VERSION}"
 echo "config=${CONFIG}"
+echo "run_id=${RUN_ID}"
 echo "collection_root=${COLLECTION_REL}"
 
-"${PYTHON_BIN}" -u -m stac_attack_lab.cli sample collect-preflight --config "${CONFIG}"
+"${PYTHON_BIN}" -u -m stac_attack_lab.cli sample collect-preflight --config "${RUNTIME_CONFIG}"
 
 if [[ "${PREFLIGHT_ONLY}" == "true" ]]; then
   echo "sample_collection_preflight=passed"
   exit 0
 fi
 
-"${PYTHON_BIN}" -u -m stac_attack_lab.cli sample collect --config "${CONFIG}"
+"${PYTHON_BIN}" -u -m stac_attack_lab.cli sample collect --config "${RUNTIME_CONFIG}"
 echo "sample_collection=${PROJECT_ROOT}/${COLLECTION_REL}"

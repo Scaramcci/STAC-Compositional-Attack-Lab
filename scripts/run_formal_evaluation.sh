@@ -4,12 +4,18 @@ set -Eeuo pipefail
 umask 077
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN_ID="safeclaw-formal-main"
+if [[ -f "${PROJECT_ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${PROJECT_ROOT}/.env"
+  set +a
+fi
+RUN_ID=""
 FORMAL_CONFIG="configs/experiments/formal_evaluation.yaml"
 PREFLIGHT_CONFIG="configs/environments/safeclaw.yaml"
 UPSTREAM_REL="integrations/safeclaw/upstream/SafeClawArena"
 PSE_TASK_REL="tasks/pse/pse-2.1-001.json"
-PYTHON_BIN="${STAC_PYTHON:-${PROJECT_ROOT}/.venv/bin/python}"
+PYTHON_BIN="${STAC_PYTHON:-python3}"
 
 usage() {
   printf '%s\n' \
@@ -63,12 +69,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! "${RUN_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  echo "Invalid run id: use only letters, numbers, dot, underscore, and hyphen." >&2
+if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+  echo "Python environment not found: ${PYTHON_BIN}" >&2
   exit 2
 fi
-if [[ ! -x "${PYTHON_BIN}" ]]; then
-  echo "Python environment not found: ${PYTHON_BIN}" >&2
+if [[ -z "${RUN_ID}" ]]; then
+  RUN_ID="formal-$(${PYTHON_BIN} -c 'import uuid; print(uuid.uuid4().hex[:12])')"
+fi
+if [[ ! "${RUN_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "Invalid run id: use only letters, numbers, dot, underscore, and hyphen." >&2
   exit 2
 fi
 for path in "${FORMAL_CONFIG}" "${PREFLIGHT_CONFIG}"; do
@@ -78,7 +87,7 @@ for path in "${FORMAL_CONFIG}" "${PREFLIGHT_CONFIG}"; do
   fi
 done
 
-RUN_ROOT_REL="experiments/safeclaw_runs/${RUN_ID}"
+RUN_ROOT_REL="experiments/runs/${RUN_ID}"
 RUN_ROOT="${PROJECT_ROOT}/${RUN_ROOT_REL}"
 LOG_FILE="${RUN_ROOT}/tmux-run.log"
 

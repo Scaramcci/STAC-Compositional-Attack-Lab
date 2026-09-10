@@ -164,8 +164,11 @@ class SafeClawFormalConfig(StrictModel):
     target_api_key_env: str
     timeout_seconds: PositiveInt = 1200
     max_attempts: PositiveInt = 2
+    provider_request_budget: PositiveInt = 128
+    provider_timeout_seconds: PositiveInt = 90
+    provider_allowed_tools: list[str] | None = None
     budget: FormalBudget
-    output_root: str = "experiments/safeclaw_runs"
+    output_root: str = "experiments/runs"
 
     @model_validator(mode="after")
     def validate_matrix(self) -> SafeClawFormalConfig:
@@ -173,6 +176,10 @@ class SafeClawFormalConfig(StrictModel):
             raise ValueError("formal_conditions_and_seeds_must_be_nonempty")
         if len(self.conditions) != len(set(self.conditions)):
             raise ValueError("duplicate_formal_condition")
+        if self.provider_allowed_tools is not None and len(self.provider_allowed_tools) != len(
+            set(self.provider_allowed_tools)
+        ):
+            raise ValueError("duplicate_formal_provider_allowed_tool")
         if self.attacker_execution_enabled and (
             not self.attacker_stage_implemented
             or self.attacker_model_config_path is None
@@ -840,6 +847,9 @@ def run_safeclaw_formal(
                             target_base_url=request.target_base_url,
                             target_api_key_env=request.target_api_key_env,
                             embedding=request.embedding,
+                            provider_request_budget=config.provider_request_budget,
+                            provider_timeout_seconds=config.provider_timeout_seconds,
+                            provider_allowed_tools=config.provider_allowed_tools,
                             environment=env,
                         )
                     )
@@ -869,6 +879,9 @@ def run_safeclaw_formal(
                             target_base_url=request.target_base_url,
                             target_api_key_env=request.target_api_key_env,
                             embedding=request.embedding,
+                            provider_request_budget=config.provider_request_budget,
+                            provider_timeout_seconds=config.provider_timeout_seconds,
+                            provider_allowed_tools=config.provider_allowed_tools,
                             environment=env,
                         )
                     )
@@ -899,6 +912,9 @@ def run_safeclaw_formal(
                             target_base_url=request.target_base_url,
                             target_api_key_env=request.target_api_key_env,
                             embedding=request.embedding,
+                            provider_request_budget=config.provider_request_budget,
+                            provider_timeout_seconds=config.provider_timeout_seconds,
+                            provider_allowed_tools=config.provider_allowed_tools,
                             environment=env,
                         )
                     )

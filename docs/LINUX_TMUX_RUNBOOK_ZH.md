@@ -1,227 +1,96 @@
-# Linux 服务器 tmux 运行手册
+# Linux 运行说明
 
-本文给出从 pilot collection 到 formal evaluation 的实际命令。所有命令都在项目根目录执行；请把 `/absolute/path/stac-compositional-attack-lab` 替换为服务器上的绝对路径。
-
-## 1. 一次性准备
+所有命令在仓库根目录执行。建议使用已有 `stac` conda 环境：
 
 ```bash
-cd /absolute/path/stac-compositional-attack-lab
-python3 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
+conda activate stac
+python -m pip install -e '.[dev]'
 cp .env.example .env
 chmod 600 .env
+make check PYTHON=python
 ```
 
-在 `.env` 中填写 `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`SAFECLAW_MODEL` 和三个 `SAFECLAW_EMBEDDING_*` 变量。不要把凭证直接写进 tmux 命令或提交到 Git。
+## 环境变量
 
-确认外部环境：
+| 角色 | 变量 | 当前值或用途 |
+|---|---|---|
+| Victim | `SAFECLAW_MODEL` | `ep-20260909180104-hmx9m` |
+| Victim | `SAFECLAW_BASE_URL` | `https://ark.cn-beijing.volces.com/api/v3`；这是 API root，不追加 `/v1` |
+| Victim | `SAFECLAW_API_KEY` | 服务器现有 Ark 凭证 |
+| Embedding | `SAFECLAW_EMBEDDING_MODEL` | 独立 embedding endpoint |
+| Embedding | `SAFECLAW_EMBEDDING_BASE_URL` | 独立 API root |
+| Embedding | `SAFECLAW_EMBEDDING_API_KEY` | 独立凭证 |
+| Planner/Attacker | `OPENAI_BASE_URL`、`OPENAI_API_KEY` | 现有 `gpt-5.5` 配置 |
+| Launcher | `STAC_PYTHON` | 可选；例如 conda 环境中的 `python` |
+| Gateway | `SAFECLAW_GATEWAY_HOST_PORT` | 可选；缺省 `0`，让 Docker 原子分配宿主端口 |
+
+不要打印 `.env`、把 key 放进命令行，或关闭 TLS 校验。
+
+## 端口与生命周期
+
+| 服务 | 网络命名空间 | bind/端口 | 宿主发布 | 启停与健康检查 |
+|---|---|---|---|---|
+| OpenClaw gateway | 每个 Victim 容器 | `127.0.0.1:18789` | `127.0.0.1:<Docker 原子分配>`；显式端口占用会报错 | pinned judge 启动，bridge 关闭；gateway health RPC |
+| Ark embedding adapter | Victim 容器 | `127.0.0.1:18790` | 否 | safety patch 启动，随 Victim 删除；`GET /health` |
+| provider relay | 每次运行独立 sibling 容器 | `0.0.0.0:18791`，只在该次 Docker network 可达 | 否 | bridge 启动/关闭；`GET /health` |
+| 诊断 mock / 历史 gateway 默认 | 诊断 provider 容器 / 宿主 | `127.0.0.1:19090` | 当前主线不发布 | 统一诊断脚本启停；旧 upstream 默认仅作配置记录 |
+
+不同容器可复用内部端口。Victim 收到的 provider 地址是 sibling relay DNS，不是容器 loopback；embedding 是 Victim 自身 loopback；宿主只访问动态发布的 gateway。browser 被禁用，canvas 不单独发布，管理端口不暴露。
+
+容器和网络名包含 UUID。Docker 在 `run -p 127.0.0.1::18789` 时原子选端口，避免“先探测后启动”的竞争。若设置固定宿主端口且已占用，启动直接失败，不会杀占用进程。成功、失败、超时都只删除本次拥有的 Victim、relay 和 network，不执行全局 prune。
+
+## 可重复诊断
+
+先运行无外网的严格 mock：
 
 ```bash
-git -C integrations/safeclaw/upstream/SafeClawArena rev-parse HEAD
-docker image inspect openclaw-env:2026.3.12 >/dev/null
-make check
+python scripts/diagnostics/run_openclaw_diagnostics.py \
+  --mode offline --run-id diagnostic-<unique-id>
 ```
 
-SafeClawArena 必须位于 `integrations/safeclaw/upstream/SafeClawArena`，commit 必须是 `a11f5cceaba0676be721021f8d232638fd111305`。
+它验证唯一 `add` 工具、分片参数、call ID、结果 `5`、一次执行、错误 tool result、真实底层 HTTP 计数、429 硬上限和脱敏 ledger。通过后才允许：
 
-## 2. Pilot collection
+```bash
+python scripts/diagnostics/run_openclaw_diagnostics.py \
+  --mode live --run-id ark-live-<unique-id>
+```
 
-创建 tmux 会话：
+Live 模式先做无工具文本，再做唯一 `add` 往返；内部硬上限为 1+2 个真实请求，单次 90 秒，无 relay 自动重试。输出统一在 `experiments/runs/<run-id>/`，默认被 Git 忽略。不要把 mock 通过称为 Ark 通过。
+
+## tmux collection
 
 ```bash
 tmux new-session -s stac-pilot
+conda activate stac
+STAC_PYTHON=python bash scripts/run_safeclaw_sample_collection.sh \
+  --config configs/sample_generation/pilot_collection.yaml \
+  --run-id <unique-run-id>
 ```
 
-在会话内运行：
+`Ctrl-b d` 分离，`tmux attach -t stac-pilot` 恢复。日志：
 
 ```bash
-cd /absolute/path/stac-compositional-attack-lab
-bash scripts/run_safeclaw_sample_collection.sh \
-  --config configs/sample_generation/pilot_collection.yaml
+tail -f experiments/runs/<run-id>/safeclaw-pilot/tmux-collection.log
 ```
 
-按 `Ctrl-b d` 退出但不停止任务。重新进入和查看状态：
+collection 完成后按 [项目指南](PROJECT_GUIDE_ZH.md) 单独 mine、audit、freeze。不要在 audit 失败时继续 main/formal。
 
-```bash
-tmux attach-session -t stac-pilot
-tmux list-sessions
-tail -f data/primitive_libraries/generated/safeclaw-pilot/tmux-collection.log
-```
+## tmux formal、停止与恢复
 
-即使部分 trajectory 失败，collection 仍会保存已产生的记录。关键文件：
-
-```text
-data/primitive_libraries/generated/safeclaw-pilot/
-├── tmux-collection.log
-└── interactions/raw/safeclaw-construction-pilot/
-    ├── collection_manifest.json
-    ├── collection_failures.jsonl
-    └── trajectories/<trajectory-id>/
-        ├── raw_trajectory.json
-        ├── source_events.jsonl
-        └── checkpoints.jsonl
-```
-
-## 3. Pilot mining 与审计
-
-Collection 结束后创建新会话：
-
-```bash
-tmux new-session -s stac-pilot-mine
-```
-
-在会话内运行：
-
-```bash
-cd /absolute/path/stac-compositional-attack-lab
-export PYTHONPATH=src
-set -o pipefail
-
-.venv/bin/python -u -m stac_attack_lab.cli sample mine \
-  --collection data/primitive_libraries/generated/safeclaw-pilot/interactions/raw/safeclaw-construction-pilot \
-  2>&1 | tee -a data/primitive_libraries/generated/safeclaw-pilot/tmux-mine.log
-
-.venv/bin/python -u -m stac_attack_lab.cli sample audit \
-  --library data/primitive_libraries/generated/safeclaw-pilot/library \
-  2>&1 | tee -a data/primitive_libraries/generated/safeclaw-pilot/tmux-audit.log
-```
-
-Pilot 的目标是至少 2 个 accepted samples。若审计输出 `accepted_sample_target_not_met`，保留整个 `safeclaw-pilot` 目录用于分析，不执行 freeze，也不要把它作为正式证据。
-
-## 4. Pilot 失败时演示 evaluation gate
-
-如果只是想确认 evaluation 会怎样失败，可以运行：
-
-```bash
-tmux new-session -s stac-evaluation-gate
-```
-
-会话内：
-
-```bash
-cd /absolute/path/stac-compositional-attack-lab
-bash scripts/run_formal_evaluation.sh --run-id safeclaw-formal-gate-check
-```
-
-当前 formal 配置只接受 `data/primitive_libraries/frozen/safeclaw-main`。Pilot 或 main 未通过 audit/freeze 时，该命令应 fail closed；原因保存在：
-
-```text
-experiments/safeclaw_runs/safeclaw-formal-gate-check/tmux-run.log
-```
-
-不要复制失败的 library 来绕过门禁。
-
-## 5. Main collection
-
-只有 pilot 审计通过后才运行 main：
-
-```bash
-tmux new-session -s stac-main-collection
-```
-
-会话内：
-
-```bash
-cd /absolute/path/stac-compositional-attack-lab
-bash scripts/run_safeclaw_sample_collection.sh \
-  --config configs/sample_generation/main_collection.yaml
-```
-
-完成后在新的 tmux 会话中执行 mining、audit 和 freeze：
-
-```bash
-tmux new-session -s stac-main-freeze
-```
-
-```bash
-cd /absolute/path/stac-compositional-attack-lab
-export PYTHONPATH=src
-set -o pipefail
-
-.venv/bin/python -u -m stac_attack_lab.cli sample mine \
-  --collection data/primitive_libraries/generated/safeclaw-main/interactions/raw/safeclaw-construction-main \
-  2>&1 | tee -a data/primitive_libraries/generated/safeclaw-main/tmux-mine.log
-
-.venv/bin/python -u -m stac_attack_lab.cli sample audit \
-  --library data/primitive_libraries/generated/safeclaw-main/library \
-  2>&1 | tee -a data/primitive_libraries/generated/safeclaw-main/tmux-audit.log
-
-.venv/bin/python -u -m stac_attack_lab.cli sample freeze \
-  --library data/primitive_libraries/generated/safeclaw-main/library \
-  --version safeclaw-main \
-  2>&1 | tee -a data/primitive_libraries/generated/safeclaw-main/tmux-freeze.log
-```
-
-Main 必须至少有 30 个 accepted samples，audit 通过后 freeze 才会成功。
-
-## 6. Formal evaluation
+仅在 `data/primitive_libraries/frozen/safeclaw-main` 已由合格 main library 生成后：
 
 ```bash
 tmux new-session -s stac-formal
+conda activate stac
+STAC_PYTHON=python bash scripts/run_formal_evaluation.sh --run-id <unique-run-id>
 ```
 
-会话内：
+中断后以同一个 `--run-id` 重跑会使用 `--resume`；不要换 ID 冒充续跑。日志和 checkpoint 位于 `experiments/runs/<run-id>/`。查看：
 
 ```bash
-cd /absolute/path/stac-compositional-attack-lab
-bash scripts/run_formal_evaluation.sh \
-  --run-id safeclaw-formal-main
+tail -f experiments/runs/<run-id>/tmux-run.log
+PYTHONPATH=src python -m stac_attack_lab.cli safeclaw audit-run \
+  --run-root experiments/runs/<run-id>
 ```
 
-脚本依次执行 PSE smoke、environment preflight、15-case matched evaluation、run audit 和 report。中断后用相同 run id 再次执行即可按 case 恢复：
-
-```bash
-bash scripts/run_formal_evaluation.sh \
-  --run-id safeclaw-formal-main
-```
-
-运行日志：
-
-```bash
-tail -f experiments/safeclaw_runs/safeclaw-formal-main/tmux-run.log
-```
-
-## 7. 查看攻击与模型对话
-
-每个完成的 formal case 都有一份聚合记录：
-
-```bash
-find experiments/safeclaw_runs/safeclaw-formal-main/cases \
-  -name complete_interaction_record.json -print
-```
-
-查看攻击动作、模型回答和官方结果：
-
-```bash
-jq '{
-  planner: .planner_stage,
-  attacker: .attacker_stage,
-  attack: .attack_realization,
-  victim_sessions: .victim_stage.sessions,
-  victim_transcript: .victim_stage.session_transcript_raw,
-  mechanism: .primitive_evaluation.mechanism_evaluation,
-  official: .official_evaluation
-}' experiments/safeclaw_runs/safeclaw-formal-main/cases/<case-id>/complete_interaction_record.json
-```
-
-逐次模型调用和逐动作请求/回应分别位于：
-
-```text
-experiments/safeclaw_runs/<run-id>/cases/<case-id>/model_calls.jsonl
-experiments/safeclaw_runs/<run-id>/runner/<case-id>/attempts/<attempt-id>/formal_action_journal.jsonl
-```
-
-失败 case 会保留脱敏后的失败阶段、异常类型和消息：
-
-```text
-experiments/safeclaw_runs/<run-id>/cases/<case-id>/failure_events.jsonl
-```
-
-查看整个运行的完成情况：
-
-```bash
-jq '.' experiments/safeclaw_runs/safeclaw-formal-main/formal_progress.json
-jq '.' experiments/safeclaw_runs/safeclaw-formal-main/formal_report.json
-```
-
-所有记录都会进行凭证脱敏。公开给导师前仍应运行 `safeclaw audit-run`，并避免上传 `.env`、外部 upstream checkout、Docker volume 或未经审计的原始凭证文件。
+优先在 tmux 中发送 `Ctrl-C`，让 launcher/bridge 执行 finally 清理。若进程已异常退出，只检查带本次 run UUID 的 `stac-*` 容器和网络；不要停止其他任务或运行 Docker prune。端口占用可用 `ss -ltnp` 定位，记录 owner 后处理，不自动 kill。

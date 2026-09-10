@@ -1,8 +1,0 @@
-{
-  "error_codes": [],
-  "library_tree_hash": "757cbcadc3943b1e7ff6d7da6a735228c58426307c84eec1c8f146638bc1d899",
-  "mining_manifest_hash": "708641e2493ffed11efe12ce55a29067c4ca0989da91a93295fb0c33349778f4",
-  "passed": true,
-  "schema_version": "1.0",
-  "stage": "audit"
-}

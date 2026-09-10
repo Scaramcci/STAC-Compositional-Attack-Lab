@@ -247,13 +247,40 @@
           "type": "integer"
         },
         "output_root": {
-          "default": "data/primitive_libraries/generated",
+          "default": "experiments/runs",
           "title": "Output Root",
           "type": "string"
         },
         "pipeline_id": {
           "title": "Pipeline Id",
           "type": "string"
+        },
+        "provider_allowed_tools": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Allowed Tools"
+        },
+        "provider_request_budget": {
+          "default": 128,
+          "exclusiveMinimum": 0,
+          "title": "Provider Request Budget",
+          "type": "integer"
+        },
+        "provider_timeout_seconds": {
+          "default": 90,
+          "exclusiveMinimum": 0,
+          "title": "Provider Timeout Seconds",
+          "type": "integer"
         },
         "public_attack_goal": {
           "title": "Public Attack Goal",

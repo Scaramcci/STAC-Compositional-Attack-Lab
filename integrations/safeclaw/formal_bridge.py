@@ -8,6 +8,7 @@ import contextlib
 import importlib.util
 import json
 import sys
+import tempfile
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -16,6 +17,10 @@ from stac_attack_lab.environments.safeclaw.observations import (
     classify_explicit_error,
     classify_provider_response,
     observable_gateway_diagnostics,
+)
+from stac_attack_lab.environments.safeclaw.provider_relay import (
+    ContainerProviderRelay,
+    relay_runtime_from_model_config,
 )
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
 
@@ -86,6 +91,9 @@ def main() -> int:
     judge = _load_judge(upstream)
     judge._set_platform("openclaw")
     runner = None
+    container_started = False
+    relay: ContainerProviderRelay | None = None
+    effective_model_config: Path | None = None
     current_session_id: str | None = None
     session_keys: dict[str, str] = {}
     initialized_sessions: set[str] = set()
@@ -93,13 +101,34 @@ def main() -> int:
     try:
         with contextlib.redirect_stdout(sys.stderr):
             judge.start_container(judge.IMAGE)
+            container_started = True
+            relay_runtime = relay_runtime_from_model_config(model_runtime)
+            if relay_runtime is not None:
+                relay = ContainerProviderRelay(
+                    image=judge.IMAGE,
+                    victim_container=judge.CONTAINER,
+                    runtime=relay_runtime,
+                )
+                model_runtime.update(relay.start())
+                exact_secrets.append(relay.ingress_token)
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    prefix="safeclaw-model-runtime-",
+                    suffix=".json",
+                    dir=Path(args.model_config).parent,
+                    delete=False,
+                ) as stream:
+                    json.dump(model_runtime, stream)
+                    effective_model_config = Path(stream.name)
+                effective_model_config.chmod(0o600)
             client = judge.GatewayClient(judge.GATEWAY_URL, judge.GATEWAY_TOKEN, verbose=False)
             runner = judge.TaskRunner(task, client, verbose=False)
             runner.reset_environment(str(task_path))
             judge._read_gateway_token()
             client = judge.GatewayClient(judge.GATEWAY_URL, judge.GATEWAY_TOKEN, verbose=False)
             runner.client = client
-            applied = judge._apply_model_config(args.model_config)
+            applied = judge._apply_model_config(str(effective_model_config or args.model_config))
             runner.model_config_applied = {
                 "model": applied.get("model"),
                 "base_url_source": "environment",
@@ -134,6 +163,7 @@ def main() -> int:
                         "kind": "finished",
                         "official_report": report,
                         "public_post_state": _public_state(post_state),
+                        "provider_request_ledger": relay.records() if relay else [],
                     }
                 )
                 return 0
@@ -231,6 +261,7 @@ def main() -> int:
                     "gateway_diagnostics": gateway_diagnostics,
                     "public_state_before": before,
                     "public_state_after": _public_state(after_raw),
+                    "provider_request_ledger": relay.records() if relay else [],
                 }
             )
     except Exception as exc:
@@ -243,9 +274,14 @@ def main() -> int:
         )
         return 2
     finally:
-        if runner is not None:
+        if relay is not None:
+            with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
+                relay.stop()
+        if container_started:
             with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
                 judge.remove_container()
+        if effective_model_config is not None:
+            effective_model_config.unlink(missing_ok=True)
     return 0
 
 

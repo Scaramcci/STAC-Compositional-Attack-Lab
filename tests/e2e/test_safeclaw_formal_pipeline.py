@@ -419,9 +419,9 @@ def _project(tmp_path: Path) -> tuple[Path, SafeClawFormalConfig, SafeClawRunner
             max_tokens=8192,
             max_wall_time_seconds=600,
         ),
-        output_root="experiments/safeclaw_runs",
+        output_root="experiments/runs",
     )
-    run_root = project / "experiments/safeclaw_runs/formal-e2e-run"
+    run_root = project / "experiments/runs/formal-e2e-run"
     runner = SafeClawRunner(
         upstream_root=upstream,
         safety_patch=project / "integrations/safeclaw/patches/safety.patch",

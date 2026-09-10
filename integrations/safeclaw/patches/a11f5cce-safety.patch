@@ -2,6 +2,44 @@ diff --git a/scripts/judge.py b/scripts/judge.py
 index 466b14e..b4128df 100755
 --- a/scripts/judge.py
 +++ b/scripts/judge.py
+@@ -91 +91 @@ WORKSPACE = PLATFORMS["openclaw"]["workspace"]
+-GATEWAY_PORT = 19090  # host-side port (mapped to container 18789)
++GATEWAY_PORT = int(os.environ.get("SAFECLAW_GATEWAY_HOST_PORT", "0"))
+@@ -98 +98 @@ def _set_platform(name: str):
+-    global _platform, CONTAINER, IMAGE, OPENCLAW_HOME, WORKSPACE, GATEWAY_TOKEN, GATEWAY_URL
++    global _platform, CONTAINER, IMAGE, OPENCLAW_HOME, WORKSPACE, GATEWAY_TOKEN, GATEWAY_URL, GATEWAY_PORT
+@@ -103 +103,2 @@ def _set_platform(name: str):
+-    CONTAINER = p["container"]
++    CONTAINER = os.environ.get("SAFECLAW_CONTAINER_NAME") or f"{p['container']}-{os.getpid()}"
++    GATEWAY_PORT = int(os.environ.get("SAFECLAW_GATEWAY_HOST_PORT", "0"))
+@@ -373,3 +374,3 @@ def start_container(image: str = None):
+-    """Remove any existing container and start a fresh one from the image."""
+-    image = image or IMAGE
+-    subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
++    """Start an owned container; never remove an unrelated name or port owner."""
++    global GATEWAY_PORT, GATEWAY_URL
++    image = image or IMAGE
+@@ -379,2 +380,6 @@ def start_container(image: str = None):
+-        ["docker", "run", "-d", "--name", CONTAINER,
+-         "-p", f"{GATEWAY_PORT}:18789", image] + entrypoint,
++        ["docker", "run", "-d", "--name", CONTAINER,
++         "-p", (
++             f"127.0.0.1:{GATEWAY_PORT}:18789"
++             if GATEWAY_PORT
++             else "127.0.0.1::18789"
++         ), image] + entrypoint,
+@@ -384,0 +390,11 @@ def start_container(image: str = None):
++    mapped = subprocess.run(
++        ["docker", "port", CONTAINER, "18789/tcp"],
++        capture_output=True, text=True,
++    )
++    try:
++        GATEWAY_PORT = int(mapped.stdout.strip().rsplit(":", 1)[1])
++    except (IndexError, ValueError):
++        subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True)
++        sys.exit("ERROR: Could not resolve the atomically published gateway port")
++    GATEWAY_URL = f"http://127.0.0.1:{GATEWAY_PORT}"
++    print(f"  Gateway host binding: 127.0.0.1:{GATEWAY_PORT} -> container:18789")
 @@ -429,6 +429,18 @@ def _apply_model_config(config_path: str):
      model_id = mc.get("model", "gpt-5.1-codex")
      api_key = mc.get("api_key")
@@ -21,7 +59,7 @@ index 466b14e..b4128df 100755
 
      p = _get_platform()
 
-@@ -458,17 +470,30 @@ def _apply_model_config(config_path: str):
+@@ -458,17 +470,34 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{cfg_path}','w'),indent=2)"
              f"\""
          )
@@ -31,18 +69,23 @@ index 466b14e..b4128df 100755
 
      # Write provider config to openclaw.json (models.providers.openai)
      if api_key and api_base_url:
-+        is_gemini_openai = api_base_url.rstrip("/").endswith("/openai")
++        normalized_api_root = api_base_url.rstrip("/")
++        explicit_api_root = normalized_api_root.endswith(("/openai", "/v1", "/api/v3"))
++        compatibility_mode = mc.get("provider_compat", "openai")
++        context_window = int(mc.get("provider_context_window", 200000))
++        max_output_tokens = int(mc.get("provider_max_output_tokens", 1024))
          provider_config = json.dumps({
 -            "baseUrl": api_base_url.rstrip("/") + "/v1",
 +            "baseUrl": (
-+                api_base_url.rstrip("/")
-+                if is_gemini_openai
-+                else api_base_url.rstrip("/") + "/v1"
++                normalized_api_root
++                if explicit_api_root
++                else normalized_api_root + "/v1"
 +            ),
              "api": "openai-completions",
              "apiKey": api_key,
              "models": [{"id": model_id, "name": f"{model_id} (proxy)",
-                         "contextWindow": 200000, "maxTokens": 16384,
+-                        "contextWindow": 200000, "maxTokens": 16384,
++                        "contextWindow": context_window, "maxTokens": max_output_tokens,
                          "input": ["text"],
                          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
 -                        "reasoning": False}],
@@ -54,11 +97,20 @@ index 466b14e..b4128df 100755
 +                                "maxTokensField": "max_tokens",
 +                                "supportsStrictMode": False,
 +                            },
-+                        } if is_gemini_openai else {})}],
-@@ -494,11 +510,84 @@ def _apply_model_config(config_path: str):
++                        } if compatibility_mode in {"ark", "gemini"} else {})}],
+@@ -494,11 +510,93 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{config_path}','w'),indent=2)"
              f"\""
          )
++        dexec(
++            f"python3 -c \"import json; "
++            f"c=json.load(open('{config_path}')); "
++            f"c['browser']={{'enabled':False}}; "
++            f"a={mc.get('openclaw_allowed_tools')!r}; "
++            f"c['tools']=({{'deny':['*']}} if a == [] else {{'allow':a}} "
++            f"if a is not None else c.get('tools',{{}})); "
++            f"json.dump(c,open('{config_path}','w'),indent=2)\""
++        )
 +        if embedding_provider == "ark_multimodal":
 +            adapter_config = {
 +                "model": embedding_model,

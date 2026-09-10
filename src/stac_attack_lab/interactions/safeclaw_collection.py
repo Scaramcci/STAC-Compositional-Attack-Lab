@@ -377,6 +377,9 @@ class SafeClawSubprocessVictimDriver:
         target_api_key_env: str,
         embedding: SafeClawEmbeddingRuntime,
         model_hash: str,
+        provider_request_budget: int = 128,
+        provider_timeout_seconds: int = 90,
+        provider_allowed_tools: list[str] | None = None,
         environment: Mapping[str, str] | None = None,
     ) -> None:
         self.project_root = project_root
@@ -388,6 +391,9 @@ class SafeClawSubprocessVictimDriver:
         self.target_api_key_env = target_api_key_env
         self.embedding = embedding
         self.model_hash = model_hash
+        self.provider_request_budget = provider_request_budget
+        self.provider_timeout_seconds = provider_timeout_seconds
+        self.provider_allowed_tools = provider_allowed_tools
         self.environment = environment if environment is not None else os.environ
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._process: subprocess.Popen[str] | None = None
@@ -459,6 +465,9 @@ class SafeClawSubprocessVictimDriver:
             target_api_key_env=self.target_api_key_env,
             environment=self.environment,
             embedding=self.embedding,
+            provider_request_budget=self.provider_request_budget,
+            provider_timeout_seconds=self.provider_timeout_seconds,
+            provider_allowed_tools=self.provider_allowed_tools,
         )
         self._started_at = monotonic()
         self._temporary = tempfile.TemporaryDirectory(prefix="safeclaw-construction-")
@@ -773,6 +782,7 @@ class SafeClawSubprocessVictimDriver:
                     "provider_response_projection": session.get("provider_response_projection"),
                     "provider_usage_observation": session.get("provider_usage_observation"),
                     "gateway_diagnostics": session.get("gateway_diagnostics", {}),
+                    "provider_request_ledger": session.get("provider_request_ledger", []),
                 },
                 "evidence_ref_ids": [f"bridge:{session_id}:response"],
             }

@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, PositiveInt
+from pydantic import Field, NonNegativeInt, PositiveInt
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.environments.safeclaw.task_adapter import PINNED_SAFECLAW_COMMIT
@@ -43,6 +43,15 @@ class SafeClawPreflightConfig(StrictModel):
     request_budget: PositiveInt | None = None
     max_attempts: PositiveInt | None = None
     request_timeout_seconds: PositiveInt | None = None
+    gateway_bind: Literal["loopback"] = "loopback"
+    gateway_container_port: PositiveInt = 18789
+    gateway_host_bind: Literal["127.0.0.1"] = "127.0.0.1"
+    gateway_host_port: NonNegativeInt = 0
+    upstream_legacy_gateway_host_port: PositiveInt = 19090
+    embedding_proxy_bind: Literal["127.0.0.1"] = "127.0.0.1"
+    embedding_proxy_container_port: PositiveInt = 18790
+    provider_relay_bind: Literal["0.0.0.0"] = "0.0.0.0"
+    provider_relay_container_port: PositiveInt = 18791
 
 
 class PreflightCheck(StrictModel):

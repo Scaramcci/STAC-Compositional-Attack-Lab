@@ -184,21 +184,24 @@ def test_whole_episode_runner_redacts_before_promotion_and_resumes(tmp_path: Pat
     assert result.secret_scan_passed is True
     assert resumed == result
     assert len(invoker.commands) == command_count
-    assert invoker.model_configs == [
-        {
-            "model": "synthetic-model",
-            "api_base_url": "http://127.0.0.1:9999",
-            "api_key": API_KEY,
-            "embedding_provider": "openai",
-            "embedding_model": "synthetic-embedding",
-            "embedding_api_base_url": "http://127.0.0.1:9998/v1",
-            "embedding_api_key": EMBEDDING_KEY,
-        }
-    ]
+    assert len(invoker.model_configs) == 1
+    model_config = invoker.model_configs[0]
+    assert model_config["model"] == "synthetic-model"
+    assert model_config["api_base_url"] == "http://127.0.0.1:9999/v1"
+    assert model_config["api_key"] == API_KEY
+    assert model_config["embedding_provider"] == "openai"
+    assert model_config["embedding_model"] == "synthetic-embedding"
+    assert model_config["embedding_api_base_url"] == "http://127.0.0.1:9998/v1"
+    assert model_config["embedding_api_key"] == EMBEDDING_KEY
+    assert model_config["provider_upstream_api_key"] == API_KEY
+    assert model_config["provider_request_budget"] == 128
+    assert model_config["provider_timeout_seconds"] == 90
+    assert "class ProviderRelayServer" in model_config["provider_relay_source"]
     case_root = tmp_path / "runs/case-001"
     assert scan_tree(case_root, [API_KEY]) == []
     payload = (case_root / "sanitized_result.json").read_text(encoding="utf-8")
     assert API_KEY not in payload
+    assert EMBEDDING_KEY not in payload
     assert "CANARY_SYNTHETIC_ACTION" in payload
 
 

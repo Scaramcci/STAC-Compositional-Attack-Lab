@@ -1,1 +1,0 @@
-{"attempt_no": 1, "case_id": "case-4ed68c2ce1a6ac231d81", "error_message": "sample_does_not_support_long_horizon_attack_family", "error_type": "ValueError", "kind": "formal_case_failure", "run_id": "formal-smoke-retry14-docker", "schema_version": "1.0", "stage": "pending", "timestamp": "2026-09-06T17:43:41.588878+00:00"}

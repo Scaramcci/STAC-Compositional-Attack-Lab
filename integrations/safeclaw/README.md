@@ -4,6 +4,7 @@
 
 - `construction_bridge.py`：collection 阶段连接 Construction Attacker 与 OpenClaw Victim；
 - `formal_bridge.py`：formal 阶段执行逐 stage Attacker action；
+- `../../src/stac_attack_lab/environments/safeclaw/provider_relay.py`：独立 relay 容器内的 OpenClaw HTTP 计数、硬上限、工具过滤与脱敏 ledger；
 - `patches/a11f5cce-safety.patch`：在临时 upstream 副本上移除敏感输出并注入受控模型配置。
 
 外部 checkout 路径为 `upstream/SafeClawArena`，固定 commit 为 `a11f5cceaba0676be721021f8d232638fd111305`。该目录被 Git 忽略，必须由操作者准备。Preflight 不会自动下载、更新或修改 upstream。
@@ -35,9 +36,13 @@ OpenClaw 继续使用 `openai` memorySearch provider。适配器将 `/v1/embeddi
 原有标准 OpenAI embedding 服务仍受支持：将上述三个版本化配置的
 `embedding_provider` 改回 `openai`，并设置对应的模型、API 根地址和密钥。
 
-聊天 API 独立配置。当前 Attacker/Planner 从 `OPENAI_BASE_URL`、`OPENAI_API_KEY`
-读取配置，默认 Victim 也使用这两个变量。使用 Gemini 时须填官方兼容地址
-`https://generativelanguage.googleapis.com/v1beta/openai/` 和 Gemini 密钥；仅添加
-`GEMINI_API_KEY` 不会自动切换服务。`.env` 解析器不会展开 `${GEMINI_API_KEY}`。
-宿主机的 Clash 代理测试通过也不代表 Docker 内的 OpenClaw 已配置代理；容器内的
-127.0.0.1 指容器自身，真实实验还需另行验证容器访问聊天接口的网络路径。
+聊天 API 独立配置。Attacker/Planner 固定从 `OPENAI_BASE_URL`、`OPENAI_API_KEY`
+读取现有 `gpt-5.5` 配置；Victim 从 `SAFECLAW_MODEL`、`SAFECLAW_BASE_URL`、
+`SAFECLAW_API_KEY` 读取 Ark endpoint。`SAFECLAW_BASE_URL` 是明确 API root，当前为
+`https://ark.cn-beijing.volces.com/api/v3`，不得再追加 `/v1`。
+
+Victim 容器只获得 relay 地址和一次性 ingress token；Ark key 保留在独立 relay
+容器。relay 将最终路径固定为 `<API root>/chat/completions`，记录每一次实际 HTTP
+尝试，在上限后返回 429，并按 `provider_allowed_tools` 过滤最终发给 provider 的工具。
+两个容器通过每次运行独有的 Docker network 通信；bridge 在成功、失败和超时后移除
+relay、network 与 Victim 容器。

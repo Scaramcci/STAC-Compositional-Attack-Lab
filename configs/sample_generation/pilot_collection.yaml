@@ -13,15 +13,15 @@
   "construction_attacker_prompt_path": "prompts/formal/construction_attacker.md",
   "victim_model_env": "SAFECLAW_MODEL",
   "allowed_victim_models": [
-    "gemini-2.5-flash"
+    "ep-20260909180104-hmx9m"
   ],
-  "victim_base_url_env": "GEMINI_BASE_URL",
-  "victim_api_key_env": "GEMINI_API_KEY",
+  "victim_base_url_env": "SAFECLAW_BASE_URL",
+  "victim_api_key_env": "SAFECLAW_API_KEY",
   "embedding_provider": "ark_multimodal",
   "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",
   "embedding_base_url_env": "SAFECLAW_EMBEDDING_BASE_URL",
   "embedding_api_key_env": "SAFECLAW_EMBEDDING_API_KEY",
-  "victim_model_hash": "safeclaw-target-gemini-2.5-flash-openai-compatible-v1",
+  "victim_model_hash": "safeclaw-target-ark-ep-20260909180104-hmx9m-v1",
   "execution_enabled": true,
   "image_tag": "openclaw-env:2026.3.12",
   "source_task_ids": [
@@ -95,5 +95,8 @@
   "max_events": 300,
   "timeout_seconds": 600,
   "minimum_free_disk_gb": 20,
-  "output_root": "data/primitive_libraries/generated"
+  "provider_request_budget": 128,
+  "provider_timeout_seconds": 90,
+  "provider_allowed_tools": null,
+  "output_root": "experiments/runs"
 }

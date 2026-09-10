@@ -268,3 +268,68 @@ def test_formal_bridge_delivers_action_through_task_runner_and_official_evaluato
     assert messages[1]["provider_usage_observation"] == "reported_nonzero"
     assert messages[2]["official_report"]["sessions"][0]["session_id"] == "s1"
     assert removed == [True]
+
+
+def test_formal_bridge_cleans_victim_if_relay_start_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bridge = _load_module(
+        ROOT / "integrations/safeclaw/formal_bridge.py", "formal_bridge_cleanup_test"
+    )
+    removed: list[bool] = []
+    relay_stopped: list[bool] = []
+    fake_judge = SimpleNamespace(
+        IMAGE="synthetic-image",
+        CONTAINER="victim-owned",
+        _set_platform=lambda platform: None,
+        start_container=lambda image: None,
+        remove_container=lambda: removed.append(True),
+    )
+
+    class FailingRelay:
+        ingress_token = "relay-token"
+
+        def __init__(self, **kwargs: object) -> None:
+            del kwargs
+
+        def start(self) -> dict[str, str]:
+            raise RuntimeError("synthetic_relay_failure")
+
+        def stop(self) -> None:
+            relay_stopped.append(True)
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text('{"sessions": []}', encoding="utf-8")
+    model_path = tmp_path / "model.json"
+    model_path.write_text(
+        json.dumps(
+            {
+                "provider_relay_source": "source",
+                "provider_upstream_base_url": "https://provider.invalid/v1",
+                "provider_upstream_api_key": "secret",
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = io.StringIO()
+    monkeypatch.setattr(bridge, "_load_judge", lambda upstream: fake_judge)
+    monkeypatch.setattr(bridge, "ContainerProviderRelay", FailingRelay)
+    monkeypatch.setattr(sys, "stdout", output)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "formal_bridge.py",
+            "--upstream",
+            str(tmp_path),
+            "--task",
+            str(task_path),
+            "--model-config",
+            str(model_path),
+        ],
+    )
+
+    assert bridge.main() == 2
+    assert json.loads(output.getvalue())["kind"] == "error"
+    assert removed == [True]
+    assert relay_stopped == [True]

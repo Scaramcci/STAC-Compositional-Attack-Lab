@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from stac_attack_lab.contracts import StrictModel
 
@@ -15,8 +15,17 @@ class SafeClawEmbeddingRuntime(StrictModel):
 
 
 def _chat_provider_root(base_url: str) -> str:
+    """Preserve the operator-provided API root without guessing a version suffix."""
+    return base_url.rstrip("/")
+
+
+def _provider_compat(base_url: str) -> str:
     normalized = base_url.rstrip("/")
-    return normalized[:-3] if normalized.endswith("/v1") else normalized
+    if normalized.endswith("/api/v3"):
+        return "ark"
+    if normalized.endswith("/openai"):
+        return "gemini"
+    return "openai"
 
 
 def _embedding_endpoint_root(base_url: str) -> str:
@@ -39,14 +48,44 @@ def build_safeclaw_model_config(
     target_api_key_env: str,
     environment: Mapping[str, str],
     embedding: SafeClawEmbeddingRuntime | None = None,
-) -> tuple[dict[str, str], list[str]]:
+    provider_request_budget: int = 128,
+    provider_timeout_seconds: int = 90,
+    provider_allowed_tools: list[str] | None = None,
+    provider_context_window: int = 200000,
+    provider_max_output_tokens: int = 1024,
+) -> tuple[dict[str, Any], list[str]]:
     target_api_key = environment.get(target_api_key_env)
     if not target_api_key:
         raise ValueError(f"missing_environment_variable:{target_api_key_env}")
-    payload = {
+    if (
+        min(
+            provider_request_budget,
+            provider_timeout_seconds,
+            provider_context_window,
+            provider_max_output_tokens,
+        )
+        < 1
+    ):
+        raise ValueError("safeclaw_provider_transport_limits_must_be_positive")
+    if provider_allowed_tools is not None and len(provider_allowed_tools) != len(
+        set(provider_allowed_tools)
+    ):
+        raise ValueError("safeclaw_provider_allowed_tools_duplicate")
+    payload: dict[str, Any] = {
         "model": target_model_id,
         "api_base_url": _chat_provider_root(target_base_url),
         "api_key": target_api_key,
+        "provider_compat": _provider_compat(target_base_url),
+        "provider_relay_source": Path(__file__)
+        .with_name("provider_relay.py")
+        .read_text(encoding="utf-8"),
+        "provider_upstream_base_url": _chat_provider_root(target_base_url),
+        "provider_upstream_api_key": target_api_key,
+        "provider_request_budget": provider_request_budget,
+        "provider_timeout_seconds": provider_timeout_seconds,
+        "provider_allowed_tools": provider_allowed_tools,
+        "provider_context_window": provider_context_window,
+        "provider_max_output_tokens": provider_max_output_tokens,
     }
     exact_secrets = [target_api_key, target_base_url]
     if embedding is None:

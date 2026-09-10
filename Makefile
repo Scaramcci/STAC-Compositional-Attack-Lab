@@ -1,10 +1,10 @@
 .PHONY: help check lint typecheck test schemas \
 	sample-preflight sample-collection formal-preflight formal-evaluation formal-report
 
-PYTHON=.venv/bin/python
-RUFF=.venv/bin/ruff
+PYTHON ?= python3
+RUFF=$(PYTHON) -m ruff
 MYPY=$(PYTHON) -m mypy
-PYTEST=$(PYTHON) -m pytest
+PYTEST=PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 $(PYTHON) -m pytest
 PYTHONPATH=src
 
 help:
@@ -18,7 +18,7 @@ help:
 		'  make sample-collection       Run/resume the canonical pilot.' \
 		'  make formal-preflight        Check the formal environment.' \
 		'  make formal-evaluation       Run/resume the formal matrix.' \
-		'  make formal-report RUN_ROOT=experiments/safeclaw_runs/<run-id>'
+		'  make formal-report RUN_ROOT=experiments/runs/<run-id>'
 
 check: lint typecheck test
 

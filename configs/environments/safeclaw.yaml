@@ -12,14 +12,33 @@
   "require_docker": true,
   "target_model_env": "SAFECLAW_MODEL",
   "allowed_target_models": [
-    "gemini-2.5-flash"
+    "ep-20260909180104-hmx9m"
   ],
-  "target_base_url_env": "GEMINI_BASE_URL",
-  "target_api_key_env": "GEMINI_API_KEY",
+  "target_base_url_env": "SAFECLAW_BASE_URL",
+  "target_api_key_env": "SAFECLAW_API_KEY",
+  "provider": "ark",
+  "api": "openai-compatible-chat-completions",
+  "endpoint_path": "/api/v3/chat/completions",
+  "context_window": 200000,
+  "max_output_tokens": 1024,
+  "streaming": "verified",
+  "tool_call_schema": "verified",
   "embedding_policy": "required_endpoint",
   "embedding_provider": "ark_multimodal",
   "embedding_model_env": "SAFECLAW_EMBEDDING_MODEL",
   "embedding_base_url_env": "SAFECLAW_EMBEDDING_BASE_URL",
   "embedding_api_key_env": "SAFECLAW_EMBEDDING_API_KEY",
-  "minimum_free_disk_gb": 20
+  "minimum_free_disk_gb": 20,
+  "request_budget": 8,
+  "max_attempts": 1,
+  "request_timeout_seconds": 90,
+  "gateway_bind": "loopback",
+  "gateway_container_port": 18789,
+  "gateway_host_bind": "127.0.0.1",
+  "gateway_host_port": 0,
+  "upstream_legacy_gateway_host_port": 19090,
+  "embedding_proxy_bind": "127.0.0.1",
+  "embedding_proxy_container_port": 18790,
+  "provider_relay_bind": "0.0.0.0",
+  "provider_relay_container_port": 18791
 }

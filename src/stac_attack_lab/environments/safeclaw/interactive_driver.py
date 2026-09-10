@@ -31,6 +31,7 @@ class SafeClawInteractiveFinish(StrictModel):
     official_report: dict[str, Any]
     public_post_state: dict[str, Any]
     provider_usage_records: list[dict[str, Any]] = Field(default_factory=list)
+    provider_request_records: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class SafeClawInteractiveVictimDriver:
@@ -49,6 +50,9 @@ class SafeClawInteractiveVictimDriver:
         target_base_url: str,
         target_api_key_env: str,
         embedding: SafeClawEmbeddingRuntime | None = None,
+        provider_request_budget: int = 128,
+        provider_timeout_seconds: int = 90,
+        provider_allowed_tools: list[str] | None = None,
         environment: Mapping[str, str] | None = None,
     ) -> None:
         self.upstream_root = upstream_root
@@ -59,11 +63,15 @@ class SafeClawInteractiveVictimDriver:
         self.target_base_url = target_base_url
         self.target_api_key_env = target_api_key_env
         self.embedding = embedding
+        self.provider_request_budget = provider_request_budget
+        self.provider_timeout_seconds = provider_timeout_seconds
+        self.provider_allowed_tools = provider_allowed_tools
         self.environment = environment if environment is not None else os.environ
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._process: subprocess.Popen[str] | None = None
         self._exact_secrets: list[str] = []
         self._provider_usage_records: list[dict[str, Any]] = []
+        self._provider_request_records: list[dict[str, Any]] = []
         self.attempt_id = "attempt-001"
         self.journal_path = case_root / "formal_action_journal.jsonl"
 
@@ -130,6 +138,9 @@ class SafeClawInteractiveVictimDriver:
             target_api_key_env=self.target_api_key_env,
             environment=self.environment,
             embedding=self.embedding,
+            provider_request_budget=self.provider_request_budget,
+            provider_timeout_seconds=self.provider_timeout_seconds,
+            provider_allowed_tools=self.provider_allowed_tools,
         )
         self.case_root.mkdir(parents=True, exist_ok=True)
         records = read_jsonl(self.journal_path)
@@ -283,6 +294,11 @@ class SafeClawInteractiveVictimDriver:
         usage = response.get("provider_usage")
         if isinstance(usage, dict):
             self._provider_usage_records.append(cast(dict[str, Any], usage))
+        request_records = response.get("provider_request_ledger")
+        if isinstance(request_records, list):
+            self._provider_request_records = [
+                cast(dict[str, Any], item) for item in request_records if isinstance(item, dict)
+            ]
         response_record = {
             "kind": "victim_response",
             "plan_id": action.plan_id,
@@ -301,6 +317,7 @@ class SafeClawInteractiveVictimDriver:
             "provider_response_hash": response.get("provider_response_hash"),
             "provider_response_projection": response.get("provider_response_projection"),
             "gateway_diagnostics": response.get("gateway_diagnostics", {}),
+            "provider_request_ledger": self._provider_request_records,
         }
         if scan_for_secrets(response_record, self._exact_secrets):
             raise ValueError("safeclaw_formal_action_record_secret_gate_failed")
@@ -324,6 +341,11 @@ class SafeClawInteractiveVictimDriver:
                 official_report=cast(dict[str, Any], report),
                 public_post_state=cast(dict[str, Any], post_state),
                 provider_usage_records=self._provider_usage_records,
+                provider_request_records=[
+                    cast(dict[str, Any], item)
+                    for item in response.get("provider_request_ledger", [])
+                    if isinstance(item, dict)
+                ],
             )
         finally:
             self._cleanup()

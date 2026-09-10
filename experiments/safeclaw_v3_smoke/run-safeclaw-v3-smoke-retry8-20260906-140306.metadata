@@ -1,3 +1,0 @@
-run_id=safeclaw-v3-smoke-retry8-20260906-140306
-config=configs/sample_generation/safeclaw_v3_smoke_retry8.yaml
-output=experiments/safeclaw_v3_smoke/retry8-generated

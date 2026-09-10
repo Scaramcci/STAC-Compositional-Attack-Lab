@@ -36,15 +36,25 @@ def test_model_config_resolves_chat_and_embedding_endpoints_without_logging() ->
         ),
     )
 
+    transport = {key: payload.pop(key) for key in list(payload) if key.startswith("provider_")}
     assert payload == {
         "model": "synthetic-chat",
-        "api_base_url": "https://provider.invalid",
+        "api_base_url": "https://provider.invalid/v1",
         "api_key": "chat-secret",
         "embedding_provider": "openai",
         "embedding_model": "synthetic-embedding",
         "embedding_api_base_url": "https://embedding.invalid/v1",
         "embedding_api_key": "embedding-secret",
     }
+    assert transport["provider_compat"] == "openai"
+    assert transport["provider_upstream_base_url"] == "https://provider.invalid/v1"
+    assert transport["provider_upstream_api_key"] == "chat-secret"
+    assert transport["provider_request_budget"] == 128
+    assert transport["provider_timeout_seconds"] == 90
+    assert transport["provider_allowed_tools"] is None
+    assert transport["provider_context_window"] == 200000
+    assert transport["provider_max_output_tokens"] == 1024
+    assert "class ProviderRelayServer" in transport["provider_relay_source"]
     assert secrets == [
         "chat-secret",
         "https://provider.invalid/v1",
@@ -208,6 +218,11 @@ def test_patched_judge_sets_gemini_openai_compat_without_affecting_other_endpoin
                 "https://generativelanguage.googleapis.com/v1beta/openai",
                 expected_compat,
             ),
+            (
+                "https://ark.cn-beijing.volces.com/api/v3",
+                "https://ark.cn-beijing.volces.com/api/v3",
+                expected_compat,
+            ),
             ("https://provider.invalid", "https://provider.invalid/v1", None),
         ]
     ):
@@ -218,6 +233,13 @@ def test_patched_judge_sets_gemini_openai_compat_without_affecting_other_endpoin
                     "model": "gemini-2.5-flash" if compat else "synthetic-chat",
                     "api_base_url": base_url,
                     "api_key": "chat-secret",
+                    "provider_compat": (
+                        "gemini"
+                        if base_url.endswith("/openai")
+                        else "ark"
+                        if base_url.endswith("/api/v3")
+                        else "openai"
+                    ),
                 }
             ),
             encoding="utf-8",

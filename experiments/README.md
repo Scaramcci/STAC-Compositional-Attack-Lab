@@ -1,5 +1,5 @@
 # Experiments
 
-`safeclaw_runs/` 保存 formal run manifest、case artifact、append-only transition、失败事件、结果和报告。目录由显式 run id 标识，生成内容默认不进入 Git。
+所有新 collection、诊断和 formal 输出统一写入 `runs/<unique-run-id>/`。`runs/` 的生成内容默认被 Git 忽略，只保留 `.gitkeep`。
 
-当前尚无正式 run，因为真实 frozen sample library gate 未通过。
+当前没有合格的正式 frozen library，也没有正式 evaluation run。本次 `offline` 与 `live` OpenClaw/Ark 诊断是协议和生命周期验证，不能作为攻击成功或 formal 指标。

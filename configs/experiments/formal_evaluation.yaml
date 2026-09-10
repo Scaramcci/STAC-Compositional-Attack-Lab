@@ -29,12 +29,15 @@
   ],
   "target_model_env": "SAFECLAW_MODEL",
   "allowed_target_models": [
-    "gemini-2.5-flash"
+    "ep-20260909180104-hmx9m"
   ],
-  "target_base_url_env": "GEMINI_BASE_URL",
-  "target_api_key_env": "GEMINI_API_KEY",
+  "target_base_url_env": "SAFECLAW_BASE_URL",
+  "target_api_key_env": "SAFECLAW_API_KEY",
   "timeout_seconds": 1200,
   "max_attempts": 2,
+  "provider_request_budget": 128,
+  "provider_timeout_seconds": 90,
+  "provider_allowed_tools": null,
   "budget": {
     "max_sessions": 3,
     "max_turns": 24,
@@ -42,5 +45,5 @@
     "max_tokens": 8192,
     "max_wall_time_seconds": 1200
   },
-  "output_root": "experiments/safeclaw_runs"
+  "output_root": "experiments/runs"
 }
