@@ -106,8 +106,10 @@ class SampleGenerationConfig(StrictModel):
     max_events: PositiveInt = 200
     timeout_seconds: PositiveInt = 1200
     provider_request_budget: PositiveInt = 128
+    provider_request_budget_scope: Literal["collection_run"] = "collection_run"
     provider_timeout_seconds: PositiveInt = 90
     provider_allowed_tools: list[str] | None = None
+    embedding_request_budget: PositiveInt = 128
     minimum_free_disk_gb: PositiveInt = 20
     output_root: str = "experiments/runs"
 
@@ -489,6 +491,7 @@ def _collection_components(
         provider_request_budget=config.provider_request_budget,
         provider_timeout_seconds=config.provider_timeout_seconds,
         provider_allowed_tools=config.provider_allowed_tools,
+        embedding_request_budget=config.embedding_request_budget,
         environment=env,
     )
     live_adapter = SafeClawConstructionInteractionAdapter(

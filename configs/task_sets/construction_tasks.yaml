@@ -47,9 +47,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -92,9 +90,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -137,9 +133,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -182,9 +176,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -227,9 +219,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -272,9 +262,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -317,9 +305,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -362,9 +348,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -407,9 +391,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -452,9 +434,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -497,9 +477,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"
@@ -542,9 +520,7 @@
         "effectful_sandbox_action"
       ],
       "allowed_delivery_surfaces": [
-        "safeclaw_user_message",
-        "safeclaw_new_session",
-        "safeclaw_local_action_sink"
+        "safeclaw_user_message"
       ],
       "legal_retry_ids": [
         "retry-victim-session-once"

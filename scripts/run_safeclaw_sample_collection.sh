@@ -76,17 +76,41 @@ if [[ ! "${RUN_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 2
 fi
 
-RUNTIME_CONFIG="$(mktemp "${TMPDIR:-/tmp}/stac-collection-config-XXXXXX.json")"
-trap 'rm -f "${RUNTIME_CONFIG}"' EXIT
-"${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" "${RUNTIME_CONFIG}" "${RUN_ID}" <<'PY'
+RUN_ROOT="${PROJECT_ROOT}/experiments/runs/${RUN_ID}"
+mkdir -p "${RUN_ROOT}"
+RUNTIME_CONFIG="${RUN_ROOT}/runtime_collection_config.json"
+DERIVATION_METADATA="${RUN_ROOT}/runtime_collection_config_derivation.json"
+"${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" "${RUNTIME_CONFIG}" "${DERIVATION_METADATA}" "${RUN_ID}" <<'PY'
+import hashlib
 import json
 import sys
 from pathlib import Path
 
-source, target, run_id = map(Path, sys.argv[1:])
+source = Path(sys.argv[1])
+target = Path(sys.argv[2])
+metadata_path = Path(sys.argv[3])
+run_id = sys.argv[4]
 value = json.loads(source.read_text(encoding="utf-8"))
+original_output_root = value.get("output_root")
 value["output_root"] = str(Path("experiments/runs") / run_id)
-target.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+encoded = json.dumps(value, indent=2, sort_keys=True) + "\n"
+if target.exists() and target.read_text(encoding="utf-8") != encoded:
+    raise SystemExit("runtime_collection_config_conflict")
+target.write_text(encoded, encoding="utf-8")
+source_bytes = source.read_bytes()
+metadata = {
+    "schema_version": "1.0",
+    "source_config_path": str(source),
+    "source_config_sha256": hashlib.sha256(source_bytes).hexdigest(),
+    "runtime_config_sha256": hashlib.sha256(encoded.encode()).hexdigest(),
+    "overrides": {
+        "output_root": {"before": original_output_root, "after": value["output_root"]}
+    },
+}
+metadata_encoded = json.dumps(metadata, indent=2, sort_keys=True) + "\n"
+if metadata_path.exists() and metadata_path.read_text(encoding="utf-8") != metadata_encoded:
+    raise SystemExit("runtime_collection_derivation_conflict")
+metadata_path.write_text(metadata_encoded, encoding="utf-8")
 PY
 
 RUN_METADATA="$(
@@ -138,7 +162,6 @@ fi
 
 finish() {
   local status=$?
-  rm -f "${RUNTIME_CONFIG}"
   echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] finished status=${status} log=${LOG_FILE}"
 }
 trap finish EXIT

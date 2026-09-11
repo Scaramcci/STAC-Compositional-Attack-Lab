@@ -51,6 +51,7 @@ def build_safeclaw_model_config(
     provider_request_budget: int = 128,
     provider_timeout_seconds: int = 90,
     provider_allowed_tools: list[str] | None = None,
+    embedding_request_budget: int = 128,
     provider_context_window: int = 200000,
     provider_max_output_tokens: int = 1024,
 ) -> tuple[dict[str, Any], list[str]]:
@@ -63,6 +64,7 @@ def build_safeclaw_model_config(
             provider_timeout_seconds,
             provider_context_window,
             provider_max_output_tokens,
+            embedding_request_budget,
         )
         < 1
     ):
@@ -84,6 +86,7 @@ def build_safeclaw_model_config(
         "provider_request_budget": provider_request_budget,
         "provider_timeout_seconds": provider_timeout_seconds,
         "provider_allowed_tools": provider_allowed_tools,
+        "embedding_request_budget": embedding_request_budget,
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
     }

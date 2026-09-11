@@ -45,6 +45,7 @@ def test_model_config_resolves_chat_and_embedding_endpoints_without_logging() ->
         "embedding_model": "synthetic-embedding",
         "embedding_api_base_url": "https://embedding.invalid/v1",
         "embedding_api_key": "embedding-secret",
+        "embedding_request_budget": 128,
     }
     assert transport["provider_compat"] == "openai"
     assert transport["provider_upstream_base_url"] == "https://provider.invalid/v1"

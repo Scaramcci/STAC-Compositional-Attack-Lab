@@ -65,6 +65,7 @@ STAC_PYTHON=python bash scripts/run_formal_evaluation.sh --run-id <unique-run-id
 ```bash
 python scripts/diagnostics/run_openclaw_diagnostics.py --mode offline
 python scripts/diagnostics/run_openclaw_diagnostics.py --mode live
+python scripts/diagnostics/run_openclaw_diagnostics.py --mode memory-live --run-id <unique-run-id>
 ```
 
-`live` 只用于受控的文本与单一 `add` 往返检查。详见 [教师向项目指南](docs/PROJECT_GUIDE_ZH.md)、[Linux 运行说明](docs/LINUX_TMUX_RUNBOOK_ZH.md) 和 [安全边界](SECURITY.md)。
+`live` 只用于受控的文本与单一 `add` 往返检查；`memory-live` 只用于普通合成 memory 写入、跨会话 `memory_search`/`memory_get` 观测，不是攻击或 collection。详见 [教师向项目指南](docs/PROJECT_GUIDE_ZH.md)、[Linux 运行说明](docs/LINUX_TMUX_RUNBOOK_ZH.md) 和 [安全边界](SECURITY.md)。

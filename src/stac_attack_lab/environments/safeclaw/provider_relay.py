@@ -307,8 +307,9 @@ class ContainerProviderRelay:
             "ingress_token": self.ingress_token,
         }
         try:
-            self._docker("network", "create", self.network)
+            self._docker("network", "create", "--internal", self.network)
             self._docker("network", "connect", self.network, self.victim_container)
+            self._docker("network", "disconnect", "bridge", self.victim_container)
             self._docker(
                 "run",
                 "-d",
@@ -320,6 +321,10 @@ class ContainerProviderRelay:
                 "sleep",
                 "infinity",
             )
+            # Only the relay receives an egress-capable interface. The Victim
+            # remains on the internal benchmark network and can reach upstream
+            # HTTP only through this authenticated, budgeted process.
+            self._docker("network", "connect", "bridge", self.container)
             self._docker(
                 "exec",
                 "-i",

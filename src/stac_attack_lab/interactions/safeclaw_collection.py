@@ -38,6 +38,9 @@ from stac_attack_lab.interactions.models import (
 from stac_attack_lab.interactions.normalizer import normalize_source_events
 
 SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
+SAFECLAW_CONSTRUCTION_TOOLS = frozenset(
+    {"read", "write", "edit", "exec", "memory_search", "memory_get"}
+)
 
 
 class SafeClawConstructionTask(StrictModel):
@@ -380,6 +383,7 @@ class SafeClawSubprocessVictimDriver:
         provider_request_budget: int = 128,
         provider_timeout_seconds: int = 90,
         provider_allowed_tools: list[str] | None = None,
+        embedding_request_budget: int = 128,
         environment: Mapping[str, str] | None = None,
     ) -> None:
         self.project_root = project_root
@@ -394,6 +398,7 @@ class SafeClawSubprocessVictimDriver:
         self.provider_request_budget = provider_request_budget
         self.provider_timeout_seconds = provider_timeout_seconds
         self.provider_allowed_tools = provider_allowed_tools
+        self.embedding_request_budget = embedding_request_budget
         self.environment = environment if environment is not None else os.environ
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._process: subprocess.Popen[str] | None = None
@@ -407,6 +412,33 @@ class SafeClawSubprocessVictimDriver:
         self._event_sequence = 0
         self._events: list[dict[str, Any]] = []
         self._checkpoints: list[dict[str, Any]] = []
+        self._provider_requests_spent = 0
+        self._embedding_requests_spent = 0
+        self._current_provider_requests = 0
+        self._current_embedding_requests = 0
+
+    @staticmethod
+    def _accepted_request_count(records: Any) -> int:
+        if not isinstance(records, list):
+            return 0
+        return sum(isinstance(item, dict) and item.get("accepted") is True for item in records)
+
+    def _observe_request_ledgers(self, response: dict[str, Any]) -> None:
+        if not hasattr(self, "_provider_requests_spent"):
+            self._provider_requests_spent = 0
+            self._embedding_requests_spent = 0
+            self._current_provider_requests = 0
+            self._current_embedding_requests = 0
+        provider = self._accepted_request_count(response.get("provider_request_ledger"))
+        embedding = self._accepted_request_count(response.get("embedding_request_ledger"))
+        self._last_provider_request_records = list(response.get("provider_request_ledger") or [])
+        self._last_embedding_request_records = list(response.get("embedding_request_ledger") or [])
+        if provider >= self._current_provider_requests:
+            self._provider_requests_spent += provider - self._current_provider_requests
+            self._current_provider_requests = provider
+        if embedding >= self._current_embedding_requests:
+            self._embedding_requests_spent += embedding - self._current_embedding_requests
+            self._current_embedding_requests = embedding
 
     def _next_sequence(self) -> int:
         self._event_sequence += 1
@@ -459,15 +491,24 @@ class SafeClawSubprocessVictimDriver:
     ) -> ConstructionObservation:
         if self._process is not None:
             raise RuntimeError("safeclaw_construction_driver_already_started")
+        provider_remaining = self.provider_request_budget - self._provider_requests_spent
+        embedding_remaining = self.embedding_request_budget - self._embedding_requests_spent
+        if provider_remaining < 1:
+            raise RuntimeError("safeclaw_collection_provider_request_budget_exhausted")
+        if embedding_remaining < 1:
+            raise RuntimeError("safeclaw_collection_embedding_request_budget_exhausted")
+        self._current_provider_requests = 0
+        self._current_embedding_requests = 0
         model_config_payload, _ = build_safeclaw_model_config(
             target_model_id=self.target_model_id,
             target_base_url=self.target_base_url,
             target_api_key_env=self.target_api_key_env,
             environment=self.environment,
             embedding=self.embedding,
-            provider_request_budget=self.provider_request_budget,
+            provider_request_budget=provider_remaining,
             provider_timeout_seconds=self.provider_timeout_seconds,
             provider_allowed_tools=self.provider_allowed_tools,
+            embedding_request_budget=embedding_remaining,
         )
         self._started_at = monotonic()
         self._temporary = tempfile.TemporaryDirectory(prefix="safeclaw-construction-")
@@ -566,6 +607,7 @@ class SafeClawSubprocessVictimDriver:
                 ),
             }
         )
+        self._observe_request_ledgers(response)
         # Model action IDs may repeat across retries; bind every attempt to a local nonce.
         action_nonce = self._event_sequence + 1
         action_type = action.action_type
@@ -611,6 +653,8 @@ class SafeClawSubprocessVictimDriver:
                 public_stage_status={"control": action_type},
             )
         session = cast(dict[str, Any], response.get("session", {}))
+        session["provider_request_ledger"] = response.get("provider_request_ledger", [])
+        session["embedding_request_ledger"] = response.get("embedding_request_ledger", [])
         post_state = cast(dict[str, Any], response.get("post_state", {}))
         session_id = str(session.get("session_id", f"construction-{action.action_id}"))
         message_hash = stable_hash(action.public_message or "")[:16]
@@ -646,7 +690,11 @@ class SafeClawSubprocessVictimDriver:
         # emitted only when the bridge reports an explicit retrieval event.
         explicit_retrievals = session.get("memory_retrievals", [])
         retrieval_observation = str(session.get("memory_retrieval_observation", "unknown"))
-        if retrieval_observation == "unknown":
+        if retrieval_observation != "observed":
+            retrieval_status = {
+                "rejected": "rejected",
+                "error": "error",
+            }.get(retrieval_observation, "not_observable")
             source_events.append(
                 {
                     "event_id": f"state-read-memory-unknown-{action.action_id}-{action_nonce}",
@@ -655,14 +703,18 @@ class SafeClawSubprocessVictimDriver:
                     "actor_role": "victim_system",
                     "event_type": "state_read",
                     "component_role": "persistent_memory",
-                    "operation": "memory_retrieval_not_observable",
-                    "status": "not_observable",
+                    "operation": (
+                        "memory_retrieval_not_occurred"
+                        if retrieval_observation == "not_occurred"
+                        else "memory_retrieval_not_observable"
+                    ),
+                    "status": retrieval_status,
                     # Unknown retrieval is diagnostic only. Without an explicit
                     # bridge event, do not claim a state read or manufacture a
                     # dependency on a state writer.
                     "evidence_ref_ids": [f"bridge:{session_id}:memory:unknown"],
                     "public_payload": {
-                        "observation": "unknown",
+                        "observation": retrieval_observation,
                         "evidence_available": False,
                         "transcript_provenance": session.get("transcript_provenance", {}),
                     },
@@ -783,15 +835,21 @@ class SafeClawSubprocessVictimDriver:
                     "provider_usage_observation": session.get("provider_usage_observation"),
                     "gateway_diagnostics": session.get("gateway_diagnostics", {}),
                     "provider_request_ledger": session.get("provider_request_ledger", []),
+                    "embedding_request_ledger": session.get("embedding_request_ledger", []),
                 },
                 "evidence_ref_ids": [f"bridge:{session_id}:response"],
             }
         )
         tool_calls = session.get("tool_calls", [])
+        tool_observations = session.get("tool_observations", [])
+        if isinstance(tool_observations, list) and tool_observations:
+            tool_calls = tool_observations
         tool_call_event_ids: list[str] = []
         for index, tool_call in enumerate(tool_calls if isinstance(tool_calls, list) else []):
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
-            provider_call_id = str(call_payload.get("id", "")) or None
+            provider_call_id = (
+                str(call_payload.get("id") or call_payload.get("call_id") or "") or None
+            )
             tool_call_event_id = (
                 f"tool-call-{provider_call_id}"
                 if provider_call_id
@@ -812,9 +870,50 @@ class SafeClawSubprocessVictimDriver:
                     "public_payload": {
                         **call_payload,
                         "provider_tool_call_id": provider_call_id,
-                        "execution_result_observed": False,
+                        "execution_result_observed": call_payload.get("result_observation")
+                        in {"observed", "rejected", "error"},
                     },
-                    "evidence_ref_ids": [f"bridge:{session_id}:tool:{index}"],
+                    "evidence_ref_ids": [
+                        str(
+                            call_payload.get("request_evidence_ref")
+                            or f"bridge:{session_id}:tool:{index}"
+                        )
+                    ],
+                }
+            )
+            result_observation = str(call_payload.get("result_observation", "not_observed"))
+            if result_observation == "not_observed":
+                continue
+            source_events.append(
+                {
+                    "event_id": (
+                        f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
+                    ),
+                    "session_id": session_id,
+                    "sequence_no": self._next_sequence(),
+                    "actor_role": "effect_tool",
+                    "event_type": "tool_result",
+                    "component_role": "agent_context",
+                    "operation": "safeclaw.tool_result",
+                    "status": {
+                        "observed": "passed",
+                        "rejected": "rejected",
+                        "error": "error",
+                    }.get(result_observation, "not_observable"),
+                    "request_event_id": tool_call_event_id,
+                    "public_payload": {
+                        "provider_tool_call_id": provider_call_id,
+                        "tool_name": call_payload.get("tool_name"),
+                        "result_observation": result_observation,
+                        "result_hash": call_payload.get("result_hash"),
+                        "result_evidence_ref": call_payload.get("result_evidence_ref"),
+                    },
+                    "evidence_ref_ids": [
+                        str(
+                            call_payload.get("result_evidence_ref")
+                            or f"bridge:{session_id}:tool-result:{index}"
+                        )
+                    ],
                 }
             )
         state_specs = [
@@ -885,6 +984,7 @@ class SafeClawSubprocessVictimDriver:
             raise RuntimeError("safeclaw_construction_driver_not_started")
         try:
             response = self._send_bridge({"kind": "finish"})
+            self._observe_request_ledgers(response)
             post_state = cast(dict[str, Any], response.get("post_state", {}))
             post_hash = stable_hash(post_state)
             final_events: list[dict[str, Any]] = []
@@ -932,6 +1032,27 @@ class SafeClawSubprocessVictimDriver:
                     "bridge_hash": file_hash(self.bridge_path),
                     "private_oracle_exposed": "false",
                     "official_evaluator_invoked": "false",
+                    "victim_provider_http_request_count": str(self._provider_requests_spent),
+                    "embedding_http_request_count": str(self._embedding_requests_spent),
+                    "provider_request_budget_scope": "collection_run",
+                    "provider_error_categories": json.dumps(
+                        sorted(
+                            {
+                                str(item.get("error_category"))
+                                for item in getattr(self, "_last_provider_request_records", [])
+                                if isinstance(item, dict) and item.get("error_category")
+                            }
+                        )
+                    ),
+                    "embedding_error_categories": json.dumps(
+                        sorted(
+                            {
+                                str(item.get("error_category"))
+                                for item in getattr(self, "_last_embedding_request_records", [])
+                                if isinstance(item, dict) and item.get("error_category")
+                            }
+                        )
+                    ),
                 },
             )
         finally:
@@ -946,7 +1067,8 @@ class SafeClawSubprocessVictimDriver:
         try:
             if process is not None and process.poll() is None:
                 try:
-                    self._send_bridge({"kind": "finish"})
+                    response = self._send_bridge({"kind": "finish"})
+                    self._observe_request_ledgers(response)
                     process.wait(timeout=30)
                 except Exception:
                     process.terminate()

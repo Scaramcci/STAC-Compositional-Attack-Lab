@@ -175,6 +175,6 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(adapter.urllib.request, "urlopen", failed)
     response = request("synthetic-key")
-    assert b"429" in response.split(b"\r\n")[0]
+    assert b"400" in response.split(b"\r\n")[0]
     assert b"synthetic-key" not in response
     assert b"secret.invalid" not in response

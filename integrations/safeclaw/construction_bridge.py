@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import importlib.util
 import json
 import subprocess
@@ -31,6 +32,7 @@ from stac_attack_lab.environments.safeclaw.provider_relay import (
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
 
 SUPPORTED_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
+MEMORY_RETRIEVAL_TOOLS = frozenset({"memory_search", "memory_get"})
 
 
 def _load_judge(upstream: Path) -> ModuleType:
@@ -85,6 +87,140 @@ def _transcript_provenance(
         "tool_result_lines": sum(line.startswith("TOOL_RESULT:") for line in lines),
         "structured_lineage_available": False,
     }
+
+
+def _text_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    return "\n".join(
+        str(item.get("text", ""))
+        for item in content
+        if isinstance(item, dict) and item.get("type") == "text"
+    )
+
+
+def _structured_tool_observations(
+    raw_state: dict[str, Any],
+    seen_entry_ids: set[str],
+    exact_secrets: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """Project new, paired tool facts from pinned OpenClaw session JSONL."""
+    calls: dict[str, dict[str, Any]] = {}
+    results: dict[str, dict[str, Any]] = {}
+    observed_ids: set[str] = set()
+    raw = str(raw_state.get("session_transcript_raw") or "")
+    for line_number, line in enumerate(raw.splitlines(), start=1):
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(entry, dict) or entry.get("type") != "message":
+            continue
+        entry_id = str(entry.get("id") or f"line-{line_number}")
+        if entry_id in seen_entry_ids:
+            continue
+        observed_ids.add(entry_id)
+        message = entry.get("message")
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if message.get("role") == "assistant" and isinstance(content, list):
+            for block in content:
+                if not isinstance(block, dict) or block.get("type") not in {
+                    "toolCall",
+                    "toolUse",
+                    "functionCall",
+                }:
+                    continue
+                call_id = str(block.get("id") or "")
+                tool_name = str(block.get("name") or "")
+                if not call_id or not tool_name:
+                    continue
+                arguments = block.get("arguments", block.get("input", {}))
+                projection = str(
+                    redact_value(
+                        json.dumps(arguments, sort_keys=True, default=str), exact_secrets or []
+                    ).sanitized
+                )[:2000]
+                calls[call_id] = {
+                    "call_id": call_id,
+                    "tool_name": tool_name,
+                    "arguments_hash": hashlib.sha256(projection.encode()).hexdigest(),
+                    "arguments_projection": projection,
+                    "request_evidence_ref": f"openclaw-session-entry:{entry_id}",
+                }
+        if message.get("role") in {"toolResult", "tool"}:
+            call_id = str(message.get("toolCallId") or message.get("toolUseId") or "")
+            if not call_id:
+                continue
+            result_text = str(redact_value(_text_content(content), exact_secrets or []).sanitized)
+            is_error = bool(message.get("isError"))
+            lowered = result_text.lower()
+            parsed_result: Any = None
+            try:
+                parsed_result = json.loads(result_text)
+            except json.JSONDecodeError:
+                pass
+            semantic_error = isinstance(parsed_result, dict) and (
+                bool(parsed_result.get("error"))
+                or parsed_result.get("unavailable") is True
+                or parsed_result.get("disabled") is True
+            )
+            observed_empty = (
+                str(message.get("toolName") or "") == "memory_search"
+                and isinstance(parsed_result, dict)
+                and parsed_result.get("results") == []
+                and not semantic_error
+            )
+            observation = (
+                "rejected"
+                if is_error
+                and any(marker in lowered for marker in ("denied", "not allowed", "forbidden"))
+                else "error"
+                if is_error or semantic_error
+                else "not_occurred"
+                if observed_empty
+                else "observed"
+            )
+            results[call_id] = {
+                "tool_name": str(message.get("toolName") or ""),
+                "result_observation": observation,
+                "result_hash": hashlib.sha256(result_text.encode()).hexdigest(),
+                "result_excerpt": result_text[:2000],
+                "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
+            }
+    projected = []
+    for call_id, call in calls.items():
+        result = results.get(call_id)
+        projected.append(
+            {
+                **call,
+                "result_observation": (result["result_observation"] if result else "not_observed"),
+                "result_hash": result.get("result_hash") if result else None,
+                "result_excerpt": (
+                    result.get("result_excerpt")
+                    if result and call["tool_name"] in MEMORY_RETRIEVAL_TOOLS
+                    else None
+                ),
+                "result_evidence_ref": (result.get("result_evidence_ref") if result else None),
+            }
+        )
+    return projected, observed_ids
+
+
+def _embedding_ledger(judge: ModuleType) -> list[dict[str, Any]]:
+    raw = judge.dexec_output("cat /tmp/stac-embedding-ledger.jsonl 2>/dev/null")
+    records: list[dict[str, Any]] = []
+    for line in str(raw or "").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(item, dict):
+            records.append(item)
+    return records
 
 
 def _observable_usage(raw: Any) -> dict[str, int] | None:
@@ -170,6 +306,7 @@ def main() -> int:
     current_key = None
     pending_restart = False
     session_index = 0
+    seen_transcript_entry_ids: set[str] = set()
     try:
         with contextlib.redirect_stdout(sys.stderr):
             phase = "container_start"
@@ -226,6 +363,7 @@ def main() -> int:
                         "kind": "finished",
                         "post_state": post_state,
                         "provider_request_ledger": relay.records() if relay else [],
+                        "embedding_request_ledger": _embedding_ledger(judge),
                     }
                 )
                 return 0
@@ -263,6 +401,10 @@ def main() -> int:
                 public_post_state = _observable_state(raw_post_state, exact_secrets)
             current_key = result.pop("_session_key")
             raw_api_response = result.pop("raw_api_response", None)
+            tool_observations, newly_seen = _structured_tool_observations(
+                raw_post_state, seen_transcript_entry_ids, exact_secrets
+            )
+            seen_transcript_entry_ids.update(newly_seen)
             classification = _classify_response(
                 raw_api_response,
                 result.get("agent_response"),
@@ -280,11 +422,40 @@ def main() -> int:
                 result["provider_usage_observation"] = "gateway_zero_or_missing_unverified"
             result["gateway_diagnostics"] = public_post_state.get("gateway_log_provenance", {})
             result["transcript_provenance"] = _transcript_provenance(raw_post_state, exact_secrets)
-            # The pinned upstream exposes assistant tool calls but no tool-result
-            # stream. Preserve an explicit unknown status; never infer recall
-            # from memory files or a memory-search request alone.
-            result["memory_retrievals"] = []
-            result["memory_retrieval_observation"] = "unknown"
+            result["tool_observations"] = tool_observations
+            memory_tools = [
+                item for item in tool_observations if item["tool_name"] in MEMORY_RETRIEVAL_TOOLS
+            ]
+            observed_retrievals = [
+                item for item in memory_tools if item["result_observation"] == "observed"
+            ]
+            result["memory_retrievals"] = [
+                {
+                    "retrieval_id": item["call_id"],
+                    "content_hash": item["result_hash"],
+                    "content_excerpt": item["result_excerpt"],
+                    "parent_artifact_ids": [],
+                    "request_event_id": f"tool-call-{item['call_id']}",
+                    "evidence_ref_ids": [
+                        item["request_evidence_ref"],
+                        item["result_evidence_ref"],
+                    ],
+                }
+                for item in observed_retrievals
+            ]
+            if observed_retrievals:
+                result["memory_retrieval_observation"] = "observed"
+            elif memory_tools:
+                states = {str(item["result_observation"]) for item in memory_tools}
+                result["memory_retrieval_observation"] = (
+                    "rejected"
+                    if "rejected" in states
+                    else "error"
+                    if "error" in states
+                    else "not_observed"
+                )
+            else:
+                result["memory_retrieval_observation"] = "not_occurred"
             pending_restart = False
             runner.session_results.append(result)
             _emit(
@@ -294,6 +465,7 @@ def main() -> int:
                     "session": result,
                     "post_state": public_post_state,
                     "provider_request_ledger": relay.records() if relay else [],
+                    "embedding_request_ledger": _embedding_ledger(judge),
                 }
             )
     except Exception as exc:

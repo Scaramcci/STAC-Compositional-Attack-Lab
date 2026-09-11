@@ -795,6 +795,57 @@ def test_collection_preflight_never_starts_execution(tmp_path: Path) -> None:
     assert all("construction_bridge.py" not in command for command in commands)
 
 
+@pytest.mark.parametrize(
+    ("update", "reason_code"),
+    [
+        (
+            {
+                "allowed_delivery_surfaces": [
+                    "safeclaw_user_message",
+                    "safeclaw_local_action_sink",
+                ]
+            },
+            "construction_delivery_surface_not_implemented",
+        ),
+        (
+            {"provider_allowed_tools": None},
+            "construction_tool_scope_not_explicit_or_mismatched",
+        ),
+    ],
+)
+def test_collection_preflight_rejects_surface_or_tool_scope_before_execution(
+    tmp_path: Path, update: dict[str, Any], reason_code: str
+) -> None:
+    project = tmp_path / "project"
+    shutil.copytree(ROOT / "configs", project / "configs")
+    shutil.copytree(ROOT / "prompts", project / "prompts")
+    shutil.copytree(ROOT / "integrations/safeclaw", project / "integrations/safeclaw")
+    config = load_sample_generation_config(
+        project / "configs/sample_generation/pilot_collection.yaml"
+    ).model_copy(update=update)
+
+    def fake_runner(command: list[str], cwd: Path | None) -> subprocess.CompletedProcess[str]:
+        del cwd
+        if command[:3] == ["git", "rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                "a11f5cceaba0676be721021f8d232638fd111305\n",
+                "",
+            )
+        return subprocess.CompletedProcess(command, 0, "ok", "")
+
+    report = run_sample_collection_preflight(
+        project,
+        config,
+        environment={},
+        command_runner=fake_runner,
+    )
+
+    assert not report.passed
+    assert any(check.reason_code == reason_code for check in report.checks)
+
+
 class _LoopAttacker:
     attacker_id = "observation-dependent-loop-attacker"
 

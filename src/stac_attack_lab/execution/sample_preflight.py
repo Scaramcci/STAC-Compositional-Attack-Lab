@@ -13,7 +13,11 @@ from stac_attack_lab.config import RoleModelConfig, configured_openai_models, lo
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.execution.sample_generation import SampleGenerationConfig
 from stac_attack_lab.hashing import file_hash
-from stac_attack_lab.interactions.safeclaw_collection import SafeClawConstructionTaskSet
+from stac_attack_lab.interactions.safeclaw_collection import (
+    SAFECLAW_CONSTRUCTION_TOOLS,
+    SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES,
+    SafeClawConstructionTaskSet,
+)
 from stac_attack_lab.prompts.loader import load_prompt
 
 
@@ -82,6 +86,33 @@ def run_sample_collection_preflight(
         config.execution_enabled,
         "sample_collection_explicitly_enabled",
         "sample_collection_execution_disabled",
+    )
+    delivery_surfaces_ok = (
+        set(config.allowed_delivery_surfaces) == SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES
+    )
+    add(
+        "delivery_surfaces",
+        delivery_surfaces_ok,
+        "construction_delivery_surfaces_implemented",
+        "construction_delivery_surface_not_implemented",
+        {
+            "configured": ",".join(sorted(config.allowed_delivery_surfaces)),
+            "implemented": ",".join(sorted(SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES)),
+        },
+    )
+    tools_ok = (
+        config.provider_allowed_tools is not None
+        and set(config.provider_allowed_tools) == SAFECLAW_CONSTRUCTION_TOOLS
+    )
+    add(
+        "tool_scope",
+        tools_ok,
+        "construction_tool_scope_explicit_and_minimal",
+        "construction_tool_scope_not_explicit_or_mismatched",
+        {
+            "configured": ",".join(sorted(config.provider_allowed_tools or [])),
+            "required": ",".join(sorted(SAFECLAW_CONSTRUCTION_TOOLS)),
+        },
     )
     split_ok = "test" not in config.allowed_source_splits
     add(

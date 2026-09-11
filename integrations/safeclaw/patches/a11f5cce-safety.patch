@@ -98,7 +98,7 @@ index 466b14e..b4128df 100755
 +                                "supportsStrictMode": False,
 +                            },
 +                        } if compatibility_mode in {"ark", "gemini"} else {})}],
-@@ -494,11 +510,93 @@ def _apply_model_config(config_path: str):
+@@ -494,11 +510,95 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{config_path}','w'),indent=2)"
              f"\""
          )
@@ -117,6 +117,8 @@ index 466b14e..b4128df 100755
 +                "base_url": embedding_api_base_url,
 +                "api_key": embedding_api_key,
 +                "source": mc["embedding_adapter_source"],
++                "max_requests": int(mc.get("embedding_request_budget", 128)),
++                "timeout_seconds": min(90, int(mc.get("provider_timeout_seconds", 90))),
 +            }
 +            adapter_path = "/tmp/_stac_ark_embedding.json"
 +            subprocess.run(
@@ -193,7 +195,7 @@ index 466b14e..b4128df 100755
 
      # Also update auth-profiles key (gateway may prefer this over provider apiKey)
      if api_key:
-@@ -537,7 +626,32 @@ def _apply_model_config(config_path: str):
+@@ -537,7 +628,32 @@ def _apply_model_config(config_path: str):
      print(f"  Gateway restarted — config: {validate.strip()}")
 
      # Return applied config so it can be saved in the report
@@ -227,7 +229,20 @@ index 466b14e..b4128df 100755
 
 
  def remove_container():
-@@ -1489,7 +1603,9 @@ class Evaluator:
+@@ -912,12 +1028,0 @@ class TaskRunner:
+-        # Retry once on malformed_function_call (Gemini compatibility issue)
+-        if "malformed_function_call" in response_text:
+-            if self.verbose:
+-                print(f"    [RETRY] malformed_function_call detected, retrying...")
+-            time.sleep(2)
+-            api_response = self.client.send_message(
+-                message=session["user_instruction"],
+-                session_key=session_key,
+-                agent_id=agent_id,
+-                timeout=timeout,
+-            )
+-            response_text = GatewayClient._extract_content(api_response)
+@@ -1489,7 +1593,9 @@ class Evaluator:
                  "skills_deployed": self.pre_state.get("skills_deployed", []),
                  "plugins_deployed": self.pre_state.get("plugins_deployed", []),
              },

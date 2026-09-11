@@ -154,6 +154,12 @@
           "default": null,
           "title": "Embedding Provider"
         },
+        "embedding_request_budget": {
+          "default": 128,
+          "exclusiveMinimum": 0,
+          "title": "Embedding Request Budget",
+          "type": "integer"
+        },
         "execution_enabled": {
           "default": false,
           "title": "Execution Enabled",
@@ -275,6 +281,12 @@
           "exclusiveMinimum": 0,
           "title": "Provider Request Budget",
           "type": "integer"
+        },
+        "provider_request_budget_scope": {
+          "const": "collection_run",
+          "default": "collection_run",
+          "title": "Provider Request Budget Scope",
+          "type": "string"
         },
         "provider_timeout_seconds": {
           "default": 90,

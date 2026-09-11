@@ -178,3 +178,37 @@ def test_container_cleanup_targets_only_owned_names(monkeypatch: pytest.MonkeyPa
         ("network", "disconnect", "network-owned", "victim-owned"),
         ("network", "rm", "network-owned"),
     ]
+
+
+def test_container_relay_removes_victim_egress_and_keeps_relay_egress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_docker(
+        *args: str, check: bool = True, input_data: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        del check, input_data
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, b"ok", b"")
+
+    monkeypatch.setattr(ContainerProviderRelay, "_docker", staticmethod(fake_docker))
+    relay = ContainerProviderRelay(
+        image="image",
+        victim_container="victim-owned",
+        runtime={
+            "source": "source",
+            "upstream_api_key": "secret",
+            "upstream_base_url": "https://provider.invalid/v1",
+            "max_requests": 1,
+            "timeout_seconds": 1,
+            "allowed_tools": [],
+        },
+    )
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+
+    relay.start()
+
+    assert ("network", "create", "--internal", relay.network) in calls
+    assert ("network", "disconnect", "bridge", "victim-owned") in calls
+    assert ("network", "connect", "bridge", relay.container) in calls

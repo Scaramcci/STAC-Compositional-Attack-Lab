@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import runpy
+from pathlib import Path
 from time import monotonic
 from typing import Any
 
@@ -10,6 +13,176 @@ from stac_attack_lab.interactions.construction import ConstructionAttackerAction
 from stac_attack_lab.interactions.safeclaw_collection import (
     SafeClawSubprocessVictimDriver,
 )
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    raw = {
+        "session_transcript_raw": "\n".join(
+            json.dumps(item)
+            for item in [
+                {
+                    "id": "request-entry",
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "toolCall",
+                                "id": "call-memory-1",
+                                "name": "memory_search",
+                                "arguments": {"query": "SYNTHETIC_CANARY"},
+                            }
+                        ],
+                    },
+                },
+                {
+                    "id": "result-entry",
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "call-memory-1",
+                        "toolName": "memory_search",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "memory/MEMORY.md:1 SYNTHETIC_CANARY",
+                            }
+                        ],
+                        "isError": False,
+                    },
+                },
+            ]
+        )
+    }
+
+    observations, seen = project(raw, set(), [])
+
+    assert seen == {"request-entry", "result-entry"}
+    assert observations == [
+        {
+            "call_id": "call-memory-1",
+            "tool_name": "memory_search",
+            "arguments_hash": observations[0]["arguments_hash"],
+            "arguments_projection": '{"query": "SYNTHETIC_CANARY"}',
+            "request_evidence_ref": "openclaw-session-entry:request-entry",
+            "result_observation": "observed",
+            "result_hash": observations[0]["result_hash"],
+            "result_excerpt": "memory/MEMORY.md:1 SYNTHETIC_CANARY",
+            "result_evidence_ref": "openclaw-session-entry:result-entry",
+        }
+    ]
+    repeated, _ = project(raw, seen, [])
+    assert repeated == []
+
+
+def test_bridge_distinguishes_rejected_and_unobserved_tool_results() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    raw = {
+        "session_transcript_raw": "\n".join(
+            json.dumps(item)
+            for item in [
+                {
+                    "id": "a",
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "toolCall",
+                                "id": "call-a",
+                                "name": "exec",
+                                "arguments": {"command": "false"},
+                            },
+                            {
+                                "type": "toolCall",
+                                "id": "call-b",
+                                "name": "read",
+                                "arguments": {"path": "missing"},
+                            },
+                        ],
+                    },
+                },
+                {
+                    "id": "b",
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "call-a",
+                        "toolName": "exec",
+                        "content": [{"type": "text", "text": "forbidden by policy"}],
+                        "isError": True,
+                    },
+                },
+            ]
+        )
+    }
+
+    observations, _ = project(raw, set(), [])
+
+    assert [item["result_observation"] for item in observations] == [
+        "rejected",
+        "not_observed",
+    ]
+    assert all(item["result_excerpt"] is None for item in observations)
+
+
+def test_bridge_does_not_treat_unavailable_memory_search_as_retrieval() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    raw = {
+        "session_transcript_raw": "\n".join(
+            json.dumps(item)
+            for item in [
+                {
+                    "id": "request",
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "toolCall",
+                                "id": "memory-call",
+                                "name": "memory_search",
+                                "arguments": {"query": "canary"},
+                            }
+                        ],
+                    },
+                },
+                {
+                    "id": "result",
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "memory-call",
+                        "toolName": "memory_search",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(
+                                    {
+                                        "results": [],
+                                        "disabled": True,
+                                        "unavailable": True,
+                                        "error": "embedding failed",
+                                    }
+                                ),
+                            }
+                        ],
+                        "isError": False,
+                    },
+                },
+            ]
+        )
+    }
+
+    observations, _ = project(raw, set(), [])
+
+    assert observations[0]["result_observation"] == "error"
 
 
 def test_explicit_memory_retrievals_are_all_preserved_with_lineage(
