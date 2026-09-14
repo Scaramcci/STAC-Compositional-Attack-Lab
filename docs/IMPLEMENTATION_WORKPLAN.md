@@ -21,13 +21,13 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 - 区分向量搜索、关键词 fallback、memory_get、错误及 unknown。仅工具返回非空不等于通过。
 - 保留真实工具调用/结果、索引证据、请求阶段和关联 ID；不要从文件存在或模型回复推断 recall。
 - 必要时做最小 instrumentation 修复和回归；真实错误按 upstream 状态分类，不直接归咎配额或 Victim 限流。
-- 本轮结果：索引写入和跨会话 memory_get 有证据；语义 memory_search 返回 disabled/unavailable（embedding transport_error），因此第 2 步未通过，不能进入 construction。另有一次误重复运行导致累计 Victim 18、embedding 6、合计 24，超过本轮 Victim/合计预算；已停止真实调用并保留全部产物。
+- 历史结果（已保留）：索引写入和跨会话 memory_get 有证据；语义 `memory_search` 曾返回 disabled/unavailable（embedding transport_error），因此当时第 2 步未通过。修复后真实 run `memory-relay-diagnostic-20260914-104102-8a963628` 已通过第 2 步；历史误重复运行的超预算产物仍保留，不作为当前通过依据。
 
-验收：索引与真实语义搜索均有证据；或者明确交付具体失败与未知项。缺少 frozen library 不阻止本步骤。
+验收：索引与真实语义搜索均有证据；当前已由上述修复后 run 满足。缺少 frozen library 不阻止本步骤。
 
 ## 3. 单条 construction（另行确认运行范围）
 
-第 2 步通过后，运行 1 task × 1 seed 的有限 construction；使用 canonical pilot 派生配置和唯一目录。
+第 2 步已通过；本轮已运行 1 task × 1 seed 的有限 construction，使用 canonical pilot 派生配置和唯一目录。
 验证 lifecycle、provider/embedding 跨运行累计预算、脱敏、raw/source events/checkpoints 完整。
 对本轮 raw 显式 normalize/mine/audit，分开报告质量、行为、官方结果及 eligibility。未执行时不写 accepted=0。
 
@@ -70,4 +70,4 @@ A/B/C 未执行。唯一 run 在真实请求前的 pinned judge 配置阶段因 
 
 A/B/C 已通过：relay/Victim embedding 均成功，向量索引建立，跨会话 `memory_search` 返回本轮事实的非空 hybrid 结果，具备 call/result/source/hash 证据。首次修复复测的 401 根因已修复；诊断脚本现在严格 A 成功后才调用 B、A/B 成功后才进入 C。最终通过 run 的 Embedding 4、Victim 6；含首次 401 失败 run 合计 Embedding 6、Victim 6。未运行 construction、pilot、main collection、mining、freeze 或 evaluation。
 
-下一步可以在单独授权下考虑最小 construction；本轮不自动推进。
+最小 construction 已在独立授权下完成（2026-09-14）；本轮不自动推进 canonical pilot。

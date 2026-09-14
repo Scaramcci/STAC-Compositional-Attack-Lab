@@ -5,8 +5,8 @@
 ## 当前结论
 
 - 已合并 `ark_embedding_proxy.py` 和工作计划中的遗留冲突，保留预算控制与结构化错误观测两边的必要实现。
-- direct embedding 与代理转换已有历史成功证据。本轮完成一次隔离索引/语义检索验证及一次最小修复后复测；索引写入成功，但语义 `memory_search` 因 embedding 上游 transport error 不可用，未通过。
-- 当前阻塞：等待 embedding 出口 transport error 的服务器网络/endpoint 处理；处理后需获得新授权再复核语义检索。不得跳到 construction 或完整 pilot。
+- direct embedding、代理转换及隔离索引/语义检索已有修复后真实成功证据（`memory-relay-diagnostic-20260914-104102-8a963628`）；语义 `memory_search` 返回带来源/hash/call 配对的非空结果，memory 链路通过。
+- 本轮已在独立目录执行 1 task × 1 seed 的真实 construction，并完成 raw→normalization→mine→audit。construction 因 provider usage 不可观测而准确记录为 `partial`；mining 产出 1 candidate、0 accepted、1 negative，audit 仅因 accepted target 未满足而失败。该结果不是攻击成功，也不是链路失败。
 - frozen primitive library 尚缺失，只阻止依赖该库的正式评测；不阻止独立 memory 验证或 construction。不能形成“先有冻结库才能采集”的循环。
 
 ## 本轮源码修复
