@@ -14,6 +14,7 @@ from stac_attack_lab.environments.safeclaw.provider_relay import (
     ProviderRelayConfig,
     ProviderRelayServer,
     RunningProviderRelay,
+    _extract_provider_usage,
     chat_completions_url,
     relay_runtime_from_model_config,
 )
@@ -269,3 +270,74 @@ def test_relay_ledger_read_fails_closed_on_corrupt_line(
         relay.embedding_records()
     with pytest.raises(RuntimeError, match="ledger_corrupt"):
         relay.records()
+
+
+def test_provider_usage_extracts_nonstream_json_and_rejects_invalid() -> None:
+    usage, observation, reasons = _extract_provider_usage(
+        b'{"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":18}}',
+        "application/json",
+    )
+    assert usage == {"input_tokens": 11, "output_tokens": 7, "total_tokens": 18}
+    assert observation == "complete" and reasons == []
+    usage, observation, reasons = _extract_provider_usage(
+        b'{"usage":{"prompt_tokens":11,"completion_tokens":7,"total_tokens":99}}',
+        "application/json",
+    )
+    assert usage is None and observation == "partial" and "total_tokens_inconsistent" in reasons
+
+
+def test_provider_usage_extracts_sse_final_usage_only_chunk() -> None:
+    body = (
+        b'data: {"choices":[{"delta":{"content":"ok"}}]}\n'
+        b'data: {"choices":[],"usage":{"prompt_tokens":13,'
+        b'"completion_tokens":5,"total_tokens":18}}\n'
+        b"data: [DONE]\n"
+    )
+    usage, observation, reasons = _extract_provider_usage(body, "text/event-stream")
+    assert usage == {"input_tokens": 13, "output_tokens": 5, "total_tokens": 18}
+    assert observation == "complete" and reasons == []
+
+
+def test_provider_usage_marks_truncated_and_missing_sse() -> None:
+    usage, observation, reasons = _extract_provider_usage(
+        b'data: {"choices":[],"usage":{"prompt_tokens":1}}\n', "text/event-stream"
+    )
+    assert usage is None and observation == "truncated" and "sse_done_missing" in reasons
+    usage, observation, reasons = _extract_provider_usage(
+        b'data: {"choices":[]}\ndata: [DONE]\n', "text/event-stream"
+    )
+    assert usage is None and observation == "missing" and "usage_missing" in reasons
+
+
+def test_relay_records_provider_usage_and_requests_ark_stream_usage(tmp_path: Path) -> None:
+    response = MockResponse(
+        body=(
+            b'data: {"choices":[{"delta":{"content":"ok"}}]}\n'
+            b'data: {"choices":[],"usage":{"prompt_tokens":4,'
+            b'"completion_tokens":6,"total_tokens":10}}\n'
+            b"data: [DONE]\n"
+        ),
+        content_type="text/event-stream",
+    )
+    with MockProviderServer([response], max_requests=1) as upstream:
+        config = ProviderRelayConfig(
+            upstream_base_url=upstream.url,
+            upstream_api_key="secret",
+            ingress_token="relay-token",
+            max_requests=1,
+            timeout_seconds=3,
+            provider_compat="ark",
+            ledger_path=str(tmp_path / "ledger.jsonl"),
+        )
+        relay = ProviderRelayServer(("127.0.0.1", 0), config)
+        with RunningProviderRelay(relay):
+            status, _ = _post(relay.url + "/v1/chat/completions", {"model": "ep", "stream": True})
+        assert status == 200
+        assert upstream.state.requests[0].body["stream_options"] == {"include_usage": True}
+        record = json.loads((tmp_path / "ledger.jsonl").read_text().splitlines()[-1])
+        assert record["provider_usage"] == {
+            "input_tokens": 4,
+            "output_tokens": 6,
+            "total_tokens": 10,
+        }
+        assert record["provider_usage_observation"] == "complete"

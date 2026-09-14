@@ -260,6 +260,47 @@ def _observable_usage(raw: Any) -> dict[str, int] | None:
     return None
 
 
+def _aggregate_relay_usage(records: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate one action's relay attempts without counting ledger snapshots twice."""
+    attempts = [item for item in records if item.get("accepted") is True]
+    known = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+    complete = 0
+    missing = 0
+    failed = 0
+    for item in attempts:
+        usage = item.get("provider_usage")
+        if item.get("status") != 200:
+            failed += 1
+        if (
+            isinstance(usage, dict)
+            and all(isinstance(usage.get(key), int) and usage.get(key) >= 0 for key in known)
+            and usage.get("total_tokens") == usage.get("input_tokens") + usage.get("output_tokens")
+        ):
+            complete += 1
+            for key in known:
+                known[key] += int(usage[key])
+        else:
+            missing += 1
+    observation = (
+        "complete"
+        if attempts and complete == len(attempts) and failed == 0
+        else "partial"
+        if attempts and complete > 0
+        else "failed"
+        if attempts and failed == len(attempts)
+        else "missing"
+    )
+    return {
+        "usage": known if attempts and complete == len(attempts) and failed == 0 else None,
+        "known_subtotal": known if complete else None,
+        "observation": observation,
+        "attempt_count": len(attempts),
+        "complete_request_count": complete,
+        "missing_request_count": missing,
+        "failed_request_count": failed,
+    }
+
+
 def _classify_response(
     raw: Any,
     agent_response: Any,
@@ -302,6 +343,7 @@ def main() -> int:
     pending_restart = False
     session_index = 0
     seen_transcript_entry_ids: set[str] = set()
+    provider_record_cursor = 0
     try:
         with contextlib.redirect_stdout(sys.stderr):
             phase = "container_start"
@@ -418,6 +460,10 @@ def main() -> int:
                 public_post_state = _observable_state(raw_post_state, exact_secrets)
             current_key = result.pop("_session_key")
             raw_api_response = result.pop("raw_api_response", None)
+            relay_records = relay.records() if relay is not None else []
+            action_relay_records = relay_records[provider_record_cursor:]
+            provider_record_cursor = len(relay_records)
+            relay_usage = _aggregate_relay_usage(action_relay_records)
             tool_observations, newly_seen = _structured_tool_observations(
                 raw_post_state, seen_transcript_entry_ids, exact_secrets
             )
@@ -430,13 +476,41 @@ def main() -> int:
                 exact_secrets,
             )
             result.update(classification)
-            usage = _observable_usage(raw_api_response)
-            if usage is not None and any(value > 0 for value in usage.values()):
-                result["provider_usage"] = usage
-                result["provider_usage_observation"] = "reported_nonzero"
+            gateway_usage = _observable_usage(raw_api_response)
+            gateway_complete = (
+                gateway_usage is not None
+                and all(
+                    key in gateway_usage
+                    for key in ("input_tokens", "output_tokens", "total_tokens")
+                )
+                and gateway_usage["total_tokens"]
+                == gateway_usage["input_tokens"] + gateway_usage["output_tokens"]
+            )
+            gateway_complete = gateway_complete and gateway_usage["total_tokens"] > 0
+            result["gateway_provider_usage"] = gateway_usage
+            result["gateway_usage_observation"] = (
+                "complete" if gateway_complete else "missing_or_invalid"
+            )
+            result["provider_relay_usage_observation"] = relay_usage["observation"]
+            result["provider_relay_attempt_count"] = relay_usage["attempt_count"]
+            result["provider_relay_complete_request_count"] = relay_usage["complete_request_count"]
+            result["provider_relay_missing_request_count"] = relay_usage["missing_request_count"]
+            result["provider_relay_known_subtotal"] = relay_usage["known_subtotal"]
+            result["provider_relay_failed_request_count"] = relay_usage["failed_request_count"]
+            if relay_usage["observation"] == "complete":
+                result["provider_usage"] = relay_usage["usage"]
+                result["provider_usage_source"] = "provider_relay_upstream"
+                result["provider_usage_observation"] = "complete"
+            elif gateway_complete:
+                result["provider_usage"] = gateway_usage
+                result["provider_usage_source"] = "gateway"
+                result["provider_usage_observation"] = "complete"
             else:
                 result["provider_usage"] = None
-                result["provider_usage_observation"] = "gateway_zero_or_missing_unverified"
+                result["provider_usage_source"] = None
+                result["provider_usage_observation"] = (
+                    "partial" if relay_usage["observation"] == "partial" else "missing_or_invalid"
+                )
             result["gateway_diagnostics"] = public_post_state.get("gateway_log_provenance", {})
             result["transcript_provenance"] = _transcript_provenance(raw_post_state, exact_secrets)
             result["tool_observations"] = tool_observations

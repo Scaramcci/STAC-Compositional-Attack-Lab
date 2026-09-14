@@ -6,7 +6,8 @@
 
 - 已合并 `ark_embedding_proxy.py` 和工作计划中的遗留冲突，保留预算控制与结构化错误观测两边的必要实现。
 - direct embedding、代理转换及隔离索引/语义检索已有修复后真实成功证据（`memory-relay-diagnostic-20260914-104102-8a963628`）；语义 `memory_search` 返回带来源/hash/call 配对的非空结果，memory 链路通过。
-- 本轮已在独立目录执行 1 task × 1 seed 的真实 construction，并完成 raw→normalization→mine→audit。construction 因 provider usage 不可观测而准确记录为 `partial`；mining 产出 1 candidate、0 accepted、1 negative，audit 仅因 accepted target 未满足而失败。该结果不是攻击成功，也不是链路失败。
+- usage 可观测性已修复：Ark relay 在 HTTP 边界解析完整 JSON/SSE usage，Ark-only 注入 `stream_options.include_usage=true`，bridge 按 action 聚合 relay attempts 并保留 gateway/provider 双来源。复测中 6/6 Victim provider requests usage 完整，已消除 `construction_token_usage_not_observable`。
+- 最新独立 construction 复测已完成 raw→normalization→mine→audit；construction 因真实 `construction_token_budget_exceeded` 记录为 `partial`，mining 为 1 candidate、0 accepted、1 negative，audit 仅因 accepted target 未满足而失败。该结果不是攻击成功，也不是工程链路失败。
 - frozen primitive library 尚缺失，只阻止依赖该库的正式评测；不阻止独立 memory 验证或 construction。不能形成“先有冻结库才能采集”的循环。
 
 ## 本轮源码修复
@@ -70,7 +71,7 @@
 
 ## 下一步
 
-按 [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md) 的第 1、2 步推进。对新写入合成事实使用不给出答案的语义查询，确认索引、向量调用、命中片段、来源和 call/result 配对。服务器真实验证须有新批次范围和预算，不从文档自动推断无限授权。
+usage 链路和单条 construction 工程闭环已验证；canonical 8 条 pilot 仍需独立批准后启动。当前缺口是更多合法 construction 轨迹、accepted 样本目标和实际行为/跨会话覆盖，不得用本轮单条 partial 结果替代 pilot 准入。
 
 
 ## 本轮独立 embedding relay 闭环（2026-09-14）
@@ -108,3 +109,11 @@
 - 本轮真实请求合计：失败的首次修复复测 Embedding 2（上游 401，Victim 0；当时旧控制流也调用了 B，已在离线代码中收紧 A→B gate）；最终通过 run Embedding 4、Victim 6。累计 Embedding 6、Victim 6，未运行其他实验流程。
 - 真实 401 根因是 adapter 上游 Authorization 错用了内部 ingress token；已修复为 relay 内保管的 embedding upstream key，内部 ingress token 仍只用于 Victim→relay。probe 解析已修复为严格检查 OpenAI-compatible `data[]`。Docker 外层 probe timeout 与内部 HTTP timeout 分离；relay ledger 改用 named volume，容器 rm 后保留账本，损坏 JSONL 读取 fail-closed。
 - 通过 run 产物未发现 API key 或 Authorization header；真实资源已清理，证据 volume 保留以避免丢失审计记录。
+
+
+## 2026-09-14 usage 可观测性修复与复测
+
+- 根因：`relay_runtime_from_model_config()` 未传递 `provider_compat=ark`，且 bridge/source event 未保留 provider usage 选择结果；gateway 返回全零 usage。
+- 修复：provider relay 解析非流式 JSON 与 SSE 最终 usage-only chunk；仅 Ark 请求启用 `stream_options.include_usage=true`，Gemini 保持 `supportsUsageInStreaming=false`；relay runtime 传递 provider compatibility；bridge 按 action ledger 游标聚合多次 provider 请求并保留完整性、来源、已知小计和缺失/失败计数；source events 保留 provider/gateway usage。
+- 受影响回归及全量质量门通过；最终复测 run `experiments/runs/construction-usage-retest-20260914-123000-e7f4a2/` 中 Victim provider 6/6 usage 完整，总计 input 43798、output 1528、total 45326。gateway usage 保留为 missing/invalid zero，不作为 token 依据。
+- 最终 construction 因配置 token budget 24000 被真实累计 45326 tokens 触发保护，未进入后续 lifecycle/effect；不是 usage 不可观测。

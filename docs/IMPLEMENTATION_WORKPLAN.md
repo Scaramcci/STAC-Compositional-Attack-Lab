@@ -1,12 +1,12 @@
 # Implementation Workplan
 
-更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；本轮隔离 memory 验证已执行，语义检索被 embedding transport error 阻塞。仅保留一套执行顺序。
+更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成单条 construction 复测。仅保留一套执行顺序。
 
 ## 1. 同步与离线复核
 
 - 同步冲突合并修复，检查 Git diff 与冲突标记；不能以 git status 干净代替源码内容检查。
 - 使用服务器实际 stac 解释器运行专项测试和 make check，验证 pinned upstream 用例，记录 commit、解释器及通过/失败/skip。
-- 重点验证 embedding 的预算预扣、accepted 行计数、错误汇总不重复扣费、无效向量不漏计，以及本地 400/真实上游状态分离。
+- 重点验证 embedding 的预算预扣、accepted 行计数、错误汇总不重复扣费、无效向量不漏计，以及本地 400/真实上游状态分离；usage 观测现已扩展到 Ark chat relay→bridge→driver。
 - 保留线程锁、跨 run 的 driver 预算契约和结构化观测，不能简单选取某个冲突分支覆盖。
 - 不重复已有效的 direct chat/embedding 探针来代替索引诊断。
 
@@ -25,11 +25,11 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 
 验收：索引与真实语义搜索均有证据；当前已由上述修复后 run 满足。缺少 frozen library 不阻止本步骤。
 
-## 3. 单条 construction（另行确认运行范围）
+## 3. 单条 construction（本轮已完成）
 
-第 2 步已通过；本轮已运行 1 task × 1 seed 的有限 construction，使用 canonical pilot 派生配置和唯一目录。
+第 2 步已通过；本轮已运行 1 task × 1 seed 的有限 construction，使用 canonical pilot 派生配置和唯一目录。usage 复测已证明 provider relay usage 可完整支撑 action token_count；最终 attempt 因真实 token budget guard 为 partial。
 验证 lifecycle、provider/embedding 跨运行累计预算、脱敏、raw/source events/checkpoints 完整。
-对本轮 raw 显式 normalize/mine/audit，分开报告质量、行为、官方结果及 eligibility。未执行时不写 accepted=0。
+对本轮 raw 显式 normalize/mine/audit，分开报告质量、行为、官方结果及 eligibility；最终 attempt 的 token usage 完整，但因真实 token budget guard 为 partial，未进入后续 lifecycle。
 
 ## 4. Pilot、main 与冻结（逐阶段准入）
 
@@ -71,3 +71,8 @@ A/B/C 未执行。唯一 run 在真实请求前的 pinned judge 配置阶段因 
 A/B/C 已通过：relay/Victim embedding 均成功，向量索引建立，跨会话 `memory_search` 返回本轮事实的非空 hybrid 结果，具备 call/result/source/hash 证据。首次修复复测的 401 根因已修复；诊断脚本现在严格 A 成功后才调用 B、A/B 成功后才进入 C。最终通过 run 的 Embedding 4、Victim 6；含首次 401 失败 run 合计 Embedding 6、Victim 6。未运行 construction、pilot、main collection、mining、freeze 或 evaluation。
 
 最小 construction 已在独立授权下完成（2026-09-14）；本轮不自动推进 canonical pilot。
+
+
+## 2026-09-14 usage 可观测性修复复测记录
+
+Ark 真实 SSE 探针返回 `[DONE]` 前的 usage-only chunk，完整 usage 为 `prompt_tokens=39, completion_tokens=33, total_tokens=72`；最终 construction run `construction-usage-retest-20260914-123000-e7f4a2` 的 6 次 Victim provider attempts 全部解析成功。未运行 canonical pilot、main collection、freeze 或 evaluation。

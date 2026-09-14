@@ -1061,3 +1061,38 @@ def test_formal_action_loop_rejects_unauthorized_surface_before_delivery(
             seed=29,
         )
     assert driver.actions == []
+
+
+def test_construction_bridge_aggregates_action_relay_usage_and_marks_missing() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    aggregate = bridge["_aggregate_relay_usage"]
+    complete = aggregate(
+        [
+            {
+                "accepted": True,
+                "status": 200,
+                "provider_usage": {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10},
+            },
+            {
+                "accepted": True,
+                "status": 200,
+                "provider_usage": {"input_tokens": 7, "output_tokens": 3, "total_tokens": 10},
+            },
+        ]
+    )
+    assert complete["observation"] == "complete"
+    assert complete["usage"] == {"input_tokens": 11, "output_tokens": 9, "total_tokens": 20}
+    partial = aggregate(
+        [
+            {
+                "accepted": True,
+                "status": 200,
+                "provider_usage": {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10},
+            },
+            {"accepted": True, "status": 200, "provider_usage": None},
+        ]
+    )
+    assert partial["observation"] == "partial"
+    assert partial["usage"] is None
+    assert partial["known_subtotal"] == {"input_tokens": 4, "output_tokens": 6, "total_tokens": 10}
+    assert partial["missing_request_count"] == 1

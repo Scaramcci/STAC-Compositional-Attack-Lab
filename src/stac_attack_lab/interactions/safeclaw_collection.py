@@ -846,7 +846,25 @@ class SafeClawSubprocessVictimDriver:
                     "provider_finish_reason": session.get("provider_finish_reason"),
                     "provider_response_hash": session.get("provider_response_hash"),
                     "provider_response_projection": session.get("provider_response_projection"),
+                    "provider_usage": session.get("provider_usage"),
                     "provider_usage_observation": session.get("provider_usage_observation"),
+                    "provider_usage_source": session.get("provider_usage_source"),
+                    "gateway_provider_usage": session.get("gateway_provider_usage"),
+                    "gateway_usage_observation": session.get("gateway_usage_observation"),
+                    "provider_relay_usage_observation": session.get(
+                        "provider_relay_usage_observation"
+                    ),
+                    "provider_relay_attempt_count": session.get("provider_relay_attempt_count"),
+                    "provider_relay_complete_request_count": session.get(
+                        "provider_relay_complete_request_count"
+                    ),
+                    "provider_relay_missing_request_count": session.get(
+                        "provider_relay_missing_request_count"
+                    ),
+                    "provider_relay_known_subtotal": session.get("provider_relay_known_subtotal"),
+                    "provider_relay_failed_request_count": session.get(
+                        "provider_relay_failed_request_count"
+                    ),
                     "gateway_diagnostics": session.get("gateway_diagnostics", {}),
                     "provider_request_ledger": session.get("provider_request_ledger", []),
                     "embedding_request_ledger": session.get("embedding_request_ledger", []),

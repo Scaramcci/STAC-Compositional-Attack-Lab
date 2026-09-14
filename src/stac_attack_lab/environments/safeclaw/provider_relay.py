@@ -26,6 +26,80 @@ def chat_completions_url(base_url: str) -> str:
     return normalized + "/chat/completions"
 
 
+def _normalize_provider_usage(value: object) -> tuple[dict[str, int] | None, list[str]]:
+    """Normalize provider usage without treating missing/invalid fields as zero."""
+    if not isinstance(value, dict):
+        return None, ["usage_missing"]
+    aliases = {
+        "input_tokens": ("input_tokens", "prompt_tokens", "promptTokenCount"),
+        "output_tokens": ("output_tokens", "completion_tokens", "candidatesTokenCount"),
+        "total_tokens": ("total_tokens", "totalTokenCount"),
+    }
+    projected: dict[str, int] = {}
+    invalid: list[str] = []
+    for canonical, names in aliases.items():
+        present = False
+        for name in names:
+            if name not in value:
+                continue
+            present = True
+            candidate = value[name]
+            if isinstance(candidate, bool) or not isinstance(candidate, int) or candidate < 0:
+                invalid.append(canonical)
+            else:
+                projected[canonical] = candidate
+            break
+        if not present:
+            invalid.append(canonical)
+    if "total_tokens" not in projected and {"input_tokens", "output_tokens"} <= set(projected):
+        projected["total_tokens"] = projected["input_tokens"] + projected["output_tokens"]
+    if set(projected) != {"input_tokens", "output_tokens", "total_tokens"}:
+        return None, sorted(
+            set(invalid) | (set({"input_tokens", "output_tokens", "total_tokens"}) - set(projected))
+        )
+    if projected["total_tokens"] != projected["input_tokens"] + projected["output_tokens"]:
+        return None, ["total_tokens_inconsistent"]
+    return projected, []
+
+
+def _extract_provider_usage(
+    body: bytes, content_type: str
+) -> tuple[dict[str, int] | None, str, list[str]]:
+    """Extract complete usage from JSON or SSE without retaining response bodies."""
+    text = body.decode("utf-8", errors="replace")
+    if "text/event-stream" in content_type.lower() or text.lstrip().startswith("data:"):
+        usage_values: list[object] = []
+        done = False
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                done = True
+                continue
+            try:
+                value = json.loads(payload)
+            except json.JSONDecodeError:
+                return None, "invalid", ["sse_event_invalid_json"]
+            if isinstance(value, dict) and "usage" in value:
+                usage_values.append(value.get("usage"))
+        if not done:
+            return None, "truncated", ["sse_done_missing"]
+        if not usage_values:
+            return None, "missing", ["usage_missing"]
+        usage, reasons = _normalize_provider_usage(usage_values[-1])
+        return usage, ("complete" if usage is not None else "partial"), reasons
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError:
+        return None, "invalid", ["json_invalid"]
+    if not isinstance(value, dict):
+        return None, "invalid", ["json_not_object"]
+    usage, reasons = _normalize_provider_usage(value.get("usage"))
+    return usage, ("complete" if usage is not None else "partial"), reasons
+
+
 def _tool_name(tool: object) -> str | None:
     if not isinstance(tool, dict):
         return None
@@ -44,6 +118,7 @@ class ProviderRelayConfig:
     max_requests: int = 8
     timeout_seconds: int = 90
     allowed_tools: tuple[str, ...] | None = None
+    provider_compat: str = "openai"
     ledger_path: str = "/tmp/stac-provider-ledger.jsonl"
     batch_id: str | None = None
 
@@ -59,6 +134,7 @@ class ProviderRelayConfig:
             max_requests=int(value.get("max_requests", 8)),
             timeout_seconds=int(value.get("timeout_seconds", 90)),
             allowed_tools=(tuple(str(item) for item in allowed) if allowed is not None else None),
+            provider_compat=str(value.get("provider_compat") or "openai"),
             ledger_path=str(value.get("ledger_path") or "/tmp/stac-provider-ledger.jsonl"),
             batch_id=(str(value.get("batch_id")) if value.get("batch_id") else None),
         )
@@ -278,6 +354,14 @@ class _RelayHandler(BaseHTTPRequestHandler):
             )
             return
 
+        # Ark emits usage in a final usage-only SSE chunk only when requested.
+        # Keep this provider-specific; Gemini compatibility remains unchanged.
+        if config.provider_compat == "ark" and payload.get("stream") is True:
+            stream_options = payload.get("stream_options")
+            if not isinstance(stream_options, dict):
+                stream_options = {}
+                payload["stream_options"] = stream_options
+            stream_options.setdefault("include_usage", True)
         encoded = json.dumps(payload, separators=(",", ":")).encode()
         target = chat_completions_url(config.upstream_base_url)
         request = urllib.request.Request(
@@ -307,6 +391,9 @@ class _RelayHandler(BaseHTTPRequestHandler):
             error_category = f"provider_http_{exc.code}"
         except Exception as exc:  # relay must return a bounded, observable failure
             error_category = type(exc).__name__
+        provider_usage, usage_observation, usage_reasons = _extract_provider_usage(
+            body, content_type
+        )
         self.server.record(
             {
                 "sequence": sequence,
@@ -317,6 +404,9 @@ class _RelayHandler(BaseHTTPRequestHandler):
                 "request_sha256": hashlib.sha256(encoded).hexdigest(),
                 "final_tools": final_tools,
                 "stream": bool(payload.get("stream")),
+                "provider_usage": provider_usage,
+                "provider_usage_observation": usage_observation,
+                "provider_usage_missing_fields": usage_reasons,
                 "duration_ms": round((time.monotonic() - started) * 1000, 3),
             }
         )
@@ -715,6 +805,7 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
         "max_requests": value.pop("provider_request_budget", 8),
         "timeout_seconds": value.pop("provider_timeout_seconds", 90),
         "allowed_tools": allowed_tools,
+        "provider_compat": value.pop("provider_compat", "openai"),
         "batch_id": value.pop("batch_id", None),
     }
     embedding_provider = value.get("embedding_provider")

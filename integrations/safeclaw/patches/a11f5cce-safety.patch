@@ -93,7 +93,7 @@ index 466b14e..b4128df 100755
 +                        **({
 +                            "compat": {
 +                                "supportsStore": False,
-+                                "supportsUsageInStreaming": False,
++                                "supportsUsageInStreaming": compatibility_mode == "ark",
 +                                "maxTokensField": "max_tokens",
 +                                "supportsStrictMode": False,
 +                            },

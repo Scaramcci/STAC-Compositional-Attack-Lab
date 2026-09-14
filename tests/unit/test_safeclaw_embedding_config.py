@@ -208,21 +208,22 @@ def test_patched_judge_sets_gemini_openai_compat_without_affecting_other_endpoin
 
     expected_compat = {
         "supportsStore": False,
-        "supportsUsageInStreaming": False,
         "maxTokensField": "max_tokens",
         "supportsStrictMode": False,
     }
+    gemini_compat = {**expected_compat, "supportsUsageInStreaming": False}
+    ark_compat = {**expected_compat, "supportsUsageInStreaming": True}
     for index, (base_url, expected_base_url, compat) in enumerate(
         [
             (
                 "https://generativelanguage.googleapis.com/v1beta/openai",
                 "https://generativelanguage.googleapis.com/v1beta/openai",
-                expected_compat,
+                gemini_compat,
             ),
             (
                 "https://ark.cn-beijing.volces.com/api/v3",
                 "https://ark.cn-beijing.volces.com/api/v3",
-                expected_compat,
+                ark_compat,
             ),
             ("https://provider.invalid", "https://provider.invalid/v1", None),
         ]
