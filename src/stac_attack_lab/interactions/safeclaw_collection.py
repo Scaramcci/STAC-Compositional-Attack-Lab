@@ -920,6 +920,7 @@ class SafeClawSubprocessVictimDriver:
                         "tool_name": call_payload.get("tool_name"),
                         "result_observation": result_observation,
                         "result_hash": call_payload.get("result_hash"),
+                        "result_excerpt": call_payload.get("result_excerpt"),
                         "result_evidence_ref": call_payload.get("result_evidence_ref"),
                     },
                     "evidence_ref_ids": [

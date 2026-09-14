@@ -212,3 +212,60 @@ def test_container_relay_removes_victim_egress_and_keeps_relay_egress(
     assert ("network", "create", "--internal", relay.network) in calls
     assert ("network", "disconnect", "bridge", "victim-owned") in calls
     assert ("network", "connect", "bridge", relay.container) in calls
+
+
+def test_embedding_probe_parses_openai_compatible_data_list_and_outer_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[tuple[str, ...], int]] = []
+
+    def fake_docker(
+        *args: str,
+        check: bool = True,
+        input_data: bytes | None = None,
+        timeout: int = 30,
+    ) -> subprocess.CompletedProcess[bytes]:
+        del check, input_data
+        calls.append((args, timeout))
+        return subprocess.CompletedProcess(
+            args,
+            0,
+            b'{"status":200,"dimension":3,"finite_nonempty":true,"usage":{"prompt_tokens":2}}',
+            b"",
+        )
+
+    monkeypatch.setattr(ContainerProviderRelay, "_docker", staticmethod(fake_docker))
+    relay = ContainerProviderRelay(
+        image="image",
+        victim_container="victim-owned",
+        runtime={"timeout_seconds": 90},
+    )
+    relay.embedding_started = True
+    result = relay.embedding_probe(from_victim=False, model="embed-model", text="safe probe")
+    assert result == {
+        "status": 200,
+        "dimension": 3,
+        "finite_nonempty": True,
+        "usage": {"prompt_tokens": 2},
+    }
+    args, timeout = calls[-1]
+    assert "timeout" in args and "100s" in args
+    assert timeout == 105
+
+
+def test_relay_ledger_read_fails_closed_on_corrupt_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    relay = ContainerProviderRelay(image="image", victim_container="victim", runtime={})
+    relay.embedding_started = True
+    relay.started = True
+
+    def corrupt_docker(*args: str, **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        del args, kwargs
+        return subprocess.CompletedProcess([], 0, b'{"ok":true}\nnot-json\n', b"")
+
+    monkeypatch.setattr(ContainerProviderRelay, "_docker", staticmethod(corrupt_docker))
+    with pytest.raises(RuntimeError, match="ledger_corrupt"):
+        relay.embedding_records()
+    with pytest.raises(RuntimeError, match="ledger_corrupt"):
+        relay.records()

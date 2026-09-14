@@ -64,3 +64,10 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 ## 本轮真实诊断结果（2026-09-14）
 
 A/B/C 未执行。唯一 run 在真实请求前的 pinned judge 配置阶段因 relay 注入字段不完整而 fail-closed；实际请求计数为 Embedding 0/12、Victim 0/8、合计 0/20。最小代码修复已完成并通过 `make check`（194 passed），但按授权边界不自动复测。下一次需要新的明确真实调用授权，先复核修复后的 relay→Victim 配置，再按 A→B→C 顺序执行。
+
+
+## 修复后真实诊断结果（2026-09-14）
+
+A/B/C 已通过：relay/Victim embedding 均成功，向量索引建立，跨会话 `memory_search` 返回本轮事实的非空 hybrid 结果，具备 call/result/source/hash 证据。首次修复复测的 401 根因已修复；诊断脚本现在严格 A 成功后才调用 B、A/B 成功后才进入 C。最终通过 run 的 Embedding 4、Victim 6；含首次 401 失败 run 合计 Embedding 6、Victim 6。未运行 construction、pilot、main collection、mining、freeze 或 evaluation。
+
+下一步可以在单独授权下考虑最小 construction；本轮不自动推进。

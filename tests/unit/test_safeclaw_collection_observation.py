@@ -131,6 +131,73 @@ def test_bridge_distinguishes_rejected_and_unobserved_tool_results() -> None:
     assert all(item["result_excerpt"] is None for item in observations)
 
 
+def test_tool_result_projects_excerpt_and_preserves_distinct_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget()
+    driver._started_at = monotonic()
+    driver._last_state = {
+        "memory_content": "",
+        "workspace_file_contents": {},
+        "sim_google_calls": [],
+    }
+    driver._new_session_pending = True
+    driver._event_sequence = 0
+    driver._events = []
+    driver._checkpoints = []
+    response: dict[str, Any] = {
+        "session": {
+            "session_id": "session-2",
+            "agent_response": "found",
+            "memory_retrieval_observation": "observed",
+            "memory_retrievals": [],
+            "tool_calls": [
+                {
+                    "call_id": "call-1",
+                    "tool_name": "memory_search",
+                    "result_observation": "observed",
+                    "result_hash": "hash-1",
+                    "result_excerpt": "MEMORY.md:1 cobalt lantern",
+                    "result_evidence_ref": "result-entry-1",
+                    "request_evidence_ref": "request-entry-1",
+                },
+                {
+                    "call_id": "call-2",
+                    "tool_name": "memory_search",
+                    "result_observation": "observed",
+                    "result_hash": "hash-2",
+                    "result_excerpt": "MEMORY.md:1 sealed envelopes",
+                    "result_evidence_ref": "result-entry-2",
+                    "request_evidence_ref": "request-entry-2",
+                },
+            ],
+            "tool_observations": [],
+            "provider_usage": {"total_tokens": 1},
+        },
+        "post_state": dict(driver._last_state),
+    }
+    monkeypatch.setattr(driver, "_send_bridge", lambda _request: response)
+    step = driver.apply(
+        ConstructionAttackerAction(
+            action_id="action-1",
+            action_type="deliver_message",
+            delivery_surface="safeclaw_user_message",
+            public_message="search",
+            rationale_summary="preserve paired search evidence",
+        )
+    )
+    result_events = [event for event in step.source_events if event["event_type"] == "tool_result"]
+    assert [event["public_payload"]["provider_tool_call_id"] for event in result_events] == [
+        "call-1",
+        "call-2",
+    ]
+    assert [event["public_payload"]["result_excerpt"] for event in result_events] == [
+        "MEMORY.md:1 cobalt lantern",
+        "MEMORY.md:1 sealed envelopes",
+    ]
+
+
 def test_bridge_does_not_treat_unavailable_memory_search_as_retrieval() -> None:
     bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
     project = bridge["_structured_tool_observations"]

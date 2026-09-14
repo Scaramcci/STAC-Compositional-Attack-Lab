@@ -376,6 +376,31 @@ class RunningProviderRelay:
         self.thread.join(timeout=5)
 
 
+def _parse_jsonl_records(raw: bytes, *, corruption: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for line in raw.decode(errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(corruption) from exc
+        if not isinstance(item, dict):
+            raise RuntimeError(corruption)
+        records.append(item)
+    return records
+
+
+def _parse_embedding_probe_output(raw: bytes) -> dict[str, Any]:
+    try:
+        value = json.loads(raw.decode(errors="replace").strip())
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("embedding_probe_invalid_response") from exc
+    if not isinstance(value, dict):
+        raise RuntimeError("embedding_probe_invalid_response")
+    return value
+
+
 class ContainerProviderRelay:
     """A relay isolated from the Victim container and removed by its owning bridge."""
 
@@ -386,6 +411,7 @@ class ContainerProviderRelay:
         self.victim_container = victim_container
         self.network = f"stac-net-{suffix}"
         self.container = f"stac-provider-{suffix}"
+        self.volume = f"stac-ledger-{suffix}"
         self.ingress_token = token
         self.embedding_ingress_token = uuid.uuid4().hex
         self.runtime = dict(runtime)
@@ -398,13 +424,14 @@ class ContainerProviderRelay:
         *args: str,
         check: bool = True,
         input_data: bytes | None = None,
+        timeout: int = 30,
     ) -> subprocess.CompletedProcess[bytes]:
         return subprocess.run(
             ["docker", *args],
             input=input_data,
             capture_output=True,
             check=check,
-            timeout=30,
+            timeout=timeout,
         )
 
     def start(self) -> dict[str, Any]:
@@ -423,12 +450,13 @@ class ContainerProviderRelay:
             embedding_config = {
                 "model": self.runtime.pop("embedding_model"),
                 "base_url": self.runtime.pop("embedding_upstream_base_url"),
-                "upstream_api_key": embedding_key,
-                "api_key": self.embedding_ingress_token,
+                # The adapter's api_key is the upstream credential; the
+                # separate ingress_token authenticates Victim-to-relay calls.
+                "api_key": embedding_key,
                 "ingress_token": self.embedding_ingress_token,
                 "max_requests": int(self.runtime.pop("embedding_request_budget", 128)),
                 "timeout_seconds": int(self.runtime.get("timeout_seconds", 90)),
-                "ledger_path": "/tmp/stac-embedding-ledger.jsonl",
+                "ledger_path": "/var/lib/stac-ledger/embedding.jsonl",
                 "batch_id": self.batch_id,
                 "port": 18792,
                 "host": "0.0.0.0",
@@ -436,10 +464,12 @@ class ContainerProviderRelay:
         config = {
             **self.runtime,
             "batch_id": self.batch_id,
+            "ledger_path": "/var/lib/stac-ledger/provider.jsonl",
             "upstream_api_key": upstream_key,
             "ingress_token": self.ingress_token,
         }
         try:
+            self._docker("volume", "create", self.volume)
             self._docker("network", "create", "--internal", self.network)
             self._docker("network", "connect", self.network, self.victim_container)
             self._docker("network", "disconnect", "bridge", self.victim_container)
@@ -450,6 +480,8 @@ class ContainerProviderRelay:
                 self.container,
                 "--network",
                 self.network,
+                "--mount",
+                f"type=volume,source={self.volume},destination=/var/lib/stac-ledger",
                 self.image,
                 "sleep",
                 "infinity",
@@ -584,8 +616,11 @@ class ContainerProviderRelay:
                 " with urllib.request.urlopen(r,timeout=c['timeout']) as x:",
                 "  raw=x.read(); status=getattr(x,'status',None) or x.getcode()",
                 "  data=json.loads(raw)",
-                "  e=data.get('data',{}).get('embedding')",
-                "  valid=(isinstance(e,list) and bool(e) and all(",
+                "  rows=data.get('data') if isinstance(data,dict) else None",
+                "  e=rows[0].get('embedding') if (isinstance(rows,list) and rows",
+                "     and isinstance(rows[0],dict)) else None",
+                "  valid=(isinstance(rows,list) and len(rows)==1 and isinstance(e,list)",
+                "     and bool(e) and all(",
                 "      type(v) in (int,float) and math.isfinite(v) for v in e))",
                 "  u=data.get('usage') if isinstance(data,dict) else None",
                 "  print(json.dumps({'status':status,'dimension':len(e) if valid else None,",
@@ -613,18 +648,22 @@ class ContainerProviderRelay:
                 "timeout": min(90, int(self.runtime.get("timeout_seconds", 90))),
             }
         ).encode()
-        result = self._docker("exec", "-i", target, "python3", "-c", script, input_data=payload)
+        outer_timeout = min(105, max(35, int(self.runtime.get("timeout_seconds", 90)) + 10))
+        result = self._docker(
+            "exec",
+            "-i",
+            target,
+            "timeout",
+            f"{outer_timeout}s",
+            "python3",
+            "-c",
+            script,
+            input_data=payload,
+            timeout=outer_timeout + 5,
+        )
         if result.returncode != 0:
             raise RuntimeError("embedding_probe_process_failed")
-        try:
-            value = json.loads(result.stdout.decode(errors="replace").strip())
-        except json.JSONDecodeError as exc:
-            raise RuntimeError("embedding_probe_invalid_response") from exc
-        return (
-            value
-            if isinstance(value, dict)
-            else {"error_category": "embedding_probe_invalid_response"}
-        )
+        return _parse_embedding_probe_output(result.stdout)
 
     def embedding_records(self) -> list[dict[str, Any]]:
         if not self.embedding_started:
@@ -634,18 +673,10 @@ class ContainerProviderRelay:
             self.container,
             "sh",
             "-c",
-            "cat /tmp/stac-embedding-ledger.jsonl 2>/dev/null || true",
+            "cat /var/lib/stac-ledger/embedding.jsonl 2>/dev/null || true",
             check=False,
         )
-        records = []
-        for line in result.stdout.decode(errors="replace").splitlines():
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(item, dict):
-                records.append(item)
-        return records
+        return _parse_jsonl_records(result.stdout, corruption="embedding_ledger_corrupt")
 
     def records(self) -> list[dict[str, Any]]:
         if not self.started:
@@ -655,20 +686,14 @@ class ContainerProviderRelay:
             self.container,
             "sh",
             "-c",
-            "cat /tmp/stac-provider-ledger.jsonl 2>/dev/null || true",
+            "cat /var/lib/stac-ledger/provider.jsonl 2>/dev/null || true",
             check=False,
         )
-        records = []
-        for line in result.stdout.decode(errors="replace").splitlines():
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(item, dict):
-                records.append(item)
-        return records
+        return _parse_jsonl_records(result.stdout, corruption="provider_ledger_corrupt")
 
     def stop(self) -> None:
+        # The named ledger volume is intentionally retained across container
+        # rebuilds; callers may remove it only after archiving its evidence.
         self._docker("rm", "-f", self.container, check=False)
         self._docker("network", "disconnect", self.network, self.victim_container, check=False)
         self._docker("network", "rm", self.network, check=False)

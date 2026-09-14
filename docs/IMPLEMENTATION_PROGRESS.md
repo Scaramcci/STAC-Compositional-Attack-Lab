@@ -98,3 +98,13 @@
 - 因此 A（relay embedding probe）、B（Victim 内部 embedding probe）、C（完整合成 memory）均未执行；Embedding 实际请求 `0/12`，Victim 实际请求 `0/8`，合计 `0/20`。没有自动重试，没有新增 batch，没有真实 provider 响应或索引证据。
 - 已完成最小离线修复：relay `start()` 回填内部 `embedding_provider=openai` 与 `embedding_model`，保留内部 URL/ingress token；同时保留本轮统一 batch ID、A→B→C gate 和脱敏 run metadata。修复后 `make check PYTHON=.venv/bin/python` 为 `194 passed`，ruff/mypy/format 全部通过。
 - 运行产物已扫描：未发现 `SAFECLAW_API_KEY`、`SAFECLAW_EMBEDDING_API_KEY` 或 Authorization literal；失败后容器/relay 已清理。不得把本轮标记为真实 embedding 或 memory_search 通过。
+
+
+## 2026-09-14 修复后真实 memory 链路通过
+
+- 修复后 run：`experiments/runs/memory-relay-diagnostic-20260914-104102-8a963628/`，batch `a7ad7fbd85924068a42eb09d5b4bc0fb`。A relay probe 和 B Victim-internal probe 均 HTTP 200，2048 维、finite/non-empty，usage `prompt_tokens=27,total_tokens=27`；A/B 共记录两次真实 embedding attempts，之后才执行 C。
+- C 真实合成场景通过：写入 `MEMORY.md`，跨会话新 session 的 `memory_search` 返回非空 `results`，命中 `MEMORY.md#L1`，包含本轮 cobalt-lantern 事实和随机 canary；结果 `mode=hybrid`、`provider=openai`、model 有值，且索引/查询 embedding ledger 共 4 次成功 upstream attempts。查询 arguments 不含 canary 答案。
+- source event 证据已按实际 bridge→driver 路径核对：`provider_tool_call_id`、`request_event_id`、request/result `openclaw-session-entry` refs、result hash 和 result excerpt 均成对存在；多次工具调用未按名称覆盖。`memory_get` 仅作为辅助证据，不替代 memory_search。
+- 本轮真实请求合计：失败的首次修复复测 Embedding 2（上游 401，Victim 0；当时旧控制流也调用了 B，已在离线代码中收紧 A→B gate）；最终通过 run Embedding 4、Victim 6。累计 Embedding 6、Victim 6，未运行其他实验流程。
+- 真实 401 根因是 adapter 上游 Authorization 错用了内部 ingress token；已修复为 relay 内保管的 embedding upstream key，内部 ingress token 仍只用于 Victim→relay。probe 解析已修复为严格检查 OpenAI-compatible `data[]`。Docker 外层 probe timeout 与内部 HTTP timeout 分离；relay ledger 改用 named volume，容器 rm 后保留账本，损坏 JSONL 读取 fail-closed。
+- 通过 run 产物未发现 API key 或 Authorization header；真实资源已清理，证据 volume 保留以避免丢失审计记录。
