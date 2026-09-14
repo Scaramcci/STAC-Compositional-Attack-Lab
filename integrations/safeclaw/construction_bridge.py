@@ -159,10 +159,8 @@ def _structured_tool_observations(
             is_error = bool(message.get("isError"))
             lowered = result_text.lower()
             parsed_result: Any = None
-            try:
+            with contextlib.suppress(json.JSONDecodeError):
                 parsed_result = json.loads(result_text)
-            except json.JSONDecodeError:
-                pass
             semantic_error = isinstance(parsed_result, dict) and (
                 bool(parsed_result.get("error"))
                 or parsed_result.get("unavailable") is True
@@ -210,7 +208,11 @@ def _structured_tool_observations(
     return projected, observed_ids
 
 
-def _embedding_ledger(judge: ModuleType) -> list[dict[str, Any]]:
+def _embedding_ledger(
+    judge: ModuleType, relay: ContainerProviderRelay | None = None
+) -> list[dict[str, Any]]:
+    if relay is not None and hasattr(relay, "embedding_records"):
+        return relay.embedding_records()
     raw = judge.dexec_output("cat /tmp/stac-embedding-ledger.jsonl 2>/dev/null")
     records: list[dict[str, Any]] = []
     for line in str(raw or "").splitlines():
@@ -363,7 +365,7 @@ def main() -> int:
                         "kind": "finished",
                         "post_state": post_state,
                         "provider_request_ledger": relay.records() if relay else [],
-                        "embedding_request_ledger": _embedding_ledger(judge),
+                        "embedding_request_ledger": _embedding_ledger(judge, relay),
                     }
                 )
                 return 0
@@ -465,7 +467,7 @@ def main() -> int:
                     "session": result,
                     "post_state": public_post_state,
                     "provider_request_ledger": relay.records() if relay else [],
-                    "embedding_request_ledger": _embedding_ledger(judge),
+                    "embedding_request_ledger": _embedding_ledger(judge, relay),
                 }
             )
     except Exception as exc:

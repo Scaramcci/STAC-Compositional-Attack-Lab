@@ -93,6 +93,28 @@ def _safe_error_fields(raw: bytes) -> dict[str, Any]:
     return fields
 
 
+def _transport_category(exc: BaseException) -> str:
+    reason = getattr(exc, "reason", exc)
+    text = str(reason).lower()
+    if isinstance(reason, TimeoutError) or "timed out" in text or "timeout" in text:
+        return "connect_timeout" if "connect" in text else "read_timeout"
+    if isinstance(reason, ConnectionRefusedError) or "refused" in text:
+        return "connection_refused"
+    if isinstance(reason, (ConnectionError, OSError)) and "tls" in text:
+        return "tls_error"
+    if "ssl" in text or "certificate" in text:
+        return "tls_error"
+    if isinstance(reason, OSError) and getattr(reason, "errno", None) in {-2, -3}:
+        return "dns_error"
+    if (
+        "name or service not known" in text
+        or "nodename nor servname" in text
+        or "temporary failure in name resolution" in text
+    ):
+        return "dns_error"
+    return "transport_error"
+
+
 def _request_id(headers: Any) -> str | None:
     for name in ("x-request-id", "request-id", "x-ark-request-id"):
         raw = headers.get(name) if headers is not None else None
@@ -213,12 +235,13 @@ def convert_embeddings(
             observe(error, time.monotonic() - started)
             raise error from exc
         except TimeoutError as exc:
-            error = UpstreamEmbeddingError(category="timeout", safe_message="upstream_timeout")
+            error = UpstreamEmbeddingError(category="read_timeout", safe_message="upstream_timeout")
             observe(error, time.monotonic() - started)
             raise error from exc
         except (urllib.error.URLError, OSError) as exc:
+            category = _transport_category(exc)
             error = UpstreamEmbeddingError(
-                category="transport_error", safe_message="upstream_transport_error"
+                category=category, safe_message="upstream_transport_error"
             )
             observe(error, time.monotonic() - started)
             raise error from exc
@@ -282,7 +305,9 @@ def convert_embeddings(
     return response
 
 
-def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPServer:
+def create_server(
+    config: dict[str, Any], port: int = 18790, host: str = "127.0.0.1"
+) -> ThreadingHTTPServer:
     max_requests = int(config.get("max_requests", 128))
     if max_requests < 1:
         raise ValueError("embedding_request_budget_must_be_positive")
@@ -406,8 +431,9 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                     association_id=association_id,
                 )
                 return
+            ingress_token = str(config.get("ingress_token", config["api_key"]))
             if not hmac.compare_digest(
-                self.headers.get("Authorization", ""), "Bearer " + config["api_key"]
+                self.headers.get("Authorization", ""), "Bearer " + ingress_token
             ):
                 self.reply(401, {"error": {"message": "unauthorized"}})
                 self._record(
@@ -487,9 +513,13 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                     association_id=association_id,
                 )
 
-    return ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    return ThreadingHTTPServer((host, port), Handler)
 
 
 if __name__ == "__main__":
     runtime = json.loads(Path(sys.argv[1]).read_text())
-    create_server(runtime).serve_forever()
+    create_server(
+        runtime,
+        port=int(runtime.get("port", 18790)),
+        host=str(runtime.get("host", "127.0.0.1")),
+    ).serve_forever()

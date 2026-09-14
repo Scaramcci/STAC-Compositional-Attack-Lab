@@ -281,8 +281,10 @@ class ContainerProviderRelay:
         self.network = f"stac-net-{suffix}"
         self.container = f"stac-provider-{suffix}"
         self.ingress_token = token
+        self.embedding_ingress_token = uuid.uuid4().hex
         self.runtime = dict(runtime)
         self.started = False
+        self.embedding_started = False
 
     @staticmethod
     def _docker(
@@ -301,6 +303,28 @@ class ContainerProviderRelay:
     def start(self) -> dict[str, Any]:
         source = str(self.runtime.pop("source"))
         upstream_key = str(self.runtime.pop("upstream_api_key"))
+        embedding_source = self.runtime.pop("embedding_source", None)
+        embedding_key = self.runtime.pop("embedding_upstream_api_key", None)
+        embedding_config = None
+        if embedding_source is not None:
+            if (
+                not embedding_key
+                or not self.runtime.get("embedding_model")
+                or not self.runtime.get("embedding_upstream_base_url")
+            ):
+                raise ValueError("provider_relay_incomplete_embedding_config")
+            embedding_config = {
+                "model": self.runtime.pop("embedding_model"),
+                "base_url": self.runtime.pop("embedding_upstream_base_url"),
+                "upstream_api_key": embedding_key,
+                "api_key": self.embedding_ingress_token,
+                "ingress_token": self.embedding_ingress_token,
+                "max_requests": int(self.runtime.pop("embedding_request_budget", 128)),
+                "timeout_seconds": int(self.runtime.get("timeout_seconds", 90)),
+                "ledger_path": "/tmp/stac-embedding-ledger.jsonl",
+                "port": 18792,
+                "host": "0.0.0.0",
+            }
         config = {
             **self.runtime,
             "upstream_api_key": upstream_key,
@@ -356,6 +380,33 @@ class ContainerProviderRelay:
                 "--port",
                 "18791",
             )
+            if embedding_config is not None:
+                self._docker(
+                    "exec",
+                    "-i",
+                    self.container,
+                    "sh",
+                    "-c",
+                    "umask 077; cat > /tmp/stac_embedding_proxy.py",
+                    input_data=str(embedding_source).encode(),
+                )
+                self._docker(
+                    "exec",
+                    "-i",
+                    self.container,
+                    "sh",
+                    "-c",
+                    "umask 077; cat > /tmp/stac_embedding_proxy.json",
+                    input_data=json.dumps(embedding_config).encode(),
+                )
+                self._docker(
+                    "exec",
+                    "-d",
+                    self.container,
+                    "python3",
+                    "/tmp/stac_embedding_proxy.py",
+                    "/tmp/stac_embedding_proxy.json",
+                )
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 health = self._docker(
@@ -369,16 +420,61 @@ class ContainerProviderRelay:
                     check=False,
                 )
                 if health.returncode == 0:
+                    if embedding_config is not None:
+                        embedding_health = self._docker(
+                            "exec",
+                            self.victim_container,
+                            "python3",
+                            "-c",
+                            "import urllib.request; urllib.request.urlopen('http://"
+                            + self.container
+                            + ":18792/health',timeout=1).close()",
+                            check=False,
+                        )
+                        if embedding_health.returncode != 0:
+                            time.sleep(0.1)
+                            continue
+                        self.embedding_started = True
                     self.started = True
-                    return {
+                    result = {
                         "api_base_url": f"http://{self.container}:18791/v1",
                         "api_key": self.ingress_token,
                     }
+                    if embedding_config is not None:
+                        result.update(
+                            {
+                                "embedding_api_base_url": f"http://{self.container}:18792/v1",
+                                "embedding_api_key": self.embedding_ingress_token,
+                                "embedding_relay_configured": True,
+                            }
+                        )
+                    return result
                 time.sleep(0.1)
             raise RuntimeError("provider_relay_health_timeout")
         except Exception:
             self.stop()
             raise
+
+    def embedding_records(self) -> list[dict[str, Any]]:
+        if not self.embedding_started:
+            return []
+        result = self._docker(
+            "exec",
+            self.container,
+            "sh",
+            "-c",
+            "cat /tmp/stac-embedding-ledger.jsonl 2>/dev/null || true",
+            check=False,
+        )
+        records = []
+        for line in result.stdout.decode(errors="replace").splitlines():
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, dict):
+                records.append(item)
+        return records
 
     def records(self) -> list[dict[str, Any]]:
         if not self.started:
@@ -406,6 +502,7 @@ class ContainerProviderRelay:
         self._docker("network", "disconnect", self.network, self.victim_container, check=False)
         self._docker("network", "rm", self.network, check=False)
         self.started = False
+        self.embedding_started = False
 
 
 def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | None:
@@ -415,7 +512,7 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
     allowed_tools = value.pop("provider_allowed_tools", None)
     if allowed_tools is not None:
         value["openclaw_allowed_tools"] = allowed_tools
-    return {
+    runtime = {
         "source": source,
         "upstream_base_url": value.pop("provider_upstream_base_url"),
         "upstream_api_key": value.pop("provider_upstream_api_key"),
@@ -423,6 +520,19 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
         "timeout_seconds": value.pop("provider_timeout_seconds", 90),
         "allowed_tools": allowed_tools,
     }
+    if value.get("embedding_provider") == "ark_multimodal":
+        # The adapter and upstream credential stay in this egress relay.
+        value["embedding_provider"] = "openai"
+        runtime.update(
+            {
+                "embedding_source": value.pop("embedding_adapter_source"),
+                "embedding_model": value.pop("embedding_model"),
+                "embedding_upstream_base_url": value.pop("embedding_api_base_url"),
+                "embedding_upstream_api_key": value.pop("embedding_api_key"),
+                "embedding_request_budget": value.pop("embedding_request_budget", 128),
+            }
+        )
+    return runtime
 
 
 def main(argv: list[str] | None = None) -> int:

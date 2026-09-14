@@ -278,7 +278,7 @@ def test_upstream_http_error_has_structured_redacted_fields(
 
 @pytest.mark.parametrize(
     ("response", "category"),
-    [(TimeoutError(), "timeout"), (io.BytesIO(b"not json"), "non_json_response")],
+    [(TimeoutError(), "read_timeout"), (io.BytesIO(b"not json"), "non_json_response")],
 )
 def test_timeout_and_non_json_failures_are_distinct(
     response: Any, category: str, monkeypatch: pytest.MonkeyPatch
