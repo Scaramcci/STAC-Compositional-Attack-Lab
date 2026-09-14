@@ -35,6 +35,18 @@
 
 ## 当前状态与阻塞
 
+### Embedding 链路专项诊断（2026-09-14）
+
+仓库当前没有 `experiments/runs/memory-observation-20260911-a/` 或 `-b/`；因此无法从本地复核用户所述两次运行的 embedding ledger、代理日志、OpenClaw tool result 和时间线。现有代码证据显示，旧代理只返回 `ark_upstream_http_error`/`ark_embedding_failed`，未分别保留上游 HTTP 状态、provider code、request ID、Retry-After 与耗时，且错误分类可能把 gateway/provider 故障投影得过粗。
+
+本轮对 `ark_embedding_proxy.py` 做了最小观测修复：上游 HTTP 401/403、404、429、其他 HTTP、超时、传输错误、非 JSON 和向量 schema 错误分别分类；错误正文只保留长度/hash，provider code 采用白名单字符和长度限制，message 使用固定安全类别；记录 `upstream_http_status`、`local_proxy_status`、`endpoint_path`、`stage`、`association_id`、`request_id`、`retry_after`、attempt 数和耗时。认证头、API key、请求文本、完整 URL 不写盘。
+
+回归：`tests/unit/test_ark_embedding_proxy.py` 与观察分类共 31 项通过（随后单文件 23 项通过）。
+
+受控 direct 验证（合成文本，1 次 embedding 上游 HTTP）成功：HTTP 200、`/embeddings/multimodal`、维度 2048、向量非空且有限、usage 可得；request ID 已脱敏保存在 `experiments/runs/memory-embedding-chain-20260914-030258/direct_embedding.json`。代理转换验证（再 1 次 embedding 上游 HTTP）成功：本地 `/v1/embeddings` 返回 200，转换维度 2048；ledger 在 `.../proxy_embedding_ledger.jsonl` 中记录上游/本地状态和 `upstream_attempt_count=1`。
+
+本轮未启动索引或 memory_search，未运行 collection/mining/freeze/formal evaluation；因此索引完成和语义检索仍为 unknown，不能报告 recall 或 accepted 数。未调用 Victim、Attacker 或 Planner。
+
 `data/primitive_libraries/frozen/safeclaw-main` 尚不存在。因而 main sample gate 与 formal matrix 尚未运行，不能报告 accepted sample、ASR、迁移性、机制成功率或官方 paired effect。正式入口应在首个 Victim episode 前 fail closed。
 
 实际 gate probe 返回 `primitive_library_audit_failed:missing_library_manifest`（exit 2），未创建 case、未启动 Victim、未发 provider 请求，符合该前置条件。
