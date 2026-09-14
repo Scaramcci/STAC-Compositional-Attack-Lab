@@ -14,10 +14,7 @@ import math
 import re
 import struct
 import sys
-<<<<<<< HEAD
 import threading
-=======
->>>>>>> f78b76ae9e0b2d8ed22c806709c4356c7f165d3f
 import time
 import urllib.error
 import urllib.request
@@ -27,14 +24,6 @@ from pathlib import Path
 from typing import Any
 
 
-<<<<<<< HEAD
-def convert_embeddings(
-    payload: dict[str, Any],
-    config: dict[str, Any],
-    *,
-    begin_request: Any = None,
-    record_request: Any = None,
-=======
 class UpstreamEmbeddingError(urllib.error.HTTPError):
     """HTTPError-compatible, redacted projection of an Ark failure."""
 
@@ -69,9 +58,9 @@ class InvalidEmbeddingError(RuntimeError):
         super().__init__(message)
         self.category = "invalid_vector"
         self.safe_message = message
-        self.upstream_http_status = None
+        self.upstream_http_status: int | None = None
         self.provider_error_code = None
-        self.request_id = None
+        self.request_id: str | None = None
         self.retry_after = None
         self.error_body_length = 0
         self.error_body_hash = None
@@ -116,8 +105,12 @@ def _request_id(headers: Any) -> str | None:
 
 
 def convert_embeddings(
-    payload: dict[str, Any], config: dict[str, str], *, on_attempt: Any = None
->>>>>>> f78b76ae9e0b2d8ed22c806709c4356c7f165d3f
+    payload: dict[str, Any],
+    config: dict[str, Any],
+    *,
+    begin_request: Any = None,
+    record_request: Any = None,
+    on_attempt: Any = None,
 ) -> dict[str, Any]:
     """Embed each text independently: Ark's input array describes one fused item."""
     if payload.get("model") != config["model"]:
@@ -137,6 +130,9 @@ def convert_embeddings(
     # Do not silently truncate vectors: this changes retrieval semantics.
     if "dimensions" in payload:
         raise ValueError("dimensions_override_unsupported")
+    timeout = int(config.get("timeout_seconds", 60))
+    if not 0 < timeout <= 90:
+        raise ValueError("invalid_embedding_timeout")
     data = []
     tokens = 0
     tokens_known = True
@@ -144,6 +140,21 @@ def convert_embeddings(
     for index, text in enumerate(inputs):
         sequence = begin_request() if begin_request is not None else index + 1
         started = time.monotonic()
+
+        def observe(
+            event: Any, elapsed: float, sequence: int = sequence, started: float = started
+        ) -> None:
+            if record_request is not None:
+                status = (
+                    event.get("upstream_http_status")
+                    if isinstance(event, dict)
+                    else event.upstream_http_status
+                )
+                category = None if isinstance(event, dict) else event.category
+                record_request(sequence, status, category, started)
+            if on_attempt is not None:
+                on_attempt(event, elapsed)
+
         request = urllib.request.Request(
             config["base_url"].rstrip("/") + "/embeddings/multimodal",
             data=json.dumps(
@@ -158,34 +169,15 @@ def convert_embeddings(
                 "User-Agent": "OpenAI/Python 1.0.0",
             },
         )
-<<<<<<< HEAD
+        upstream_status = None
+        response_headers = None
         try:
-            with urllib.request.urlopen(
-                request, timeout=int(config.get("timeout_seconds", 60))
-            ) as response:
-                result = json.load(response)
-                status = int(getattr(response, "status", 200))
-        except Exception as exc:
-            if record_request is not None:
-                category = (
-                    f"provider_http_{exc.code}"
-                    if isinstance(exc, urllib.error.HTTPError)
-                    else type(exc).__name__
-                )
-                record_request(sequence, getattr(exc, "code", None), category, started)
-            raise
-        if record_request is not None:
-            record_request(sequence, status, None, started)
-        vector = result["data"]["embedding"]
-=======
-        started = time.monotonic()
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                result = json.load(response)
+            with urllib.request.urlopen(request, timeout=timeout) as response:
                 upstream_status = getattr(response, "status", None)
                 if upstream_status is None and hasattr(response, "getcode"):
                     upstream_status = response.getcode()
                 response_headers = getattr(response, "headers", None)
+                result = json.load(response)
         except urllib.error.HTTPError as exc:
             raw = exc.read(1024 * 1024)
             details = _safe_error_fields(raw)
@@ -208,7 +200,7 @@ def convert_embeddings(
                     next(
                         (
                             value
-                            for key, value in exc.headers.items()
+                            for key, value in (exc.headers or {}).items()
                             if str(key).lower() == "retry-after"
                         ),
                         None,
@@ -218,54 +210,51 @@ def convert_embeddings(
                 body_length=details["error_body_length"],
                 body_hash=details["error_body_hash"],
             )
-            if on_attempt:
-                on_attempt(error, time.monotonic() - started)
+            observe(error, time.monotonic() - started)
             raise error from exc
         except TimeoutError as exc:
             error = UpstreamEmbeddingError(category="timeout", safe_message="upstream_timeout")
-            if on_attempt:
-                on_attempt(error, time.monotonic() - started)
+            observe(error, time.monotonic() - started)
             raise error from exc
         except (urllib.error.URLError, OSError) as exc:
             error = UpstreamEmbeddingError(
                 category="transport_error", safe_message="upstream_transport_error"
             )
-            if on_attempt:
-                on_attempt(error, time.monotonic() - started)
+            observe(error, time.monotonic() - started)
             raise error from exc
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             error = UpstreamEmbeddingError(
-                category="non_json_response", safe_message="upstream_response_not_json"
+                category="non_json_response",
+                status=upstream_status,
+                request_id=_request_id(response_headers),
+                safe_message="upstream_response_not_json",
             )
-            if on_attempt:
-                on_attempt(error, time.monotonic() - started)
+            observe(error, time.monotonic() - started)
             raise error from exc
         except Exception as exc:
             error = UpstreamEmbeddingError(
                 category="upstream_failure", safe_message="upstream_request_failed"
             )
-            if on_attempt:
-                on_attempt(error, time.monotonic() - started)
+            observe(error, time.monotonic() - started)
             raise error from exc
-        if on_attempt:
-            on_attempt(
-                {
-                    "upstream_http_status": upstream_status,
-                    "request_id": _request_id(response_headers),
-                },
-                time.monotonic() - started,
-            )
         result_data = result.get("data") if isinstance(result, dict) else None
         vector = result_data.get("embedding") if isinstance(result_data, dict) else None
->>>>>>> f78b76ae9e0b2d8ed22c806709c4356c7f165d3f
         if (
             not isinstance(vector, list)
             or not vector
             or not all(type(value) in (int, float) and math.isfinite(value) for value in vector)
         ):
-            raise InvalidEmbeddingError("invalid_upstream_vector")
+            error_vector = InvalidEmbeddingError("invalid_upstream_vector")
+            error_vector.upstream_http_status = upstream_status
+            error_vector.request_id = _request_id(response_headers)
+            observe(error_vector, time.monotonic() - started)
+            raise error_vector
         if dimension is not None and len(vector) != dimension:
-            raise InvalidEmbeddingError("inconsistent_upstream_dimensions")
+            error_vector = InvalidEmbeddingError("inconsistent_upstream_dimensions")
+            error_vector.upstream_http_status = upstream_status
+            error_vector.request_id = _request_id(response_headers)
+            observe(error_vector, time.monotonic() - started)
+            raise error_vector
         dimension = len(vector)
         embedding = (
             base64.b64encode(struct.pack(f"<{len(vector)}f", *vector)).decode()
@@ -273,7 +262,12 @@ def convert_embeddings(
             else vector
         )
         data.append({"object": "embedding", "index": index, "embedding": embedding})
-        prompt_tokens = result.get("usage", {}).get("prompt_tokens")
+        usage = result.get("usage")
+        prompt_tokens = usage.get("prompt_tokens") if isinstance(usage, dict) else None
+        observe(
+            {"upstream_http_status": upstream_status, "request_id": _request_id(response_headers)},
+            time.monotonic() - started,
+        )
         if type(prompt_tokens) is int and prompt_tokens >= 0:
             tokens += prompt_tokens
         else:
@@ -310,6 +304,9 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                                 "sequence": sequence,
                                 "accepted": False,
                                 "status": 429,
+                                "local_proxy_status": 400,
+                                "upstream_http_status": None,
+                                "upstream_attempt_count": 0,
                                 "error_category": "embedding_request_budget_exhausted",
                                 "upstream_path": "/embeddings/multimodal",
                                 "duration_ms": 0,
@@ -321,20 +318,6 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                 raise RuntimeError("embedding_request_budget_exhausted")
             request_count += 1
             return sequence
-
-    def record_request(
-        sequence: int, status: int | None, error_category: str | None, started: float
-    ) -> None:
-        value = {
-            "sequence": sequence,
-            "accepted": True,
-            "status": status,
-            "error_category": error_category,
-            "upstream_path": "/embeddings/multimodal",
-            "duration_ms": round((time.monotonic() - started) * 1000, 3),
-        }
-        with request_lock, ledger_path.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(value, sort_keys=True) + "\n")
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
@@ -349,10 +332,9 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
             started: float,
             upstream: Any = None,
             association_id: str | None = None,
+            sequence: int | None = None,
         ) -> None:
-            path = config.get("ledger_path")
-            if not path:
-                return
+            path = ledger_path
             record: dict[str, Any] = {
                 "timestamp": time.time(),
                 "association_id": association_id,
@@ -361,7 +343,9 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                 "local_proxy_status": local_status,
                 "duration_ms": round((time.monotonic() - started) * 1000, 3),
             }
-            if isinstance(upstream, UpstreamEmbeddingError):
+            if sequence is not None:
+                record.update({"sequence": sequence, "accepted": True, "upstream_attempt_count": 1})
+            if isinstance(upstream, (UpstreamEmbeddingError, InvalidEmbeddingError)):
                 record.update(
                     {
                         "upstream_http_status": upstream.upstream_http_status,
@@ -377,7 +361,7 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                 )
             elif isinstance(upstream, dict):
                 record.update(upstream)
-            with Path(path).open("a", encoding="utf-8") as stream:
+            with request_lock, Path(path).open("a", encoding="utf-8") as stream:
                 stream.write(json.dumps(record, sort_keys=True) + "\n")
 
         def reply(self, status: int, data: dict[str, Any]) -> None:
@@ -395,6 +379,24 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
             started = time.monotonic()
             association_id = _bounded_text(self.headers.get("X-Request-ID"), 160)
             attempts: list[Any] = []
+            sequences: list[int] = []
+
+            def begin() -> int:
+                sequence = begin_request()
+                sequences.append(sequence)
+                return sequence
+
+            def observe(event: Any, elapsed: float) -> None:
+                attempts.append(event)
+                self._record(
+                    local_status=200 if isinstance(event, dict) else 400,
+                    stage="upstream_attempt",
+                    started=time.monotonic() - elapsed,
+                    upstream=event,
+                    association_id=association_id,
+                    sequence=sequences[-1],
+                )
+
             if self.path != "/v1/embeddings":
                 self.reply(404, {"error": {"message": "unknown_endpoint"}})
                 self._record(
@@ -423,33 +425,11 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                 if not isinstance(payload, dict):
                     raise ValueError("invalid_request")
                 result = convert_embeddings(
-<<<<<<< HEAD
-                    payload,
-                    config,
-                    begin_request=begin_request,
-                    record_request=record_request,
-                )
-            except urllib.error.HTTPError:
-                # OpenClaw 2026.3.12 retries every 429/5xx up to four times.
-                # The ledger retains the real upstream status; returning a
-                # local 400 keeps this transport attempt non-retryable.
-                self.reply(400, {"error": {"message": "ark_upstream_http_error"}})
-            except (ValueError, TypeError):
-                self.reply(400, {"error": {"message": "invalid_embedding_request"}})
-            except RuntimeError as exc:
-                message = (
-                    "embedding_request_budget_exhausted"
-                    if str(exc) == "embedding_request_budget_exhausted"
-                    else "ark_embedding_failed"
-                )
-                self.reply(400, {"error": {"message": message}})
-            except Exception:
-                self.reply(400, {"error": {"message": "ark_embedding_failed"}})
-=======
-                    payload, config, on_attempt=lambda event, _elapsed: attempts.append(event)
+                    payload, config, begin_request=begin, on_attempt=observe
                 )
             except (UpstreamEmbeddingError, InvalidEmbeddingError) as exc:
-                local_status = 502 if exc.upstream_http_status is None else exc.upstream_http_status
+                # Keep failures non-retryable for pinned OpenClaw; retain the upstream status.
+                local_status = 400
                 exc.upstream_attempt_count = len(attempts) or 1
                 self.reply(
                     local_status,
@@ -480,16 +460,23 @@ def create_server(config: dict[str, Any], port: int = 18790) -> ThreadingHTTPSer
                     association_id=association_id,
                 )
                 return
+            except RuntimeError as exc:
+                message = (
+                    "embedding_request_budget_exhausted"
+                    if str(exc) == "embedding_request_budget_exhausted"
+                    else "ark_embedding_failed"
+                )
+                self.reply(400, {"error": {"message": message}})
+                return
             except Exception:
-                self.reply(502, {"error": {"message": "ark_embedding_failed"}})
+                self.reply(400, {"error": {"message": "ark_embedding_failed"}})
                 self._record(
-                    local_status=502,
+                    local_status=400,
                     stage="upstream",
                     started=started,
                     association_id=association_id,
                 )
                 return
->>>>>>> f78b76ae9e0b2d8ed22c806709c4356c7f165d3f
             else:
                 self.reply(200, result)
                 self._record(

@@ -5,6 +5,7 @@ import io
 import json
 import struct
 import urllib.error
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -118,7 +119,9 @@ def test_invalid_upstream_vectors_are_rejected(
         adapter.convert_embeddings({"model": "ep-test", "input": "one"}, CONFIG)
 
 
-def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_http_translation_auth_and_error_redaction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     # Feed a raw HTTP request through the real handler without opening sockets.
     from http.server import BaseHTTPRequestHandler
 
@@ -133,7 +136,8 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
         return FakeServer()
 
     monkeypatch.setattr(adapter, "ThreadingHTTPServer", capture_server)
-    adapter.create_server(CONFIG)
+    ledger_path = tmp_path / "ledger.jsonl"
+    adapter.create_server({**CONFIG, "ledger_path": str(ledger_path), "max_requests": 3})
 
     class Connection:
         def __init__(self, raw: bytes):
@@ -172,6 +176,8 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
     assert len(result["data"]) == 2
 
     def failed(*args: Any, **kwargs: Any) -> None:
+        nonlocal calls
+        calls += 1
         raise urllib.error.HTTPError("https://secret.invalid", 429, "synthetic-key", {}, None)
 
     monkeypatch.setattr(adapter.urllib.request, "urlopen", failed)
@@ -179,6 +185,60 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
     assert b"400" in response.split(b"\r\n")[0]
     assert b"synthetic-key" not in response
     assert b"secret.invalid" not in response
+    # Two successful batch items and one upstream error consume the same budget.
+    assert calls == 3
+    assert b"embedding_request_budget_exhausted" in request("synthetic-key")
+    assert calls == 3
+    records = [json.loads(line) for line in ledger_path.read_text().splitlines()]
+    accepted = [item for item in records if item.get("accepted") is True]
+    assert len(accepted) == 3  # Request summaries must not double-count attempts.
+    assert [item["sequence"] for item in accepted] == [1, 2, 3]
+    assert accepted[-1]["upstream_http_status"] == 429
+    assert accepted[-1]["local_proxy_status"] == 400
+    assert accepted[-1]["error_category"] == "rate_limited"
+    assert records[-1]["accepted"] is False
+    assert records[-1]["upstream_attempt_count"] == 0
+    assert "synthetic-key" not in ledger_path.read_text()
+    assert "secret.invalid" not in ledger_path.read_text()
+
+
+@pytest.mark.parametrize("body", [b"not json", b'{"data":{"embedding":[]}}'])
+def test_invalid_success_response_is_recorded_once(
+    body: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Response(io.BytesIO):
+        status = 200
+        headers = {"x-request-id": "req-safe"}
+
+    def upstream(*args: Any, **kwargs: Any) -> Response:
+        assert kwargs["timeout"] == 17
+        return Response(body)
+
+    monkeypatch.setattr(adapter.urllib.request, "urlopen", upstream)
+    records: list[Any] = []
+    events: list[Any] = []
+    with pytest.raises((adapter.UpstreamEmbeddingError, adapter.InvalidEmbeddingError)):
+        adapter.convert_embeddings(
+            {"model": "ep-test", "input": "one"},
+            {**CONFIG, "timeout_seconds": 17},
+            begin_request=lambda: 7,
+            record_request=lambda *args: records.append(args),
+            on_attempt=lambda event, elapsed: events.append(event),
+        )
+    assert len(records) == len(events) == 1
+    assert records[0][:2] == (7, 200)
+    assert records[0][2] in {"invalid_vector", "non_json_response"}
+    assert events[0].request_id == "req-safe"
+
+
+def test_missing_usage_is_not_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        adapter.urllib.request,
+        "urlopen",
+        lambda *a, **k: io.BytesIO(b'{"data":{"embedding":[1,2]},"usage":null}'),
+    )
+    result = adapter.convert_embeddings({"model": "ep-test", "input": "one"}, CONFIG)
+    assert "usage" not in result
 
 
 @pytest.mark.parametrize(
