@@ -385,6 +385,7 @@ class SafeClawSubprocessVictimDriver:
         provider_allowed_tools: list[str] | None = None,
         embedding_request_budget: int = 128,
         environment: Mapping[str, str] | None = None,
+        batch_id: str | None = None,
     ) -> None:
         self.project_root = project_root
         self.upstream_root = upstream_root
@@ -400,6 +401,7 @@ class SafeClawSubprocessVictimDriver:
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
         self.environment = environment if environment is not None else os.environ
+        self.batch_id = batch_id
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._process: subprocess.Popen[str] | None = None
         self._stderr: IO[str] | None = None
@@ -509,6 +511,7 @@ class SafeClawSubprocessVictimDriver:
             provider_timeout_seconds=self.provider_timeout_seconds,
             provider_allowed_tools=self.provider_allowed_tools,
             embedding_request_budget=embedding_remaining,
+            batch_id=self.batch_id,
         )
         self._started_at = monotonic()
         self._temporary = tempfile.TemporaryDirectory(prefix="safeclaw-construction-")
@@ -583,6 +586,17 @@ class SafeClawSubprocessVictimDriver:
             legal_retry_ids=task.legal_retry_ids,
             legal_reroute_ids=task.legal_reroute_ids,
         )
+
+    def embedding_probe(self, *, source: str, model: str, text: str) -> dict[str, Any]:
+        """Run one bounded probe through the live relay topology."""
+        if self._process is None:
+            raise RuntimeError("safeclaw_construction_driver_not_started")
+        response = self._send_bridge(
+            {"kind": "embedding_probe", "source": source, "model": model, "text": text}
+        )
+        if response.get("kind") != "embedding_probe":
+            raise RuntimeError("safeclaw_embedding_probe_invalid_response")
+        return response
 
     def apply(self, action: ConstructionAttackerAction) -> ConstructionVictimStep:
         if self._budget is None:

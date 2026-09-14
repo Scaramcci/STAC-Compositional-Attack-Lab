@@ -52,3 +52,15 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 - frozen library 缺失只阻止依赖它的 formal 步骤，不阻止第 2、3 步。
 - 正常检索失败不触发无限重试或自动更换模型。具体账户/权限问题交给用户处理，其他可独立离线工作继续。
 - 更新唯一当前状态；历史测试与当前验证分开。未经要求不 commit/push，不恢复已清理的历史数据。
+
+
+## 本轮完成记录（2026-09-14）
+
+第 1 步已完成：safety patch 可应用于 pinned upstream，Victim 内旧 adapter 路径改为显式拒绝；独立 relay 负责 embedding，Victim 无上游 embedding key 和直接公网接口。第 2 步的离线部分已完成：provider/embedding relay 使用持久 ledger、batch ID、单实例锁和 crash-conservative 原子预占，损坏/写入失败 fail-closed；所有实际上游 attempts 在预算内计费。`make check` 为 194 passed，未调用真实模型 API。
+
+下一步仍需用户新授权后做有限服务器验证：检查 Docker 网络实际隔离、relay endpoint allowlist 和持久 ledger 权限，再运行受限 embedding/memory_search 批次。未获授权前不得进入 collection、construction、pilot、mining、freeze 或 evaluation。
+
+
+## 本轮真实诊断结果（2026-09-14）
+
+A/B/C 未执行。唯一 run 在真实请求前的 pinned judge 配置阶段因 relay 注入字段不完整而 fail-closed；实际请求计数为 Embedding 0/12、Victim 0/8、合计 0/20。最小代码修复已完成并通过 `make check`（194 passed），但按授权边界不自动复测。下一次需要新的明确真实调用授权，先复核修复后的 relay→Victim 配置，再按 A→B→C 顺序执行。

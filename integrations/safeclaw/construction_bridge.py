@@ -211,18 +211,11 @@ def _structured_tool_observations(
 def _embedding_ledger(
     judge: ModuleType, relay: ContainerProviderRelay | None = None
 ) -> list[dict[str, Any]]:
-    if relay is not None and hasattr(relay, "embedding_records"):
-        return relay.embedding_records()
-    raw = judge.dexec_output("cat /tmp/stac-embedding-ledger.jsonl 2>/dev/null")
-    records: list[dict[str, Any]] = []
-    for line in str(raw or "").splitlines():
-        try:
-            item = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(item, dict):
-            records.append(item)
-    return records
+    if relay is None or not hasattr(relay, "embedding_records"):
+        # Never fall back to a Victim-local ledger: that would mask an adapter
+        # started in the wrong container or report stale records as live use.
+        raise RuntimeError("embedding_relay_missing")
+    return relay.embedding_records()
 
 
 def _observable_usage(raw: Any) -> dict[str, int] | None:
@@ -357,6 +350,28 @@ def main() -> int:
         for raw in sys.stdin:
             command = json.loads(raw)
             kind = command.get("kind")
+            if kind == "embedding_probe":
+                if relay is None:
+                    raise RuntimeError("embedding_relay_missing")
+                source = str(command.get("source", "relay"))
+                if source not in {"relay", "victim"}:
+                    raise RuntimeError("embedding_probe_invalid_source")
+                with contextlib.redirect_stdout(sys.stderr):
+                    probe = relay.embedding_probe(
+                        from_victim=source == "victim",
+                        model=str(command["model"]),
+                        text=str(command["text"]),
+                    )
+                    ledger = relay.embedding_records()
+                _emit(
+                    {
+                        "kind": "embedding_probe",
+                        "source": source,
+                        "probe": probe,
+                        "embedding_request_ledger": ledger,
+                    }
+                )
+                continue
             if kind == "finish":
                 with contextlib.redirect_stdout(sys.stderr):
                     post_state = runner.capture_post_state()

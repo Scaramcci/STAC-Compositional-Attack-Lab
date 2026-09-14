@@ -54,6 +54,7 @@ def build_safeclaw_model_config(
     embedding_request_budget: int = 128,
     provider_context_window: int = 200000,
     provider_max_output_tokens: int = 1024,
+    batch_id: str | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     target_api_key = environment.get(target_api_key_env)
     if not target_api_key:
@@ -90,6 +91,8 @@ def build_safeclaw_model_config(
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
     }
+    if batch_id:
+        payload["batch_id"] = batch_id
     exact_secrets = [target_api_key, target_base_url]
     if embedding is None:
         return payload, exact_secrets

@@ -133,6 +133,14 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
         encoding="utf-8",
     )
 
+    if provider == "ark_multimodal":
+        with pytest.raises(ValueError, match="embedding_adapter_must_run_in_provider_relay"):
+            module["_apply_model_config"](str(model_config))
+        output = capsys.readouterr().out
+        assert not any("_stac_ark_embedding" in command for command in docker_commands)
+        assert "embedding-secret" not in output
+        return
+
     applied = module["_apply_model_config"](str(model_config))
     output = capsys.readouterr().out
 
@@ -158,14 +166,6 @@ def test_patched_judge_applies_memory_search_config_without_secret_output(
             },
         }
     ]
-    if provider == "ark_multimodal":
-        adapter_configs = [
-            item for item in captured_inputs if isinstance(item, dict) and "source" in item
-        ]
-        assert adapter_configs[0]["base_url"] == "https://embedding.invalid/v1"
-        assert adapter_configs[0]["api_key"] == "embedding-secret"
-        assert any("ark_embedding_adapter_start_failed" in command for command in docker_commands)
-        assert all("embedding-secret" not in command for command in docker_commands)
     assert any("memorySearch" in command for command in docker_commands)
     assert applied["embedding_configured"] is True
     assert applied["embedding_model"] == "synthetic-embedding"

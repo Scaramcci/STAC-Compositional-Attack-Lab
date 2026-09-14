@@ -98,7 +98,7 @@ index 466b14e..b4128df 100755
 +                                "supportsStrictMode": False,
 +                            },
 +                        } if compatibility_mode in {"ark", "gemini"} else {})}],
-@@ -494,11 +510,95 @@ def _apply_model_config(config_path: str):
+@@ -494,11 +510,53 @@ def _apply_model_config(config_path: str):
              f"json.dump(c,open('{config_path}','w'),indent=2)"
              f"\""
          )
@@ -112,52 +112,10 @@ index 466b14e..b4128df 100755
 +            f"json.dump(c,open('{config_path}','w'),indent=2)\""
 +        )
 +        if embedding_provider == "ark_multimodal":
-+            adapter_config = {
-+                "model": embedding_model,
-+                "base_url": embedding_api_base_url,
-+                "api_key": embedding_api_key,
-+                "source": mc["embedding_adapter_source"],
-+                "max_requests": int(mc.get("embedding_request_budget", 128)),
-+                "timeout_seconds": min(90, int(mc.get("provider_timeout_seconds", 90))),
-+            }
-+            adapter_path = "/tmp/_stac_ark_embedding.json"
-+            subprocess.run(
-+                ["docker", "exec", "-i", CONTAINER, "bash", "-c",
-+                 f"umask 077; cat > {adapter_path}"],
-+                input=json.dumps(adapter_config).encode(), capture_output=True, check=True,
-+            )
-+            source_path = "/tmp/_stac_ark_embedding.py"
-+            subprocess.run(
-+                ["docker", "exec", CONTAINER, "python3", "-c",
-+                 "import json,sys; "
-+                 "c=json.load(open(sys.argv[1])); "
-+                 "open(sys.argv[2], 'w').write(c['source'])",
-+                 adapter_path, source_path],
-+                capture_output=True, check=True,
-+            )
-+            subprocess.run(
-+                ["docker", "exec", "-d", CONTAINER, "bash", "-lc",
-+                 f"python3 {source_path} {adapter_path} > /tmp/_stac_ark_embedding.log 2>&1"],
-+                capture_output=True, check=True,
-+            )
-+            # Wait for the container-local listener before restarting OpenClaw.
-+            readiness = "\n".join([
-+                "import time, urllib.request",
-+                "for attempt in range(50):",
-+                "    try:",
-+                "        urllib.request.urlopen('http://127.0.0.1:18790/health', timeout=1).close()",
-+                "        break",
-+                "    except OSError:",
-+                "        time.sleep(0.1)",
-+                "else:",
-+                "    raise SystemExit('ark_embedding_adapter_start_failed')",
-+            ])
-+            subprocess.run(
-+                ["docker", "exec", CONTAINER, "python3", "-c", readiness],
-+                capture_output=True, check=True,
-+            )
-+            embedding_provider = "openai"
-+            embedding_api_base_url = "http://127.0.0.1:18790/v1"
++            # The Ark adapter is owned by the external provider relay.  Never
++            # start the legacy adapter inside Victim (which would expose both
++            # egress and the upstream embedding credential).
++            raise ValueError("embedding_adapter_must_run_in_provider_relay")
 +        if embedding_provider:
 +            memory_search = {
 +                "enabled": True,
@@ -195,7 +153,7 @@ index 466b14e..b4128df 100755
 
      # Also update auth-profiles key (gateway may prefer this over provider apiKey)
      if api_key:
-@@ -537,7 +628,32 @@ def _apply_model_config(config_path: str):
+@@ -537,7 +586,32 @@ def _apply_model_config(config_path: str):
      print(f"  Gateway restarted — config: {validate.strip()}")
 
      # Return applied config so it can be saved in the report
@@ -229,7 +187,7 @@ index 466b14e..b4128df 100755
 
 
  def remove_container():
-@@ -912,12 +1028,0 @@ class TaskRunner:
+@@ -912,12 +988,0 @@ class TaskRunner:
 -        # Retry once on malformed_function_call (Gemini compatibility issue)
 -        if "malformed_function_call" in response_text:
 -            if self.verbose:
@@ -242,7 +200,7 @@ index 466b14e..b4128df 100755
 -                timeout=timeout,
 -            )
 -            response_text = GatewayClient._extract_content(api_response)
-@@ -1489,7 +1593,9 @@ class Evaluator:
+@@ -1489,7 +1553,9 @@ class Evaluator:
                  "skills_deployed": self.pre_state.get("skills_deployed", []),
                  "plugins_deployed": self.pre_state.get("plugins_deployed", []),
              },

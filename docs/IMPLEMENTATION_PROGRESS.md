@@ -71,3 +71,30 @@
 ## 下一步
 
 按 [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md) 的第 1、2 步推进。对新写入合成事实使用不给出答案的语义查询，确认索引、向量调用、命中片段、来源和 call/result 配对。服务器真实验证须有新批次范围和预算，不从文档自动推断无限授权。
+
+
+## 本轮独立 embedding relay 闭环（2026-09-14）
+
+- `a11f5cce-safety.patch` 已删除 Victim 内启动旧 Ark adapter 的路径；若未先由 relay 注入内部配置，`_apply_model_config` 以 `embedding_adapter_must_run_in_provider_relay` fail-closed。标准 `git apply --check` 对 pinned upstream 通过。
+- `ContainerProviderRelay` 继续负责唯一 embedding adapter 进程：relay 容器连接可出网 bridge，Victim 仅连接 `--internal` 网络；启动顺序为网络/容器、chat relay、embedding relay、双健康检查后才向 Victim 注入内部 URL 和随机 ingress token。上游 embedding key 只留在 relay runtime；非 Ark embedding provider 现在显式拒绝，避免把 raw key 交给 Victim。construction bridge 同时移除 Victim-local ledger fallback，缺 relay 时显式失败。
+- embedding/provider relay ledger 增加持久 batch ID、跨重启序号和原子预占；预占在实际上游调用前 `fsync`，因此崩溃或发送结果不确定时保守计费。账本 lock 文件拒绝重复实例；账本损坏、不可读或写入失败均 fail-closed。预算拒绝行不访问上游，隐藏重试无法绕过出口。
+- 补充了 mock 跨重启预算、超额拒绝、损坏账本和生命周期检查；未调用真实模型 API，未运行 collection/construction/pilot/mining/freeze/evaluation。
+
+## 本轮验证结果
+
+- `make check PYTHON=.venv/bin/python`：`194 passed`；ruff format/check、mypy（68 source files）、Python 编译和 `git diff --check` 通过。
+- 专项 `test_ark_embedding_proxy.py`、`test_provider_relay.py`、`test_safeclaw_formal_bridge.py`：`36 passed`；pinned patch 单元测试已更新为验证旧 Victim adapter 路径被拒绝。
+- 仅做离线/mock socket 与本地文件验证；没有真实上游请求。当前工作树仍有未提交修改，按要求未 commit/push。
+
+## 下一轮有限真实测试条件
+
+具备条件：拓扑、内部认证、上游凭证隔离、预算持久化和健康检查代码闭环，且离线质量门全绿。仍需在服务器上由用户明确授权一个新的有限批次，并先确认 Docker 网络权限、relay 上游 endpoint/allowlist 可达、持久 ledger 路径可写且无残留 lock；本轮不自行启动真实 embedding 或 memory_search。
+
+
+## 2026-09-14 真实 memory relay 诊断（本轮授权）
+
+- 预检通过：无运行中的 SafeClaw/Victim/relay 或 CLI 子进程；旧 tmux 仅为已完成 shell。Docker 可用，镜像 `openclaw-env:2026.3.12` digest 为 `sha256:3f0d4246a528d64d3b97c1a5b708200668d8362d7a3c4d9d65c5b2a8935dee99`，pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`，Ark endpoint DNS 可解析。历史空 lock 文件仍保留，未盲删。
+- 唯一新 run：`experiments/runs/memory-relay-diagnostic-20260914-100746-956a0bca/`，batch ID `ed1641292c5744ff8e55243d8ef0089f`。运行在真实请求前的 `apply_model_config` 阶段 fail-closed：relay 注入 Victim 的内部 embedding 配置缺少 `embedding_provider`/`embedding_model`，触发 `incomplete_embedding_model_config`。
+- 因此 A（relay embedding probe）、B（Victim 内部 embedding probe）、C（完整合成 memory）均未执行；Embedding 实际请求 `0/12`，Victim 实际请求 `0/8`，合计 `0/20`。没有自动重试，没有新增 batch，没有真实 provider 响应或索引证据。
+- 已完成最小离线修复：relay `start()` 回填内部 `embedding_provider=openai` 与 `embedding_model`，保留内部 URL/ingress token；同时保留本轮统一 batch ID、A→B→C gate 和脱敏 run metadata。修复后 `make check PYTHON=.venv/bin/python` 为 `194 passed`，ruff/mypy/format 全部通过。
+- 运行产物已扫描：未发现 `SAFECLAW_API_KEY`、`SAFECLAW_EMBEDDING_API_KEY` 或 Authorization literal；失败后容器/relay 已清理。不得把本轮标记为真实 embedding 或 memory_search 通过。

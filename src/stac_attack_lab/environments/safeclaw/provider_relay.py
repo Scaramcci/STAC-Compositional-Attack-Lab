@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import hmac
 import json
+import os
 import subprocess
 import threading
 import time
@@ -44,6 +45,7 @@ class ProviderRelayConfig:
     timeout_seconds: int = 90
     allowed_tools: tuple[str, ...] | None = None
     ledger_path: str = "/tmp/stac-provider-ledger.jsonl"
+    batch_id: str | None = None
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> ProviderRelayConfig:
@@ -58,6 +60,7 @@ class ProviderRelayConfig:
             timeout_seconds=int(value.get("timeout_seconds", 90)),
             allowed_tools=(tuple(str(item) for item in allowed) if allowed is not None else None),
             ledger_path=str(value.get("ledger_path") or "/tmp/stac-provider-ledger.jsonl"),
+            batch_id=(str(value.get("batch_id")) if value.get("batch_id") else None),
         )
         if not config.upstream_base_url or not config.upstream_api_key or not config.ingress_token:
             raise ValueError("provider_relay_missing_required_config")
@@ -68,6 +71,100 @@ class ProviderRelayConfig:
         ):
             raise ValueError("provider_relay_duplicate_allowed_tool")
         return config
+
+
+class _PersistentRelayBudget:
+    """Durable reservation counter shared by relay restarts."""
+
+    def __init__(self, path: Path, maximum: int, batch_id: str | None = None) -> None:
+        self.path = path
+        self.reservation_path = Path(str(path) + ".reservations")
+        self.batch_id = batch_id or uuid.uuid4().hex
+        self.maximum = maximum
+        self.lock_path = Path(str(path) + ".lock")
+        self._fd: int | None = None
+        self._mutex = threading.Lock()
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            self._fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as exc:
+            raise RuntimeError("provider_relay_ledger_single_instance_locked") from exc
+        except OSError as exc:
+            raise RuntimeError("provider_relay_ledger_unavailable") from exc
+        try:
+            self.records = self._read()
+            reservations = self._read_path(self.reservation_path)
+        except Exception:
+            self.close()
+            raise
+        self.reserved = sum(1 for item in reservations if item.get("accepted") == "reserved")
+        self.sequence = max(
+            [
+                int(item["sequence"])
+                for item in reservations
+                if isinstance(item.get("sequence"), int)
+            ]
+            or [0]
+        )
+
+    def _read(self) -> list[dict[str, Any]]:
+        return self._read_path(self.path)
+
+    def _read_path(self, path: Path) -> list[dict[str, Any]]:
+        if not path.exists():
+            return []
+        try:
+            result = []
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    item = json.loads(line)
+                    if not isinstance(item, dict):
+                        raise ValueError("record_not_object")
+                    result.append(item)
+            return result
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("provider_relay_ledger_corrupt") from exc
+
+    def _append(self, item: dict[str, Any], path: Path | None = None) -> None:
+        try:
+            with (path or self.path).open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(item, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError as exc:
+            raise RuntimeError("provider_relay_ledger_write_failed") from exc
+
+    def reserve(self) -> tuple[int, bool]:
+        with self._mutex:
+            self.sequence += 1
+            accepted = self.reserved < self.maximum
+            item = {
+                "batch_id": self.batch_id,
+                "stage": "reservation",
+                "sequence": self.sequence,
+                "accepted": "reserved" if accepted else False,
+                "upstream_attempt_count": 1 if accepted else 0,
+                "status": 200 if accepted else 429,
+                "timestamp": time.time(),
+            }
+            self._append(item, self.reservation_path)
+            if accepted:
+                self.reserved += 1
+            return self.sequence, accepted
+
+    def append(self, item: dict[str, Any]) -> None:
+        with self._mutex:
+            self._append(item)
+            self.records.append(item)
+
+    def close(self) -> None:
+        if self._fd is not None:
+            try:
+                os.close(self._fd)
+                self.lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._fd = None
 
 
 @dataclass
@@ -158,10 +255,9 @@ class _RelayHandler(BaseHTTPRequestHandler):
             )
             return
 
+        sequence, accepted = self.server.budget.reserve()
         with self.server.state.lock:
-            self.server.state.total_attempts += 1
-            sequence = self.server.state.total_attempts
-            accepted = self.server.state.accepted_requests < config.max_requests
+            self.server.state.total_attempts = sequence
             if accepted:
                 self.server.state.accepted_requests += 1
         if not accepted:
@@ -237,8 +333,20 @@ class ProviderRelayServer(ThreadingHTTPServer):
         config: ProviderRelayConfig,
     ) -> None:
         self.config = config
-        self.state = ProviderRelayState()
+        self.budget = _PersistentRelayBudget(
+            Path(config.ledger_path), config.max_requests, config.batch_id
+        )
+        self.state = ProviderRelayState(
+            accepted_requests=self.budget.reserved,
+            total_attempts=self.budget.sequence,
+        )
         super().__init__(address, _RelayHandler)
+
+    def server_close(self) -> None:
+        try:
+            super().server_close()
+        finally:
+            self.budget.close()
 
     @property
     def url(self) -> str:
@@ -247,11 +355,9 @@ class ProviderRelayServer(ThreadingHTTPServer):
 
     def record(self, value: dict[str, Any]) -> None:
         with self.state.lock:
-            self.state.records.append(dict(value))
-            path = Path(self.config.ledger_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(value, sort_keys=True) + "\n")
+            item = {"batch_id": self.budget.batch_id, **value}
+            self.state.records.append(dict(item))
+            self.budget.append(item)
 
 
 class RunningProviderRelay:
@@ -283,6 +389,7 @@ class ContainerProviderRelay:
         self.ingress_token = token
         self.embedding_ingress_token = uuid.uuid4().hex
         self.runtime = dict(runtime)
+        self.batch_id = str(self.runtime.get("batch_id") or uuid.uuid4().hex)
         self.started = False
         self.embedding_started = False
 
@@ -322,11 +429,13 @@ class ContainerProviderRelay:
                 "max_requests": int(self.runtime.pop("embedding_request_budget", 128)),
                 "timeout_seconds": int(self.runtime.get("timeout_seconds", 90)),
                 "ledger_path": "/tmp/stac-embedding-ledger.jsonl",
+                "batch_id": self.batch_id,
                 "port": 18792,
                 "host": "0.0.0.0",
             }
         config = {
             **self.runtime,
+            "batch_id": self.batch_id,
             "upstream_api_key": upstream_key,
             "ingress_token": self.ingress_token,
         }
@@ -436,13 +545,15 @@ class ContainerProviderRelay:
                             continue
                         self.embedding_started = True
                     self.started = True
-                    result = {
+                    result: dict[str, Any] = {
                         "api_base_url": f"http://{self.container}:18791/v1",
                         "api_key": self.ingress_token,
                     }
                     if embedding_config is not None:
                         result.update(
                             {
+                                "embedding_provider": "openai",
+                                "embedding_model": embedding_config["model"],
                                 "embedding_api_base_url": f"http://{self.container}:18792/v1",
                                 "embedding_api_key": self.embedding_ingress_token,
                                 "embedding_relay_configured": True,
@@ -454,6 +565,66 @@ class ContainerProviderRelay:
         except Exception:
             self.stop()
             raise
+
+    def embedding_probe(self, *, from_victim: bool, model: str, text: str) -> dict[str, Any]:
+        """Send one bounded embedding request from relay or Victim network namespace."""
+        if not self.embedding_started:
+            raise RuntimeError("embedding_relay_not_started")
+        target = self.victim_container if from_victim else self.container
+        host = self.container if from_victim else "127.0.0.1"
+        script = "\n".join(
+            [
+                "import hashlib,json,math,sys,urllib.error,urllib.request",
+                "c=json.load(sys.stdin)",
+                "body=json.dumps({'model':c['model'],'input':c['text']}).encode()",
+                "headers={'Authorization':'Bearer '+c['token'],",
+                "         'Content-Type':'application/json'}",
+                "r=urllib.request.Request(c['url'],data=body,headers=headers)",
+                "try:",
+                " with urllib.request.urlopen(r,timeout=c['timeout']) as x:",
+                "  raw=x.read(); status=getattr(x,'status',None) or x.getcode()",
+                "  data=json.loads(raw)",
+                "  e=data.get('data',{}).get('embedding')",
+                "  valid=(isinstance(e,list) and bool(e) and all(",
+                "      type(v) in (int,float) and math.isfinite(v) for v in e))",
+                "  u=data.get('usage') if isinstance(data,dict) else None",
+                "  print(json.dumps({'status':status,'dimension':len(e) if valid else None,",
+                "    'finite_nonempty':valid,'usage':u if isinstance(u,dict) else None},",
+                "    sort_keys=True))",
+                "except urllib.error.HTTPError as x:",
+                " raw=x.read(1048576)",
+                " print(json.dumps({'status':x.code,'error_category':'upstream_http_error',",
+                "   'body_length':len(raw),'body_hash':hashlib.sha256(raw).hexdigest()},",
+                "   sort_keys=True))",
+                "except TimeoutError:",
+                " print(json.dumps({'status':None,'error_category':'read_timeout'},",
+                "   sort_keys=True))",
+                "except Exception as x:",
+                " print(json.dumps({'status':None,'error_category':type(x).__name__},",
+                "   sort_keys=True))",
+            ]
+        )
+        payload = json.dumps(
+            {
+                "url": f"http://{host}:18792/v1/embeddings",
+                "token": self.embedding_ingress_token,
+                "model": model,
+                "text": text,
+                "timeout": min(90, int(self.runtime.get("timeout_seconds", 90))),
+            }
+        ).encode()
+        result = self._docker("exec", "-i", target, "python3", "-c", script, input_data=payload)
+        if result.returncode != 0:
+            raise RuntimeError("embedding_probe_process_failed")
+        try:
+            value = json.loads(result.stdout.decode(errors="replace").strip())
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("embedding_probe_invalid_response") from exc
+        return (
+            value
+            if isinstance(value, dict)
+            else {"error_category": "embedding_probe_invalid_response"}
+        )
 
     def embedding_records(self) -> list[dict[str, Any]]:
         if not self.embedding_started:
@@ -519,8 +690,14 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
         "max_requests": value.pop("provider_request_budget", 8),
         "timeout_seconds": value.pop("provider_timeout_seconds", 90),
         "allowed_tools": allowed_tools,
+        "batch_id": value.pop("batch_id", None),
     }
-    if value.get("embedding_provider") == "ark_multimodal":
+    embedding_provider = value.get("embedding_provider")
+    if embedding_provider is not None and embedding_provider != "ark_multimodal":
+        # A raw OpenAI embedding key must never be copied into Victim.  Only
+        # the independently hosted Ark adapter has a relay contract today.
+        raise ValueError("embedding_provider_requires_independent_relay_adapter")
+    if embedding_provider == "ark_multimodal":
         # The adapter and upstream credential stay in this egress relay.
         value["embedding_provider"] = "openai"
         runtime.update(

@@ -11,6 +11,7 @@ import hashlib
 import hmac
 import json
 import math
+import os
 import re
 import struct
 import sys
@@ -18,10 +19,124 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import uuid
 from email.message import Message
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+
+class _PersistentBudget:
+    """Crash-safe, single-owner reservation ledger for upstream attempts."""
+
+    def __init__(self, path: Path, maximum: int, batch_id: str | None = None) -> None:
+        self.path = path
+        self.maximum = maximum
+        self.lock_path = Path(str(path) + ".lock")
+        self.batch_id = batch_id or uuid.uuid4().hex
+        self._lock_fd: int | None = None
+        self._mutex = threading.Lock()
+        self._acquired = False
+        self._acquire_owner()
+        try:
+            self._records = self._read_records()
+        except Exception:
+            self.close()
+            raise
+        self._next_sequence = max(
+            [
+                int(item["sequence"])
+                for item in self._records
+                if isinstance(item.get("sequence"), int)
+            ]
+            or [0]
+        )
+        # Reservations are the durable unit.  Legacy ledgers without a
+        # reservation marker are counted by their accepted attempt rows.
+        reservations = sum(
+            1
+            for item in self._records
+            if item.get("stage") == "reservation" and item.get("accepted") == "reserved"
+        )
+        legacy = sum(
+            1 for item in self._records if "batch_id" not in item and item.get("accepted") is True
+        )
+        self._accepted = reservations + legacy
+
+    def _acquire_owner(self) -> None:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._lock_fd = os.open(self.lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.write(self._lock_fd, f"{os.getpid()}\n".encode())
+            self._acquired = True
+        except FileExistsError as exc:
+            raise RuntimeError("embedding_ledger_single_instance_locked") from exc
+        except OSError as exc:
+            raise RuntimeError("embedding_ledger_unavailable") from exc
+
+    def _read_records(self) -> list[dict[str, Any]]:
+        if not self.path.exists():
+            return []
+        records: list[dict[str, Any]] = []
+        try:
+            for line in self.path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                item = json.loads(line)
+                if not isinstance(item, dict):
+                    raise ValueError("record_not_object")
+                records.append(item)
+        except (OSError, UnicodeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("embedding_ledger_corrupt") from exc
+        return records
+
+    def reserve(self) -> int:
+        with self._mutex:
+            self._next_sequence += 1
+            sequence = self._next_sequence
+            accepted = self._accepted < self.maximum
+            record = {
+                "batch_id": self.batch_id,
+                "sequence": sequence,
+                "accepted": "reserved" if accepted else False,
+                "stage": "reservation",
+                "status": 200 if accepted else 429,
+                "local_proxy_status": 200 if accepted else 400,
+                "upstream_http_status": None,
+                "upstream_attempt_count": 1 if accepted else 0,
+                "error_category": None if accepted else "embedding_request_budget_exhausted",
+                "upstream_path": "/embeddings/multimodal",
+                "timestamp": time.time(),
+            }
+            self._append(record)
+            self._records.append(record)
+            if accepted:
+                self._accepted += 1
+                return sequence
+            raise RuntimeError("embedding_request_budget_exhausted")
+
+    def _append(self, record: dict[str, Any]) -> None:
+        try:
+            with self.path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except (OSError, UnicodeError) as exc:
+            raise RuntimeError("embedding_ledger_write_failed") from exc
+
+    def append(self, record: dict[str, Any]) -> None:
+        with self._mutex:
+            self._append(record)
+            self._records.append(record)
+
+    def close(self) -> None:
+        if self._acquired and self._lock_fd is not None:
+            try:
+                os.close(self._lock_fd)
+                self.lock_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            self._acquired = False
 
 
 class UpstreamEmbeddingError(urllib.error.HTTPError):
@@ -312,37 +427,10 @@ def create_server(
     if max_requests < 1:
         raise ValueError("embedding_request_budget_must_be_positive")
     ledger_path = Path(str(config.get("ledger_path", "/tmp/stac-embedding-ledger.jsonl")))
-    request_lock = threading.Lock()
-    request_count = 0
-    attempt_count = 0
+    budget = _PersistentBudget(ledger_path, max_requests, str(config.get("batch_id") or "") or None)
 
     def begin_request() -> int:
-        nonlocal attempt_count, request_count
-        with request_lock:
-            attempt_count += 1
-            sequence = attempt_count
-            if request_count >= max_requests:
-                with ledger_path.open("a", encoding="utf-8") as stream:
-                    stream.write(
-                        json.dumps(
-                            {
-                                "sequence": sequence,
-                                "accepted": False,
-                                "status": 429,
-                                "local_proxy_status": 400,
-                                "upstream_http_status": None,
-                                "upstream_attempt_count": 0,
-                                "error_category": "embedding_request_budget_exhausted",
-                                "upstream_path": "/embeddings/multimodal",
-                                "duration_ms": 0,
-                            },
-                            sort_keys=True,
-                        )
-                        + "\n"
-                    )
-                raise RuntimeError("embedding_request_budget_exhausted")
-            request_count += 1
-            return sequence
+        return budget.reserve()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
@@ -359,8 +447,8 @@ def create_server(
             association_id: str | None = None,
             sequence: int | None = None,
         ) -> None:
-            path = ledger_path
             record: dict[str, Any] = {
+                "batch_id": budget.batch_id,
                 "timestamp": time.time(),
                 "association_id": association_id,
                 "stage": stage,
@@ -386,8 +474,12 @@ def create_server(
                 )
             elif isinstance(upstream, dict):
                 record.update(upstream)
-            with request_lock, Path(path).open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, sort_keys=True) + "\n")
+            try:
+                budget.append(record)
+            except RuntimeError:
+                # A failed ledger write must fail closed; do not emit a successful
+                # response whose attempt cannot be audited.
+                raise
 
         def reply(self, status: int, data: dict[str, Any]) -> None:
             body = json.dumps(data).encode()
@@ -513,7 +605,18 @@ def create_server(
                     association_id=association_id,
                 )
 
-    return ThreadingHTTPServer((host, port), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
+    original_close = getattr(server, "server_close", None)
+    if original_close is not None:
+
+        def close() -> None:
+            try:
+                original_close()
+            finally:
+                budget.close()
+
+        server.server_close = close  # type: ignore[method-assign]
+    return server
 
 
 if __name__ == "__main__":
