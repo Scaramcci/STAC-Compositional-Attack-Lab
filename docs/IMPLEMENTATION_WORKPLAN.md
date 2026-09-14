@@ -8,5 +8,6 @@
 4. 将审计通过的 main library freeze 为 `data/primitive_libraries/frozen/safeclaw-main`；验收为 immutable manifest/tree hash 可复验。当前没有该库。
 5. 仅在上述 frozen gate 通过后运行 1 task × 3 conditions × 5 seeds formal matrix；验收为完整 matched pairs、Planner/独立 Attacker journals、mechanism 与官方 verdict 并列、失败分母不丢失。
 6. 对 formal run 执行 `audit-run` 和 report；报告区分协议失败、基础设施失败、机制未出现和官方失败，不把本次诊断结果计为正式实验结果。
+7. 在 embedding direct 与代理转换证据通过后，另起唯一 run 做一次隔离 memory 验证：确认索引实际完成且分片 embedding ledger 成功，再执行语义相关查询；仅当返回片段带正确来源引用时报告 memory_search 通过。当前仍未执行此步骤。
 
 停止条件：凭证或日志脱敏失效、provider 请求计数无法证明、容器所有权不明确、端口冲突、frozen library 缺失/审计失败，或预算达到上限。遇到这些条件先保留确定性证据并修复，不自动扩大请求、任务或时间预算。

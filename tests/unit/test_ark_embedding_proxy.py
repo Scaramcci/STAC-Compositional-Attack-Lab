@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from stac_attack_lab.environments.safeclaw import ark_embedding_proxy as adapter
+from stac_attack_lab.environments.safeclaw.observations import classify_provider_response
 
 CONFIG = {
     "model": "ep-test",
@@ -104,7 +105,7 @@ def test_upstream_error_is_not_returned_as_partial_batch(monkeypatch: pytest.Mon
         adapter.convert_embeddings({"model": "ep-test", "input": ["one", "two"]}, CONFIG)
 
 
-@pytest.mark.parametrize("vector", [[], [True], [float("nan")], ["invalid"]])
+@pytest.mark.parametrize("vector", [None, [], [True], [float("nan")], ["invalid"]])
 def test_invalid_upstream_vectors_are_rejected(
     vector: list[Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -178,3 +179,66 @@ def test_http_translation_auth_and_error_redaction(monkeypatch: pytest.MonkeyPat
     assert b"429" in response.split(b"\r\n")[0]
     assert b"synthetic-key" not in response
     assert b"secret.invalid" not in response
+
+
+@pytest.mark.parametrize(
+    ("status", "category"),
+    [
+        (401, "authentication"),
+        (403, "authentication"),
+        (404, "endpoint_not_found"),
+        (429, "rate_limited"),
+        (500, "upstream_http_error"),
+    ],
+)
+def test_upstream_http_error_has_structured_redacted_fields(
+    status: int, category: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    headers = {"X-Request-ID": "req-safe", "Retry-After": "7"}
+    body = b'{"error":{"code":"provider_code","message":"secret prompt and key"}}'
+
+    def failed(*args: Any, **kwargs: Any) -> Any:
+        raise urllib.error.HTTPError(
+            "https://secret.invalid/path", status, "secret", headers, io.BytesIO(body)
+        )
+
+    monkeypatch.setattr(adapter.urllib.request, "urlopen", failed)
+    with pytest.raises(adapter.UpstreamEmbeddingError) as caught:
+        adapter.convert_embeddings({"model": "ep-test", "input": "one"}, CONFIG)
+    error = caught.value
+    assert error.category == category
+    assert error.upstream_http_status == status
+    assert error.provider_error_code == "provider_code"
+    assert error.request_id == "req-safe"
+    assert error.error_body_length == len(body)
+    assert error.error_body_hash
+    assert error.safe_message == category
+    assert "secret.invalid" not in str(error)
+
+
+@pytest.mark.parametrize(
+    ("response", "category"),
+    [(TimeoutError(), "timeout"), (io.BytesIO(b"not json"), "non_json_response")],
+)
+def test_timeout_and_non_json_failures_are_distinct(
+    response: Any, category: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def upstream(*args: Any, **kwargs: Any) -> Any:
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    monkeypatch.setattr(adapter.urllib.request, "urlopen", upstream)
+    with pytest.raises(adapter.UpstreamEmbeddingError) as caught:
+        adapter.convert_embeddings({"model": "ep-test", "input": "one"}, CONFIG)
+    assert caught.value.category == category
+
+
+def test_embedding_failure_is_not_mislabeled_as_victim_rate_limit() -> None:
+    projection = classify_provider_response(
+        {"id": "embedding-request", "model": "ep-test", "choices": []},
+        "No response from OpenClaw.",
+        [],
+        gateway_diagnostics={"failure_category": "provider_or_gateway_error"},
+    )
+    assert projection["response_observation"] == "provider_or_gateway_error"
