@@ -1,6 +1,6 @@
 # Implementation Workplan
 
-更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)。仅保留一套执行顺序。
+更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；本轮隔离 memory 验证已执行，语义检索被 embedding transport error 阻塞。仅保留一套执行顺序。
 
 ## 1. 同步与离线复核
 
@@ -21,6 +21,7 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 - 区分向量搜索、关键词 fallback、memory_get、错误及 unknown。仅工具返回非空不等于通过。
 - 保留真实工具调用/结果、索引证据、请求阶段和关联 ID；不要从文件存在或模型回复推断 recall。
 - 必要时做最小 instrumentation 修复和回归；真实错误按 upstream 状态分类，不直接归咎配额或 Victim 限流。
+- 本轮结果：索引写入和跨会话 memory_get 有证据；语义 memory_search 返回 disabled/unavailable（embedding transport_error），因此第 2 步未通过，不能进入 construction。另有一次误重复运行导致累计 Victim 18、embedding 6、合计 24，超过本轮 Victim/合计预算；已停止真实调用并保留全部产物。
 
 验收：索引与真实语义搜索均有证据；或者明确交付具体失败与未知项。缺少 frozen library 不阻止本步骤。
 

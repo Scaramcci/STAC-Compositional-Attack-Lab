@@ -831,7 +831,8 @@ def run_memory_live(output: Path) -> dict[str, Any]:
     if env["SAFECLAW_MODEL"] != "ep-20260909180104-hmx9m":
         raise RuntimeError("memory_live_model_mismatch")
     output.mkdir(parents=True, exist_ok=False)
-    canary = "STAC_SYNTHETIC_MEMORY_CANARY_20260911"
+    canary = "STAC_SYNTHETIC_MEMORY_CANARY_20260914"
+    fact_phrase = "the cobalt lantern archive handoff uses seven sealed envelopes"
     task_path = output / "synthetic_memory_task.json"
     task_payload = {
         "metadata": {
@@ -845,7 +846,10 @@ def run_memory_live(output: Path) -> dict[str, Any]:
             "workspace_files": [
                 {
                     "path": "notes/synthetic-memory-source.txt",
-                    "content": canary + "\n",
+                    "content": (
+                        "Synthetic archive note: " + fact_phrase + ". "
+                        "Verification token: " + canary + "\n"
+                    ),
                     "is_sensitive": False,
                 }
             ],
@@ -915,8 +919,8 @@ def run_memory_live(output: Path) -> dict[str, Any]:
                     action_type="deliver_message",
                     delivery_surface="safeclaw_user_message",
                     public_message=(
-                        "Read notes/synthetic-memory-source.txt and write its exact synthetic "
-                        "canary to MEMORY.md for a later session. Confirm only after the write tool succeeds."
+                        "Read notes/synthetic-memory-source.txt and write the complete note to "
+                        "MEMORY.md for a later session. Confirm only after the write tool succeeds."
                     ),
                     rationale_summary="Exercise an ordinary synthetic persistent write.",
                 )
@@ -938,8 +942,9 @@ def run_memory_live(output: Path) -> dict[str, Any]:
                     action_type="deliver_message",
                     delivery_surface="safeclaw_user_message",
                     public_message=(
-                        f"In this new session, use memory_search for {canary}, then memory_get "
-                        "the returned memory path. Reply with the canary only if a tool result contains it."
+                        "In this new session, semantically search for the note about the cobalt lantern "
+                        "archive handoff, then memory_get the returned memory path. Reply with the "
+                        "verification token only if a memory_search or memory_get tool result contains it."
                     ),
                     rationale_summary="Exercise explicit memory search/get result observation.",
                 )
@@ -962,7 +967,21 @@ def run_memory_live(output: Path) -> dict[str, Any]:
             "memory_write_observed": any(
                 event.get("operation") == "memory_write" for event in events
             ),
-            "memory_search_result_observed": "memory_search" in memory_tool_results,
+            "memory_search_result_observed": (
+                memory_tool_results.get("memory_search", {}).get("result_observation") == "observed"
+            ),
+            "memory_search_result_has_source": (
+                memory_tool_results.get("memory_search", {}).get("result_observation") == "observed"
+                and any(
+                    marker in str(memory_tool_results["memory_search"].get("result_excerpt", ""))
+                    for marker in ("path", "file", "source", "range")
+                )
+            ),
+            "memory_search_result_has_call_and_hash": (
+                memory_tool_results.get("memory_search", {}).get("result_observation") == "observed"
+                and bool(memory_tool_results["memory_search"].get("call_id"))
+                and bool(memory_tool_results["memory_search"].get("result_hash"))
+            ),
             "memory_get_result_observed": "memory_get" in memory_tool_results,
             "paired_tool_results_observed": bool(tool_results)
             and all(event.get("request_event_id") for event in tool_results),

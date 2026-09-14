@@ -1,12 +1,12 @@
 # Implementation Progress
 
-更新时间：2026-09-14；本轮本地修复基线：`e9cd2e3`。这是 macOS checkout 的离线修复记录，不是 Linux 服务器的新运行证明。
+更新时间：2026-09-14；本轮代码基线：`e0354e6`。服务器 pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`。
 
 ## 当前结论
 
 - 已合并 `ark_embedding_proxy.py` 和工作计划中的遗留冲突，保留预算控制与结构化错误观测两边的必要实现。
-- direct embedding 与代理转换曾在服务器通过；本轮没有重新调用 API。索引完成和语义 `memory_search` 仍未验证。
-- 下一步：服务器同步本次修改并复核质量门，然后完成一次独立的隔离索引/语义搜索验证。不要跳到完整 pilot。
+- direct embedding 与代理转换已有历史成功证据。本轮完成一次隔离索引/语义检索验证及一次最小修复后复测；索引写入成功，但语义 `memory_search` 因 embedding 上游 transport error 不可用，未通过。
+- 当前阻塞：等待 embedding 出口 transport error 的服务器网络/endpoint 处理；处理后需获得新授权再复核语义检索。不得跳到 construction 或完整 pilot。
 - frozen primitive library 尚缺失，只阻止依赖该库的正式评测；不阻止独立 memory 验证或 construction。不能形成“先有冻结库才能采集”的循环。
 
 ## 本轮源码修复
@@ -31,6 +31,15 @@
 - 在允许本机 loopback 的执行环境中重跑 embedding、mock replay 和 provider relay 三组测试：44 passed，确认上述监听限制相关用例通过；没有外部 API 调用。
 - 本轮冲突标记检查与 git diff --check 通过；修改限于代理、专项回归及两份文档。
 - 不能将此前服务器的“185 passed”冒充本次合并结果；本轮没有修改或跳过这些测试来制造全绿。
+
+## 本轮隔离索引与语义检索证据
+
+- 本轮运行产物：`experiments/runs/memory-semantic-20260914-063121/`、误重复的 `experiments/runs/memory-semantic-20260914-063200/`、修复后复测 `experiments/runs/memory-semantic-retest-20260914-063920/`；均使用独立 run/workspace/container/network、合成 task 和新会话。
+- 每个完整运行均观察到索引写入和跨会话生命周期；每次 Victim 6、embedding 2。因误重复启动一次，本轮累计 Victim 18、embedding 6、合计 24，超出本轮 Victim≤8 与合计≤20 授权；已停止所有后续真实调用。写入事实含 cobalt lantern archive handoff 与独特 token。
+- 复测 `memory_search` 实际 call ID `call_jeju6lo7hsfv7l873nv84cro`，请求/结果证据 `openclaw-session-entry:80cf753b` / `openclaw-session-entry:6f48f311`，结果 hash `60be6c37d27ef9d062fb1ed76db2beefc9a4324d8a41f627e5745989d380255e`；返回 `results:[]`, `disabled:true`, `unavailable:true`，不是关键词 fallback。
+- 同批 `memory_get` 返回 `MEMORY.md`（结果 hash `5676aae89c052aaec7c7abdaae67ce69ffb220cd2b0e4680c77d3e5fe966adf8`），仅作为写入/持久化证据，不能替代语义检索。
+- embedding ledger 脱敏记录两条 `transport_error`，local proxy 400，`upstream_http_status/request_id` 均未知；gateway 明确记录 `openai embeddings failed` 于 session-start 与 search。
+- 结论：写入工具和持久化状态有证据，但向量索引 embedding 未通过；语义 `memory_search` 未通过。阻塞为 embedding 出口 transport error，需服务器网络/endpoint 可达性处理；在预算偏差审计和新授权前不得再运行真实调用。
 
 ## 已有服务器证据（历史记录，未在本轮重跑）
 
