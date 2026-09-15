@@ -46,6 +46,7 @@ from stac_attack_lab.interactions.safeclaw_collection import (
     SafeClawConstructionInteractionAdapter,
     SafeClawConstructionTask,
     SafeClawSubprocessVictimDriver,
+    _legal_construction_action_types,
 )
 from stac_attack_lab.planning.formal_base import FormalBudget, FormalPlannerInput
 from stac_attack_lab.planning.formal_baselines import RuleBasedFormalPlanner
@@ -67,6 +68,40 @@ CAPABILITIES = [
     "persistent_state_read",
     "effectful_sandbox_action",
 ]
+
+
+def test_legal_action_types_respect_live_budget_state() -> None:
+    budget = CollectionBudget(max_sessions=2, max_turns=2, max_actions=4, max_consecutive_retries=2)
+    assert _legal_construction_action_types(
+        turn_count=0,
+        session_count=0,
+        action_count=0,
+        consecutive_retries=0,
+        new_session_pending=True,
+        budget=budget,
+        retry_ids=["retry"],
+        reroute_ids=["reroute"],
+    ) == ["deliver_message", "retry", "reroute", "stop"]
+    assert _legal_construction_action_types(
+        turn_count=1,
+        session_count=1,
+        action_count=1,
+        consecutive_retries=0,
+        new_session_pending=False,
+        budget=budget,
+        retry_ids=["retry"],
+        reroute_ids=["reroute"],
+    ) == ["deliver_message", "start_new_session", "retry", "reroute", "stop"]
+    assert _legal_construction_action_types(
+        turn_count=2,
+        session_count=2,
+        action_count=2,
+        consecutive_retries=2,
+        new_session_pending=False,
+        budget=budget,
+        retry_ids=["retry"],
+        reroute_ids=["reroute"],
+    ) == ["reroute", "stop"]
 
 
 def test_construction_observation_exposes_all_legal_action_types() -> None:

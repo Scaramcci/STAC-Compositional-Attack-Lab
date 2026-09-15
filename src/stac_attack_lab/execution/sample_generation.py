@@ -495,6 +495,7 @@ def _collection_components(
         provider_allowed_tools=config.provider_allowed_tools,
         embedding_request_budget=config.embedding_request_budget,
         environment=env,
+        batch_id=config.pipeline_id,
     )
     live_adapter = SafeClawConstructionInteractionAdapter(
         project_root=project_root,

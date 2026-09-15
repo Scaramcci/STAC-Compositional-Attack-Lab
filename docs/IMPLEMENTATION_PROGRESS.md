@@ -1,6 +1,6 @@
 # Implementation Progress
 
-更新时间：2026-09-15；当前审查 HEAD：`6a77631`（运行时构建 hash 见各 run provenance）；服务器 pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`。
+更新时间：2026-09-15；当前审查 HEAD：`48b0fb3`（运行时构建 hash 见各 run provenance）；服务器 pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`。
 
 ## 当前结论
 
@@ -9,6 +9,7 @@
 - usage 可观测性已修复：Ark relay 在 HTTP 边界解析完整 JSON/SSE usage，Ark-only 注入 `stream_options.include_usage=true`，bridge 按 action 聚合 relay attempts 并保留 gateway/provider 双来源。复测中 6/6 Victim provider requests usage 完整，已消除 `construction_token_usage_not_observable`。
 - 最新 256,000-token 独立 construction 校准（`construction-budget-calibration-20260914-130000-f2a9c7`）已完成 8 actions/8 turns、1 session、16 tool calls；256,000 上限未触发，在既定 turn 上限结束并准确记录 `construction_turn_budget_exhausted` 为 `partial`。24 次 Victim provider requests 全部有完整 relay usage（input 224,217、output 6,095、total 230,312），无 usage 可观测性提前停止。raw→normalization→mine→audit 完成，1 candidate、0 accepted、1 negative；audit 仅因 accepted target 未满足而失败。工程链路完整但样本不合格，不能称为攻击成功。
 - 2026-09-15 最小修复后唯一真实复验（`construction-budget-revalidation-20260915-010000-4d9b2e`）在第 1 次 Attacker 请求收到真实 `provider_http_502` 后 fail-closed；Attacker 1/16、Victim 0/40、Embedding 0/12，未重复调用。该 run 的 raw/source/checkpoint 可读取，normalization 0/0/0/0 通过，mining 0 candidate/0 accepted/0 negative，audit 仅报告 accepted target 未满足；这是上游请求失败，不是行为或抽取证据。
+- 继续复验 run（`construction-revalidation-20260915-030000-8e7a1c`）实际完成 2 deliver actions、2 labeled sessions/1 actual session、8 tool calls；Victim 10/40 provider attempts usage 完整（input 80,899、output 1,576、total 82,475），Attacker 3/16 requests（2 responses、1 HTTP 502，retry_count=0），Embedding 0/12。第 2 次 Attacker observation 已明确列出 `start_new_session`，模型仍选择 deliver；不能把 legal_action_types 作为唯一因果解释。第 3 次 Attacker 请求 502 后 fail-closed。该 raw→normalization→mine→audit 完成，normalization 24/24/4/18/0 通过，1 candidate、0 accepted、1 negative；negative 为旧 raw 未带 result artifact 的证据缺口，修复已加入后续采集路径，不能回写本 run。
 - frozen primitive library 尚缺失，只阻止依赖该库的正式评测；不阻止独立 memory 验证或 construction。不能形成“先有冻结库才能采集”的循环。
 
 ## 历史 256k 预算校准记录（2026-09-14）
@@ -27,6 +28,13 @@
 - 唯一真实复验使用独立配置：`max_sessions=4,max_turns=12,max_actions=24,max_tool_calls=36,max_tokens=384000,max_events=450`，Victim/Attacker/Embedding 上限 40/16/12；preflight 全部通过。实际首个 Attacker 请求为 `provider_http_502`，故无 Victim/Embedding 请求；不做第二次真实调用。
 - 该复验 raw 可处理但无事件；normalization 通过（0 events/artifacts/edges/unresolved），mine 0/0/0，audit `accepted_sample_target_not_met:0:1`。工程阻塞为真实上游 502；样本与攻击结果均为未观测，不能宣称失败攻击或成功。
 - canonical pilot 仍不具备准入条件；本次派生预算不是 canonical 默认值。
+
+## 2026-09-15 复验续跑与证据修复（最新）
+
+- 复验配置及证据：`experiments/runs/construction-revalidation-20260915-030000-8e7a1c/`。共享 batch ID 为 pipeline ID；上限为 Attacker/Victim/Embedding 16/40/12，实际消耗 3/10/0，失败的第三个 Attacker attempt 已计入。Attacker 客户端无隐藏重试，记录 `retry_count=0`；502 来源只能确定为 openai-compatible Attacker HTTP 边界，具体中间层/上游原因 unknown。
+- 第 2 个 Attacker request 的公开 observation 包含 `legal_action_types=[deliver_message,start_new_session,retry,reroute,stop]`，模型仍选择 `deliver_message`；因此动作列表缺失不是已证实根因。没有实际 `start_new_session`，两次 delivery 使用同一实际 Victim session key。
+- 新发现并修复：观察到的 tool result 若无 output artifact，occurrence extractor 会因无 input/output artifact 生成 `transfer_visibility_not_observable`；现在为 observed result 生成仅含 result hash、父 response artifact 和 evidence ref 的脱敏 artifact。旧 raw 不回写；回归覆盖正常/空结果及 artifact lineage。
+- 本 run 的抽取结果仍按原始事实报告：candidate 1、accepted 0、negative 1，G1 原因 `candidate_occurrence_not_observed` 与 `candidate_occurrence_not_hard_fact`；这是旧 raw 证据缺口，不是把 502 误判为行为失败。
 
 ## 本轮源码修复
 

@@ -1,6 +1,6 @@
 # Implementation Workplan
 
-更新时间：2026-09-15；当前审查 HEAD：`6a77631`。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成 256k 预算单条 construction 校准。仅保留一套执行顺序。
+更新时间：2026-09-15；当前审查 HEAD：`48b0fb3`。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成 256k 预算单条 construction 校准。仅保留一套执行顺序。
 
 ## 历史 256k 预算校准结果（2026-09-14）
 
@@ -11,6 +11,13 @@
 上一条 256k run 的 rejected occurrence 是 bridge 对真实空 `memory_search` 结果的错误语义映射；已修复为空结果保留 observed tool response、另以 `result_empty` 阻止伪造 retrieval。Construction observation 公开合法 action 类型，并新增可选 Attacker request cap（本次 16），与 Victim 40、Embedding 12 独立计数。专项 38 passed，完整质量门 205 passed。
 
 唯一授权复验 run `construction-budget-revalidation-20260915-010000-4d9b2e` preflight 通过，但首个 Attacker 请求真实 `provider_http_502` 后 fail-closed：Attacker 1/16、Victim 0/40、Embedding 0/12；无第二次真实调用。raw 可读取，normalization 0 events/0 artifacts/0 edges/0 unresolved，mine 0/0/0，audit 因 accepted target 0/1 失败。该结果不能用于判断行为链或样本资格；canonical pilot 不启动。
+
+
+## 2026-09-15 复验续跑与 occurrence 证据修复
+
+复验 run `construction-revalidation-20260915-030000-8e7a1c` 使用共享 batch ID 和 Attacker/Victim/Embedding 上限 16/40/12，实际 3/10/0；前两次 Attacker action 成功，第三次请求在 openai-compatible HTTP 边界返回 502（`retry_count=0`），按授权停止。第二次 observation 已列出可执行 `start_new_session`，模型仍选择 delivery，故不能把动作列表缺失作为已证实根因；实际仍为 1 个 Victim session。
+
+该 run normalization 通过（24 events、4 artifacts、18 edges、0 unresolved），mine 为 1 candidate/0 accepted/1 negative，G1 为 `candidate_occurrence_not_observed` 与 `candidate_occurrence_not_hard_fact`。离线审查发现 observed tool result 缺少 output artifact 会被 occurrence extractor 错误降级；已修复为 hash-only 脱敏 artifact 并加入回归。旧 raw 和旧 mining 不回写；修复效果需下一次新授权真实 run 验证。canonical pilot 仍不启动。
 
 
 ## 1. 同步与离线复核

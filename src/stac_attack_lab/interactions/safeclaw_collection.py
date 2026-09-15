@@ -121,6 +121,45 @@ class ConstructionVictimDriver(Protocol):
     def abort(self) -> None: ...
 
 
+def _legal_construction_action_types(
+    *,
+    turn_count: int,
+    session_count: int,
+    action_count: int,
+    consecutive_retries: int,
+    new_session_pending: bool,
+    budget: CollectionBudget,
+    retry_ids: list[str],
+    reroute_ids: list[str],
+) -> list[str]:
+    actions: list[str] = []
+    if (
+        turn_count < budget.max_turns
+        and action_count < budget.max_actions
+        and (not new_session_pending or session_count < budget.max_sessions)
+    ):
+        actions.append("deliver_message")
+    if (
+        not new_session_pending
+        and session_count < budget.max_sessions
+        and action_count < budget.max_actions
+    ):
+        actions.append("start_new_session")
+    if (
+        retry_ids
+        and action_count < budget.max_actions
+        and (
+            budget.max_consecutive_retries is None
+            or consecutive_retries < budget.max_consecutive_retries
+        )
+    ):
+        actions.append("retry")
+    if reroute_ids and action_count < budget.max_actions:
+        actions.append("reroute")
+    actions.append("stop")
+    return actions
+
+
 class SafeClawConstructionInteractionAdapter:
     """Adaptive collection over a complete, stateful SafeClaw-style victim driver."""
 
@@ -279,13 +318,16 @@ class SafeClawConstructionInteractionAdapter:
                         "remaining_tokens": max(budget.max_tokens - token_count, 0),
                         "remaining_events": max(budget.max_events - len(all_events), 0),
                         "elapsed_wall_time_ms": int(elapsed_seconds * 1000),
-                        "legal_action_types": [
-                            "deliver_message",
-                            "start_new_session",
-                            "retry",
-                            "reroute",
-                            "stop",
-                        ],
+                        "legal_action_types": _legal_construction_action_types(
+                            turn_count=turn_count,
+                            session_count=session_count,
+                            action_count=action_count,
+                            consecutive_retries=consecutive_retries,
+                            new_session_pending=new_session_pending,
+                            budget=budget,
+                            retry_ids=configured.legal_retry_ids,
+                            reroute_ids=configured.legal_reroute_ids,
+                        ),
                     }
                 )
                 if last_failure is not None or step.status in {"blocked", "error"}:
@@ -601,7 +643,16 @@ class SafeClawSubprocessVictimDriver:
             elapsed_wall_time_ms=0,
             legal_retry_ids=task.legal_retry_ids,
             legal_reroute_ids=task.legal_reroute_ids,
-            legal_action_types=["deliver_message", "start_new_session", "retry", "reroute", "stop"],
+            legal_action_types=_legal_construction_action_types(
+                turn_count=0,
+                session_count=0,
+                action_count=0,
+                consecutive_retries=0,
+                new_session_pending=True,
+                budget=budget,
+                retry_ids=task.legal_retry_ids,
+                reroute_ids=task.legal_reroute_ids,
+            ),
         )
 
     def embedding_probe(self, *, source: str, model: str, text: str) -> dict[str, Any]:
@@ -959,6 +1010,25 @@ class SafeClawSubprocessVictimDriver:
                         "result_excerpt": call_payload.get("result_excerpt"),
                         "result_evidence_ref": call_payload.get("result_evidence_ref"),
                     },
+                    "output_artifacts": [
+                        {
+                            "artifact_id": (
+                                f"artifact-tool-result-{provider_call_id or action.action_id}-"
+                                f"{action_nonce}-{index}"
+                            ),
+                            "artifact_type": "tool_result",
+                            "content_hash": str(
+                                call_payload.get("result_hash")
+                                or stable_hash(call_payload.get("result_excerpt") or "")
+                            ),
+                            "parent_artifact_ids": [response_artifact_id],
+                            "taint_labels": ["synthetic"],
+                            "trust_label": "derived",
+                            "source_ref_ids": [
+                                str(call_payload.get("result_evidence_ref") or tool_call_event_id)
+                            ],
+                        }
+                    ],
                     "evidence_ref_ids": [
                         str(
                             call_payload.get("result_evidence_ref")
