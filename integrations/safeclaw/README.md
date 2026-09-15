@@ -37,7 +37,7 @@ OpenClaw 继续使用 `openai` memorySearch provider。适配器将 `/v1/embeddi
 `embedding_provider` 改回 `openai`，并设置对应的模型、API 根地址和密钥。
 
 聊天 API 独立配置。Attacker/Planner 固定从 `OPENAI_BASE_URL`、`OPENAI_API_KEY`
-读取现有 `gpt-5.5` 配置；Victim 从 `SAFECLAW_MODEL`、`SAFECLAW_BASE_URL`、
+读取现有 `gpt-5.6-sol` 配置；Victim 从 `SAFECLAW_MODEL`、`SAFECLAW_BASE_URL`、
 `SAFECLAW_API_KEY` 读取 Ark endpoint。`SAFECLAW_BASE_URL` 是明确 API root，当前为
 `https://ark.cn-beijing.volces.com/api/v3`，不得再追加 `/v1`。
 

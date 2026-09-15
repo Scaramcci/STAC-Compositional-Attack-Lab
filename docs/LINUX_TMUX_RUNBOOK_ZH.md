@@ -20,7 +20,7 @@ make check PYTHON=python
 | Embedding | `SAFECLAW_EMBEDDING_MODEL` | 独立 embedding endpoint |
 | Embedding | `SAFECLAW_EMBEDDING_BASE_URL` | 独立 API root |
 | Embedding | `SAFECLAW_EMBEDDING_API_KEY` | 独立凭证 |
-| Planner/Attacker | `OPENAI_BASE_URL`、`OPENAI_API_KEY` | 现有 `gpt-5.5` 配置 |
+| Planner/Attacker | `OPENAI_BASE_URL`、`OPENAI_API_KEY` | 现有 `gpt-5.6-sol` 配置 |
 | Launcher | `STAC_PYTHON` | 可选；例如 conda 环境中的 `python` |
 | Gateway | `SAFECLAW_GATEWAY_HOST_PORT` | 可选；缺省 `0`，让 Docker 原子分配宿主端口 |
 

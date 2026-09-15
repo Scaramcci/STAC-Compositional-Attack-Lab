@@ -88,7 +88,7 @@
 
 ## 仍保留的工程约束
 
-- Ark Victim 为 `ep-20260909180104-hmx9m`；Attacker/Planner 仍为 gpt-5.5；embedding 使用独立变量，不混用凭证。
+- Ark Victim 为 `ep-20260909180104-hmx9m`；Attacker/Planner 使用 gpt-5.6-sol；embedding 使用独立变量，不混用凭证。
 - 新输出统一 `experiments/runs/<run-id>/`，保留 runtime config、差异/hash、版本、请求 ledger。
 - 消息投递只支持 `safeclaw_user_message`；新会话是 lifecycle action，local sink 是效果目标，不冒充 delivery surface。
 - 工具范围与本地执行限制一致；Victim 无直接上游出口，外部请求经认证、预算控制与 ledger。

@@ -18,7 +18,7 @@
 ## 角色边界
 
 - Victim：OpenClaw `2026.3.12`，模型为 Ark endpoint `ep-20260909180104-hmx9m`。
-- Construction Attacker、Formal Attacker、Planner：各自独立调用，沿用 `gpt-5.5` 配置。
+- Construction Attacker、Formal Attacker、Planner：各自独立调用，使用 `gpt-5.6-sol` 配置。
 - Scheduler：只选择零个或一个兼容 frozen sample，不生成攻击内容。
 - Mechanism Verifier：检查链条是否实际出现。
 - SafeClaw official evaluator：给出 benchmark verdict；它不能进入 Attacker/Planner 上下文。
