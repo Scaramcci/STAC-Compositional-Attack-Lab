@@ -2,6 +2,11 @@
 
 更新时间：2026-09-15；当前审查 HEAD：`120be7403a214b5d6b32814b80fac02bc750762b`（本轮另有未提交修复）（运行时构建 hash 见各 run provenance）；服务器 pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`。
 
+## 六个 socket 用例复测通过（2026-09-15T11:07:43.103552+00:00）
+
+使用 conda stac 解释器，在允许本机 socket 的执行环境中，精确重跑此前失败的六个 mock HTTP 用例：**6 passed in 4.13s**，exit code 0。覆盖 mock capture/retry budget，以及 relay tool schema、实际上游 attempts 上限、ingress auth 和 SSE usage。没有真实模型请求。此前 socket 测试阻塞已解除；本次仅重跑六个用例，未重新执行整个 make check，不改变单条 construction 的 pilot 准入结论。
+
+
 ## 2026-09-15 离线准入检查与有界 502 重试（本轮，无真实调用）
 
 本轮在现有未提交修复上继续，HEAD 仍为 `120be740`，使用 conda stac Python 3.11.16。用户授权完成离线准入检查，并为每次 Attacker 响应追加两次 502 尝试。未启动任何真实 construction、探针、Planner、pilot 或 evaluation；旧 raw/mining/运行目录不回写。
