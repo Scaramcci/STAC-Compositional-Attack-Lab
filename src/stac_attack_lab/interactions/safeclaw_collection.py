@@ -776,6 +776,7 @@ class SafeClawSubprocessVictimDriver:
             retrieval_status = {
                 "rejected": "rejected",
                 "error": "error",
+                "empty": "passed",
             }.get(retrieval_observation, "not_observable")
             source_events.append(
                 {
@@ -788,6 +789,8 @@ class SafeClawSubprocessVictimDriver:
                     "operation": (
                         "memory_retrieval_not_occurred"
                         if retrieval_observation == "not_occurred"
+                        else "memory_retrieval_empty"
+                        if retrieval_observation == "empty"
                         else "memory_retrieval_not_observable"
                     ),
                     "status": retrieval_status,
@@ -797,6 +800,7 @@ class SafeClawSubprocessVictimDriver:
                     "evidence_ref_ids": [f"bridge:{session_id}:memory:unknown"],
                     "public_payload": {
                         "observation": retrieval_observation,
+                        "retrieval_hit": retrieval_observation == "observed",
                         "evidence_available": False,
                         "transcript_provenance": session.get("transcript_provenance", {}),
                     },
@@ -810,18 +814,18 @@ class SafeClawSubprocessVictimDriver:
                     raw_retrieval.get("retrieval_id")
                     or f"{action.action_id}-{action_nonce}-{retrieval_index}"
                 )
-                retrieved_hash = str(
-                    raw_retrieval.get("content_hash")
-                    or stable_hash(post_state.get("memory_content", ""))
+                retrieved_hash_raw = raw_retrieval.get("content_hash")
+                retrieved_hash = (
+                    str(retrieved_hash_raw).strip()
+                    if retrieved_hash_raw is not None and str(retrieved_hash_raw).strip()
+                    else None
                 )
                 retrieved_parents = raw_retrieval.get("parent_artifact_ids", [])
                 if not isinstance(retrieved_parents, list):
                     retrieved_parents = []
                 evidence_refs = raw_retrieval.get("evidence_ref_ids", [])
-                if not isinstance(evidence_refs, list) or not evidence_refs:
-                    evidence_refs = [f"bridge:{session_id}:memory_retrieval:{retrieval_id}"]
-                source_events.append(
-                    {
+                evidence_refs = [str(item).strip() for item in evidence_refs if str(item).strip()]
+                retrieval_event: dict[str, Any] = {
                         "event_id": f"state-read-memory-{retrieval_id}",
                         "session_id": session_id,
                         "sequence_no": self._next_sequence(),
@@ -836,20 +840,19 @@ class SafeClawSubprocessVictimDriver:
                         "status": "passed",
                         "read_state_refs": [memory_state_ref],
                         "request_event_id": raw_retrieval.get("request_event_id"),
-                        "output_artifacts": [
-                            {
-                                "artifact_id": f"artifact-recall-{retrieval_id}",
-                                "artifact_type": "recalled_state",
-                                "content_hash": retrieved_hash,
-                                "parent_artifact_ids": [str(item) for item in retrieved_parents],
-                                "taint_labels": ["synthetic", "persistent"],
-                                "trust_label": "derived",
-                                "source_ref_ids": [str(item) for item in evidence_refs],
-                            }
-                        ],
                         "evidence_ref_ids": [str(item) for item in evidence_refs],
                     }
-                )
+                if retrieved_hash is not None:
+                    retrieval_event["output_artifacts"] = [{
+                        "artifact_id": f"artifact-recall-{retrieval_id}",
+                        "artifact_type": "recalled_state",
+                        "content_hash": retrieved_hash,
+                        "parent_artifact_ids": [str(item) for item in retrieved_parents],
+                        "taint_labels": ["synthetic", "persistent"],
+                        "trust_label": "derived",
+                        "source_ref_ids": [str(item) for item in evidence_refs],
+                    }]
+                source_events.append(retrieval_event)
         self._new_session_pending = False
         response_text = str(session.get("agent_response", ""))
         response_observation = str(session.get("response_observation", "unknown"))
@@ -885,6 +888,7 @@ class SafeClawSubprocessVictimDriver:
             response_failure = "victim_response_unknown"
             response_step_status = "partial"
         response_artifact_id = f"artifact-response-{stable_hash(response_text)[:16]}-{action_nonce}"
+        response_artifact_observed = response_status == "passed"
         source_events.append(
             {
                 "event_id": f"response-{action.action_id}-{action_nonce}",
@@ -896,8 +900,8 @@ class SafeClawSubprocessVictimDriver:
                 "operation": "extract_victim_response",
                 "status": response_status,
                 "input_artifact_ids": [message_id],
-                "output_artifacts": [
-                    {
+                "output_artifacts": (
+                    [{
                         "artifact_id": response_artifact_id,
                         "artifact_type": "agent_response",
                         "content_hash": stable_hash(response_text),
@@ -905,8 +909,10 @@ class SafeClawSubprocessVictimDriver:
                         "taint_labels": ["synthetic"],
                         "trust_label": "derived",
                         "source_ref_ids": [f"bridge:{session_id}:response"],
-                    }
-                ],
+                    }]
+                    if response_artifact_observed
+                    else []
+                ),
                 "public_payload": {
                     "response": response_text,
                     "observation": response_observation,
@@ -966,7 +972,7 @@ class SafeClawSubprocessVictimDriver:
                     "component_role": "effect_tool",
                     "operation": "safeclaw.tool_request",
                     "status": "attempted",
-                    "input_artifact_ids": [response_artifact_id],
+                    "input_artifact_ids": ([response_artifact_id] if response_artifact_observed else []),
                     "public_payload": {
                         **call_payload,
                         "provider_tool_call_id": provider_call_id,
@@ -984,8 +990,19 @@ class SafeClawSubprocessVictimDriver:
             result_observation = str(call_payload.get("result_observation", "not_observed"))
             if result_observation == "not_observed":
                 continue
-            source_events.append(
-                {
+            result_hash_raw = call_payload.get("result_hash")
+            result_hash = (
+                str(result_hash_raw).strip()
+                if result_hash_raw is not None and str(result_hash_raw).strip()
+                else None
+            )
+            result_evidence_ref_raw = call_payload.get("result_evidence_ref")
+            result_evidence_ref = (
+                str(result_evidence_ref_raw).strip()
+                if result_evidence_ref_raw is not None and str(result_evidence_ref_raw).strip()
+                else None
+            )
+            result_event: dict[str, Any] = {
                     "event_id": (
                         f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
                     ),
@@ -1010,33 +1027,24 @@ class SafeClawSubprocessVictimDriver:
                         "result_excerpt": call_payload.get("result_excerpt"),
                         "result_evidence_ref": call_payload.get("result_evidence_ref"),
                     },
-                    "output_artifacts": [
-                        {
-                            "artifact_id": (
-                                f"artifact-tool-result-{provider_call_id or action.action_id}-"
-                                f"{action_nonce}-{index}"
-                            ),
-                            "artifact_type": "tool_result",
-                            "content_hash": str(
-                                call_payload.get("result_hash")
-                                or stable_hash(call_payload.get("result_excerpt") or "")
-                            ),
-                            "parent_artifact_ids": [response_artifact_id],
-                            "taint_labels": ["synthetic"],
-                            "trust_label": "derived",
-                            "source_ref_ids": [
-                                str(call_payload.get("result_evidence_ref") or tool_call_event_id)
-                            ],
-                        }
-                    ],
-                    "evidence_ref_ids": [
-                        str(
-                            call_payload.get("result_evidence_ref")
-                            or f"bridge:{session_id}:tool-result:{index}"
-                        )
-                    ],
+                    "evidence_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
                 }
-            )
+            if result_hash is not None:
+                raw_parents = call_payload.get("parent_artifact_ids", [])
+                parent_artifact_ids = [str(item) for item in raw_parents] if isinstance(raw_parents, list) else []
+                result_event["output_artifacts"] = [{
+                    "artifact_id": (
+                        f"artifact-tool-result-{provider_call_id or action.action_id}-"
+                        f"{action_nonce}-{index}"
+                    ),
+                    "artifact_type": "tool_result",
+                    "content_hash": result_hash,
+                    "parent_artifact_ids": parent_artifact_ids,
+                    "taint_labels": ["synthetic"],
+                    "trust_label": "derived",
+                    "source_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
+                }]
+            source_events.append(result_event)
         state_specs = [
             ("memory", "persistent_memory", "memory_write", "memory_content"),
             ("workspace", "workspace_file", "workspace_write", "workspace_file_contents"),

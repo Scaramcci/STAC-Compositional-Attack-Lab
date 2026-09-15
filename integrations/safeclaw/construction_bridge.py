@@ -517,8 +517,11 @@ def main() -> int:
             memory_tools = [
                 item for item in tool_observations if item["tool_name"] in MEMORY_RETRIEVAL_TOOLS
             ]
-            observed_retrievals = [
+            observed_memory_results = [
                 item for item in memory_tools if item["result_observation"] == "observed"
+            ]
+            observed_retrievals = [
+                item for item in observed_memory_results if not item["result_empty"]
             ]
             result["memory_retrievals"] = [
                 {
@@ -536,6 +539,8 @@ def main() -> int:
             ]
             if observed_retrievals:
                 result["memory_retrieval_observation"] = "observed"
+            elif observed_memory_results:
+                result["memory_retrieval_observation"] = "empty"
             elif memory_tools:
                 states = {str(item["result_observation"]) for item in memory_tools}
                 result["memory_retrieval_observation"] = (
