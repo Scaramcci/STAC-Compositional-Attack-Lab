@@ -1,6 +1,10 @@
 # Implementation Workplan
 
-更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成单条 construction 复测。仅保留一套执行顺序。
+更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成 256k 预算单条 construction 校准。仅保留一套执行顺序。
+
+## 2026-09-14 256k 预算校准结果
+
+独立派生 run `construction-budget-calibration-20260914-130000-f2a9c7`（`pse-2.1-002 × 20260827`）仅提高 `max_tokens` 至 256000，完成 8 actions/turns、1 session、16 tool calls；24 次 Victim provider requests usage 全部完整（224217 input、6095 output、230312 total），Attacker 9 次（31842 total），Embedding 1 次。既定 `max_turns=8` 触发 `construction_turn_budget_exhausted`，trajectory 为 partial；不是 usage 观测失败。normalization→mine→audit 实际执行，结果 1 candidate/0 accepted/1 negative，audit 因 accepted target 0/1 失败。工程执行完整性通过，样本合格性不通过；official outcome 保持 `not_evaluated`。未启动 canonical pilot，仍需完整 accepted 样本及 lifecycle/cross-session 覆盖后再准入。
 
 ## 1. 同步与离线复核
 
@@ -10,9 +14,9 @@
 - 保留线程锁、跨 run 的 driver 预算契约和结构化观测，不能简单选取某个冲突分支覆盖。
 - 不重复已有效的 direct chat/embedding 探针来代替索引诊断。
 
-## 2. 隔离索引与语义 memory_search 验证（当前下一步）
+## 2. 隔离索引与语义 memory_search 验证（已完成）
 
-direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw 实际使用链，而不是直接开始 8 条 pilot。
+direct embedding、代理转换及 OpenClaw 实际使用链均已有修复后成功证据；本阶段已完成，不能用历史失败记录覆盖当前结论。
 
 - 独立 workspace/session/index，放入少量合成事实与独特 canary；不读取真实用户文档。
 - 检查索引确实完成、索引分片/查询 embedding 的实际上游请求成功、维度和模型一致。
@@ -58,7 +62,7 @@ direct embedding 和代理转换已有成功记录；接下来验证 OpenClaw �
 
 第 1 步已完成：safety patch 可应用于 pinned upstream，Victim 内旧 adapter 路径改为显式拒绝；独立 relay 负责 embedding，Victim 无上游 embedding key 和直接公网接口。第 2 步的离线部分已完成：provider/embedding relay 使用持久 ledger、batch ID、单实例锁和 crash-conservative 原子预占，损坏/写入失败 fail-closed；所有实际上游 attempts 在预算内计费。`make check` 为 194 passed，未调用真实模型 API。
 
-下一步仍需用户新授权后做有限服务器验证：检查 Docker 网络实际隔离、relay endpoint allowlist 和持久 ledger 权限，再运行受限 embedding/memory_search 批次。未获授权前不得进入 collection、construction、pilot、mining、freeze 或 evaluation。
+历史记录（2026-09-14，已完成）：此前曾需用户新授权后检查 Docker 网络实际隔离、relay endpoint allowlist 和持久 ledger 权限；该授权及修复后验证已完成，不再作为当前下一步。
 
 
 ## 本轮真实诊断结果（2026-09-14）
