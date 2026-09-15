@@ -70,6 +70,7 @@ def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None
             "arguments_projection": '{"query": "SYNTHETIC_CANARY"}',
             "request_evidence_ref": "openclaw-session-entry:request-entry",
             "result_observation": "observed",
+            "result_empty": False,
             "result_hash": observations[0]["result_hash"],
             "result_excerpt": "memory/MEMORY.md:1 SYNTHETIC_CANARY",
             "result_evidence_ref": "openclaw-session-entry:result-entry",
@@ -77,6 +78,47 @@ def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None
     ]
     repeated, _ = project(raw, seen, [])
     assert repeated == []
+
+
+def test_bridge_preserves_observed_empty_memory_search_without_claiming_retrieval() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    raw = {
+        "session_transcript_raw": "\n".join(
+            json.dumps(item)
+            for item in [
+                {
+                    "id": "request",
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "toolCall",
+                                "id": "empty-call",
+                                "name": "memory_search",
+                                "arguments": {"query": "missing"},
+                            }
+                        ],
+                    },
+                },
+                {
+                    "id": "result",
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "empty-call",
+                        "toolName": "memory_search",
+                        "content": [{"type": "text", "text": '{"results": []}'}],
+                        "isError": False,
+                    },
+                },
+            ]
+        )
+    }
+    observations, _ = project(raw, set(), [])
+    assert observations[0]["result_observation"] == "observed"
+    assert observations[0]["result_empty"] is True
 
 
 def test_bridge_distinguishes_rejected_and_unobserved_tool_results() -> None:

@@ -110,6 +110,7 @@ class SampleGenerationConfig(StrictModel):
     provider_timeout_seconds: PositiveInt = 90
     provider_allowed_tools: list[str] | None = None
     embedding_request_budget: PositiveInt = 128
+    attacker_request_budget: PositiveInt | None = None
     minimum_free_disk_gb: PositiveInt = 20
     output_root: str = "experiments/runs"
 
@@ -125,6 +126,7 @@ class SampleGenerationConfig(StrictModel):
             max_wall_time_seconds=self.max_wall_time_seconds,
             max_events=self.max_events,
             timeout_seconds=self.timeout_seconds,
+            max_attacker_requests=self.attacker_request_budget,
         )
         if self.seed is not None and self.seeds:
             raise ValueError("sample_seed_and_seeds_are_mutually_exclusive")
@@ -532,6 +534,7 @@ def collect_sample_interactions(
             max_wall_time_seconds=config.max_wall_time_seconds,
             max_events=config.max_events,
             timeout_seconds=config.timeout_seconds,
+            max_attacker_requests=config.attacker_request_budget,
         ),
     )
     summary = collect_interactions(

@@ -190,6 +190,7 @@ class SafeClawConstructionInteractionAdapter:
         session_count = 0
         tool_call_count = 0
         token_count = 0
+        attacker_request_count = 0
         new_session_pending = True
         stopped = False
         consecutive_retries = 0
@@ -204,6 +205,13 @@ class SafeClawConstructionInteractionAdapter:
                 if len(all_events) >= budget.max_events:
                     last_failure = "construction_event_budget_exhausted"
                     break
+                if (
+                    budget.max_attacker_requests is not None
+                    and attacker_request_count >= budget.max_attacker_requests
+                ):
+                    last_failure = "construction_attacker_request_budget_exhausted"
+                    break
+                attacker_request_count += 1
                 action = attacker.next_action(task, manifest, observation, seed=seed)
                 if action.action_type == "stop":
                     stopped = True
@@ -271,6 +279,13 @@ class SafeClawConstructionInteractionAdapter:
                         "remaining_tokens": max(budget.max_tokens - token_count, 0),
                         "remaining_events": max(budget.max_events - len(all_events), 0),
                         "elapsed_wall_time_ms": int(elapsed_seconds * 1000),
+                        "legal_action_types": [
+                            "deliver_message",
+                            "start_new_session",
+                            "retry",
+                            "reroute",
+                            "stop",
+                        ],
                     }
                 )
                 if last_failure is not None or step.status in {"blocked", "error"}:
@@ -335,6 +350,7 @@ class SafeClawConstructionInteractionAdapter:
                 "collection_session_count": str(session_count),
                 "collection_tool_call_count": str(tool_call_count),
                 "collection_token_count": str(token_count),
+                "collection_attacker_request_count": str(attacker_request_count),
                 "collection_wall_time_ms": str(int((monotonic() - started_at) * 1000)),
             },
         )
@@ -585,6 +601,7 @@ class SafeClawSubprocessVictimDriver:
             elapsed_wall_time_ms=0,
             legal_retry_ids=task.legal_retry_ids,
             legal_reroute_ids=task.legal_reroute_ids,
+            legal_action_types=["deliver_message", "start_new_session", "retry", "reroute", "stop"],
         )
 
     def embedding_probe(self, *, source: str, model: str, text: str) -> dict[str, Any]:
@@ -937,6 +954,7 @@ class SafeClawSubprocessVictimDriver:
                         "provider_tool_call_id": provider_call_id,
                         "tool_name": call_payload.get("tool_name"),
                         "result_observation": result_observation,
+                        "result_empty": bool(call_payload.get("result_empty")),
                         "result_hash": call_payload.get("result_hash"),
                         "result_excerpt": call_payload.get("result_excerpt"),
                         "result_evidence_ref": call_payload.get("result_evidence_ref"),

@@ -34,6 +34,9 @@ class ConstructionObservation(StrictModel):
     remaining_events: int
     legal_retry_ids: list[str] = Field(default_factory=list)
     legal_reroute_ids: list[str] = Field(default_factory=list)
+    legal_action_types: list[str] = Field(
+        default_factory=lambda: ["deliver_message", "start_new_session", "retry", "reroute", "stop"]
+    )
 
 
 class ConstructionAttackerAction(StrictModel):

@@ -1,10 +1,17 @@
 # Implementation Workplan
 
-更新时间：2026-09-14。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成 256k 预算单条 construction 校准。仅保留一套执行顺序。
+更新时间：2026-09-15；当前审查 HEAD：`6a77631`。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；memory relay 已通过，usage 可观测性已修复并完成 256k 预算单条 construction 校准。仅保留一套执行顺序。
 
-## 2026-09-14 256k 预算校准结果
+## 历史 256k 预算校准结果（2026-09-14）
 
 独立派生 run `construction-budget-calibration-20260914-130000-f2a9c7`（`pse-2.1-002 × 20260827`）仅提高 `max_tokens` 至 256000，完成 8 actions/turns、1 session、16 tool calls；24 次 Victim provider requests usage 全部完整（224217 input、6095 output、230312 total），Attacker 9 次（31842 total），Embedding 1 次。既定 `max_turns=8` 触发 `construction_turn_budget_exhausted`，trajectory 为 partial；不是 usage 观测失败。normalization→mine→audit 实际执行，结果 1 candidate/0 accepted/1 negative，audit 因 accepted target 0/1 失败。工程执行完整性通过，样本合格性不通过；official outcome 保持 `not_evaluated`。未启动 canonical pilot，仍需完整 accepted 样本及 lifecycle/cross-session 覆盖后再准入。
+
+## 2026-09-15 根因修复与单条复验结果
+
+上一条 256k run 的 rejected occurrence 是 bridge 对真实空 `memory_search` 结果的错误语义映射；已修复为空结果保留 observed tool response、另以 `result_empty` 阻止伪造 retrieval。Construction observation 公开合法 action 类型，并新增可选 Attacker request cap（本次 16），与 Victim 40、Embedding 12 独立计数。专项 38 passed，完整质量门 205 passed。
+
+唯一授权复验 run `construction-budget-revalidation-20260915-010000-4d9b2e` preflight 通过，但首个 Attacker 请求真实 `provider_http_502` 后 fail-closed：Attacker 1/16、Victim 0/40、Embedding 0/12；无第二次真实调用。raw 可读取，normalization 0 events/0 artifacts/0 edges/0 unresolved，mine 0/0/0，audit 因 accepted target 0/1 失败。该结果不能用于判断行为链或样本资格；canonical pilot 不启动。
+
 
 ## 1. 同步与离线复核
 
@@ -77,6 +84,6 @@ A/B/C 已通过：relay/Victim embedding 均成功，向量索引建立，跨会
 最小 construction 已在独立授权下完成（2026-09-14）；本轮不自动推进 canonical pilot。
 
 
-## 2026-09-14 usage 可观测性修复复测记录
+## 历史 usage 可观测性修复复测记录（2026-09-14）
 
 Ark 真实 SSE 探针返回 `[DONE]` 前的 usage-only chunk，完整 usage 为 `prompt_tokens=39, completion_tokens=33, total_tokens=72`；最终 construction run `construction-usage-retest-20260914-123000-e7f4a2` 的 6 次 Victim provider attempts 全部解析成功。未运行 canonical pilot、main collection、freeze 或 evaluation。

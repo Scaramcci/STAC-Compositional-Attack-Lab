@@ -178,13 +178,12 @@ def _structured_tool_observations(
                 and any(marker in lowered for marker in ("denied", "not allowed", "forbidden"))
                 else "error"
                 if is_error or semantic_error
-                else "not_occurred"
-                if observed_empty
                 else "observed"
             )
             results[call_id] = {
                 "tool_name": str(message.get("toolName") or ""),
                 "result_observation": observation,
+                "result_empty": observed_empty,
                 "result_hash": hashlib.sha256(result_text.encode()).hexdigest(),
                 "result_excerpt": result_text[:2000],
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
@@ -196,6 +195,7 @@ def _structured_tool_observations(
             {
                 **call,
                 "result_observation": (result["result_observation"] if result else "not_observed"),
+                "result_empty": bool(result.get("result_empty")) if result else False,
                 "result_hash": result.get("result_hash") if result else None,
                 "result_excerpt": (
                     result.get("result_excerpt")

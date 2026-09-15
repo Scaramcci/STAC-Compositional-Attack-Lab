@@ -30,6 +30,7 @@ class CollectionBudget(StrictModel):
     max_wall_time_seconds: PositiveInt = 1200
     max_events: PositiveInt = 200
     timeout_seconds: PositiveInt = 300
+    max_attacker_requests: PositiveInt | None = None
 
     @model_validator(mode="after")
     def validate_independent_limits(self) -> CollectionBudget:

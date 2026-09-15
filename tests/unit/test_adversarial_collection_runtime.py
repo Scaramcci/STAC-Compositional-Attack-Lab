@@ -69,6 +69,28 @@ CAPABILITIES = [
 ]
 
 
+def test_construction_observation_exposes_all_legal_action_types() -> None:
+    observation = ConstructionObservation(
+        task_id="task",
+        session_index=0,
+        action_index=0,
+        remaining_sessions=4,
+        remaining_turns=12,
+        remaining_actions=24,
+        remaining_tool_calls=36,
+        remaining_tokens=384000,
+        elapsed_wall_time_ms=0,
+        remaining_events=450,
+    )
+    assert observation.legal_action_types == [
+        "deliver_message",
+        "start_new_session",
+        "retry",
+        "reroute",
+        "stop",
+    ]
+
+
 def _formal_input(tmp_path: Path) -> tuple[FormalPlannerInput, PrimitiveChainLibrary]:
     base = load_sample_generation_config(ROOT / "tests/fixtures/sample_generation.json")
     config = base.model_copy(
@@ -377,6 +399,43 @@ def test_consecutive_retry_guard_fails_closed_after_configured_limit(tmp_path: P
         "retry",
         "retry",
     ]
+
+
+def test_adaptive_collection_enforces_attacker_request_budget(tmp_path: Path) -> None:
+    project, task_set = _task_project(tmp_path)
+    driver = _FakeVictimDriver()
+    adapter = SafeClawConstructionInteractionAdapter(
+        project_root=project, task_set_path=task_set, driver=driver
+    )
+    task = adapter.inventory()[0]
+    attacker = _RetryLoopAttacker(
+        objective_id="test-objective",
+        public_attack_goal="Exercise attacker request budget.",
+        allowed_delivery_surfaces=["safeclaw_user_message"],
+        required_trust_boundary_crossings=["public-persistence"],
+        public_terminal_predicate_ids=["state_persisted"],
+        safety_constraint_ids=["synthetic_only"],
+        model_hash="fake-attacker",
+        prompt_hash="fake-prompt",
+    )
+    result = adapter.collect_adversarial(
+        task,
+        attacker.prepare(task, seed=7),
+        attacker,
+        seed=7,
+        budget=CollectionBudget(
+            max_sessions=1,
+            max_turns=4,
+            max_actions=8,
+            max_attacker_requests=2,
+            max_events=20,
+            timeout_seconds=30,
+        ),
+    )
+    assert result.status == "partial"
+    assert result.failure_category == "construction_attacker_request_budget_exhausted"
+    assert len(driver.actions) == 2
+    assert result.provenance["collection_attacker_request_count"] == "2"
 
 
 def test_adaptive_collection_passes_only_public_observation_and_records_failures(
