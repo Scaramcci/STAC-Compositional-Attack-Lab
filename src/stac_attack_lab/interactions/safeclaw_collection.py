@@ -19,6 +19,7 @@ from stac_attack_lab.environments.safeclaw.model_config import (
     build_safeclaw_model_config,
 )
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
+from stac_attack_lab.execution.deadline import wall_clock_deadline
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.base import (
     CollectedInteraction,
@@ -216,6 +217,18 @@ class SafeClawConstructionInteractionAdapter:
         seed: int,
         budget: CollectionBudget,
     ) -> CollectedInteraction:
+        with wall_clock_deadline(budget.max_wall_time_seconds):
+            return self._collect_adversarial(task, manifest, attacker, seed=seed, budget=budget)
+
+    def _collect_adversarial(
+        self,
+        task: SourceInteractionTask,
+        manifest: ConstructionManifest,
+        attacker: ConstructionAttacker,
+        *,
+        seed: int,
+        budget: CollectionBudget,
+    ) -> CollectedInteraction:
         configured = self._tasks[task.source_task_id]
         if not set(manifest.allowed_delivery_surfaces) <= set(configured.allowed_delivery_surfaces):
             raise ValueError("construction_manifest_surface_not_supported")
@@ -236,6 +249,8 @@ class SafeClawConstructionInteractionAdapter:
         started_at = monotonic()
         try:
             observation = self.driver.start(configured, seed=seed, budget=budget)
+            executable_retry_ids = observation.legal_retry_ids
+            executable_reroute_ids = observation.legal_reroute_ids
             for _ in range(budget.max_actions):
                 elapsed_seconds = monotonic() - started_at
                 if elapsed_seconds >= budget.max_wall_time_seconds:
@@ -258,6 +273,8 @@ class SafeClawConstructionInteractionAdapter:
                     if isinstance(attacker_failure, str) and attacker_failure:
                         last_failure = attacker_failure
                     break
+                if monotonic() - started_at >= budget.max_wall_time_seconds:
+                    raise TimeoutError("construction_wall_time_budget_exhausted")
                 is_delivery = action.action_type == "deliver_message"
                 if action.action_type == "retry":
                     consecutive_retries += 1
@@ -325,8 +342,8 @@ class SafeClawConstructionInteractionAdapter:
                             consecutive_retries=consecutive_retries,
                             new_session_pending=new_session_pending,
                             budget=budget,
-                            retry_ids=configured.legal_retry_ids,
-                            reroute_ids=configured.legal_reroute_ids,
+                            retry_ids=executable_retry_ids,
+                            reroute_ids=executable_reroute_ids,
                         ),
                     }
                 )
@@ -334,6 +351,8 @@ class SafeClawConstructionInteractionAdapter:
                     break
             if not stopped and action_count >= budget.max_actions and last_failure is None:
                 last_failure = "construction_action_budget_exhausted"
+            if monotonic() - started_at >= budget.max_wall_time_seconds:
+                raise TimeoutError("construction_wall_time_budget_exhausted")
             result = self.driver.finish()
         except Exception as exc:
             partial_events, partial_checkpoints = self.driver.observed_snapshot()
@@ -522,7 +541,9 @@ class SafeClawSubprocessVictimDriver:
     def _read_bridge(self) -> dict[str, Any]:
         if self._process is None or self._process.stdout is None:
             raise RuntimeError("safeclaw_construction_bridge_not_started")
-        raw = self._process.stdout.readline()
+        limit = self._budget.timeout_seconds if self._budget is not None else 90
+        with wall_clock_deadline(limit):
+            raw = self._process.stdout.readline()
         if not raw:
             raise RuntimeError("safeclaw_construction_bridge_closed")
         value = json.loads(raw)
@@ -572,6 +593,7 @@ class SafeClawSubprocessVictimDriver:
             batch_id=self.batch_id,
         )
         self._started_at = monotonic()
+        self._budget = budget
         self._temporary = tempfile.TemporaryDirectory(prefix="safeclaw-construction-")
         temporary_root = Path(self._temporary.name)
         patched_upstream = temporary_root / "SafeClawArena"
@@ -641,8 +663,8 @@ class SafeClawSubprocessVictimDriver:
             remaining_tool_calls=budget.max_tool_calls,
             remaining_tokens=budget.max_tokens,
             elapsed_wall_time_ms=0,
-            legal_retry_ids=task.legal_retry_ids,
-            legal_reroute_ids=task.legal_reroute_ids,
+            legal_retry_ids=[],
+            legal_reroute_ids=[],
             legal_action_types=_legal_construction_action_types(
                 turn_count=0,
                 session_count=0,
@@ -650,8 +672,8 @@ class SafeClawSubprocessVictimDriver:
                 consecutive_retries=0,
                 new_session_pending=True,
                 budget=budget,
-                retry_ids=task.legal_retry_ids,
-                reroute_ids=task.legal_reroute_ids,
+                retry_ids=[],
+                reroute_ids=[],
             ),
         )
 
@@ -676,6 +698,8 @@ class SafeClawSubprocessVictimDriver:
             and action.delivery_surface not in SUPPORTED_CONSTRUCTION_DELIVERY_SURFACES
         ):
             raise ValueError("safeclaw_construction_delivery_surface_not_implemented")
+        if action.action_type in {"retry", "reroute"}:
+            raise ValueError("safeclaw_construction_control_not_implemented")
         remaining_wall_time = self._budget.max_wall_time_seconds - (monotonic() - self._started_at)
         if remaining_wall_time <= 0:
             raise TimeoutError("construction_wall_time_budget_exhausted")
@@ -702,37 +726,17 @@ class SafeClawSubprocessVictimDriver:
                 "actor_role": "environment",
                 "event_type": "lifecycle",
                 "component_role": "session_lifecycle",
-                "operation": "restart_new_session",
+                "operation": "request_new_session",
                 "status": "passed",
                 "lifecycle_id": action.action_id,
-                "public_payload": {"transition": "new_session"},
+                "public_payload": {"transition": "new_session_pending"},
                 "evidence_ref_ids": [f"bridge:{action.action_id}"],
             }
             self._events.append(event)
             return ConstructionVictimStep(
                 session_id=str(event["session_id"]),
                 source_events=[event],
-                public_stage_status={"lifecycle": "new_session_started"},
-            )
-        if action_type in {"retry", "reroute"}:
-            event = {
-                "event_id": f"control-{action.action_id}-{action_nonce}",
-                "session_id": "construction-control",
-                "sequence_no": self._next_sequence(),
-                "actor_role": "construction_attacker",
-                "event_type": "lifecycle",
-                "component_role": "session_lifecycle",
-                "operation": "retry" if action_type == "retry" else "branch_reroute",
-                "status": "passed",
-                "lifecycle_id": action.action_id,
-                "public_payload": {"transition": action_type},
-                "evidence_ref_ids": [f"bridge:{action.action_id}"],
-            }
-            self._events.append(event)
-            return ConstructionVictimStep(
-                session_id="construction-control",
-                source_events=[event],
-                public_stage_status={"control": action_type},
+                public_stage_status={"lifecycle": "new_session_pending"},
             )
         session = cast(dict[str, Any], response.get("session", {}))
         session["provider_request_ledger"] = response.get("provider_request_ledger", [])
@@ -826,32 +830,35 @@ class SafeClawSubprocessVictimDriver:
                 evidence_refs = raw_retrieval.get("evidence_ref_ids", [])
                 evidence_refs = [str(item).strip() for item in evidence_refs if str(item).strip()]
                 retrieval_event: dict[str, Any] = {
-                        "event_id": f"state-read-memory-{retrieval_id}",
-                        "session_id": session_id,
-                        "sequence_no": self._next_sequence(),
-                        "actor_role": "victim_system",
-                        "event_type": "state_read",
-                        "component_role": "persistent_memory",
-                        "operation": (
-                            "memory_retrieve_later_session"
-                            if self._new_session_pending
-                            else "memory_retrieve"
-                        ),
-                        "status": "passed",
-                        "read_state_refs": [memory_state_ref],
-                        "request_event_id": raw_retrieval.get("request_event_id"),
-                        "evidence_ref_ids": [str(item) for item in evidence_refs],
-                    }
+                    "event_id": f"state-read-memory-{retrieval_id}",
+                    "session_id": session_id,
+                    "sequence_no": self._next_sequence(),
+                    "actor_role": "victim_system",
+                    "event_type": "state_read",
+                    "component_role": "persistent_memory",
+                    "operation": (
+                        "memory_retrieve_later_session"
+                        if self._new_session_pending
+                        else "memory_retrieve"
+                    ),
+                    "status": "passed",
+                    "read_state_refs": [memory_state_ref],
+                    "public_payload": {"retrieval_hit": True},
+                    "request_event_id": raw_retrieval.get("request_event_id"),
+                    "evidence_ref_ids": [str(item) for item in evidence_refs],
+                }
                 if retrieved_hash is not None:
-                    retrieval_event["output_artifacts"] = [{
-                        "artifact_id": f"artifact-recall-{retrieval_id}",
-                        "artifact_type": "recalled_state",
-                        "content_hash": retrieved_hash,
-                        "parent_artifact_ids": [str(item) for item in retrieved_parents],
-                        "taint_labels": ["synthetic", "persistent"],
-                        "trust_label": "derived",
-                        "source_ref_ids": [str(item) for item in evidence_refs],
-                    }]
+                    retrieval_event["output_artifacts"] = [
+                        {
+                            "artifact_id": f"artifact-recall-{retrieval_id}",
+                            "artifact_type": "recalled_state",
+                            "content_hash": retrieved_hash,
+                            "parent_artifact_ids": [str(item) for item in retrieved_parents],
+                            "taint_labels": ["synthetic", "persistent"],
+                            "trust_label": "derived",
+                            "source_ref_ids": [str(item) for item in evidence_refs],
+                        }
+                    ]
                 source_events.append(retrieval_event)
         self._new_session_pending = False
         response_text = str(session.get("agent_response", ""))
@@ -901,15 +908,17 @@ class SafeClawSubprocessVictimDriver:
                 "status": response_status,
                 "input_artifact_ids": [message_id],
                 "output_artifacts": (
-                    [{
-                        "artifact_id": response_artifact_id,
-                        "artifact_type": "agent_response",
-                        "content_hash": stable_hash(response_text),
-                        "parent_artifact_ids": [message_id],
-                        "taint_labels": ["synthetic"],
-                        "trust_label": "derived",
-                        "source_ref_ids": [f"bridge:{session_id}:response"],
-                    }]
+                    [
+                        {
+                            "artifact_id": response_artifact_id,
+                            "artifact_type": "agent_response",
+                            "content_hash": stable_hash(response_text),
+                            "parent_artifact_ids": [message_id],
+                            "taint_labels": ["synthetic"],
+                            "trust_label": "derived",
+                            "source_ref_ids": [f"bridge:{session_id}:response"],
+                        }
+                    ]
                     if response_artifact_observed
                     else []
                 ),
@@ -939,6 +948,11 @@ class SafeClawSubprocessVictimDriver:
                     "provider_relay_failed_request_count": session.get(
                         "provider_relay_failed_request_count"
                     ),
+                    "actual_session_identity_sha256": session.get("actual_session_identity_sha256"),
+                    "previous_delivery_session_identity_sha256": session.get(
+                        "previous_delivery_session_identity_sha256"
+                    ),
+                    "restart_requested": session.get("restart_requested"),
                     "gateway_diagnostics": session.get("gateway_diagnostics", {}),
                     "provider_request_ledger": session.get("provider_request_ledger", []),
                     "embedding_request_ledger": session.get("embedding_request_ledger", []),
@@ -972,7 +986,7 @@ class SafeClawSubprocessVictimDriver:
                     "component_role": "effect_tool",
                     "operation": "safeclaw.tool_request",
                     "status": "attempted",
-                    "input_artifact_ids": ([response_artifact_id] if response_artifact_observed else []),
+                    "input_artifact_ids": [],
                     "public_payload": {
                         **call_payload,
                         "provider_tool_call_id": provider_call_id,
@@ -1003,47 +1017,61 @@ class SafeClawSubprocessVictimDriver:
                 else None
             )
             result_event: dict[str, Any] = {
-                    "event_id": (
-                        f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
-                    ),
-                    "session_id": session_id,
-                    "sequence_no": self._next_sequence(),
-                    "actor_role": "effect_tool",
-                    "event_type": "tool_result",
-                    "component_role": "agent_context",
-                    "operation": "safeclaw.tool_result",
-                    "status": {
-                        "observed": "passed",
-                        "rejected": "rejected",
-                        "error": "error",
-                    }.get(result_observation, "not_observable"),
-                    "request_event_id": tool_call_event_id,
-                    "public_payload": {
-                        "provider_tool_call_id": provider_call_id,
-                        "tool_name": call_payload.get("tool_name"),
-                        "result_observation": result_observation,
-                        "result_empty": bool(call_payload.get("result_empty")),
-                        "result_hash": call_payload.get("result_hash"),
-                        "result_excerpt": call_payload.get("result_excerpt"),
-                        "result_evidence_ref": call_payload.get("result_evidence_ref"),
+                "event_id": (
+                    f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
+                ),
+                "session_id": session_id,
+                "sequence_no": self._next_sequence(),
+                "actor_role": "effect_tool",
+                "event_type": "tool_result",
+                "component_role": "agent_context",
+                "operation": "safeclaw.tool_result",
+                "status": {
+                    "observed": "passed",
+                    "rejected": "rejected",
+                    "error": "error",
+                }.get(result_observation, "not_observable"),
+                "request_event_id": tool_call_event_id,
+                "public_payload": {
+                    "provider_tool_call_id": provider_call_id,
+                    "tool_name": call_payload.get("tool_name"),
+                    "result_observation": result_observation,
+                    "result_empty": call_payload.get("result_empty"),
+                    **{
+                        key: call_payload.get(key)
+                        for key in (
+                            "result_disabled",
+                            "result_unavailable",
+                            "result_error",
+                            "result_is_error",
+                            "result_hash_scope",
+                        )
                     },
-                    "evidence_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
-                }
+                    "result_hash": call_payload.get("result_hash"),
+                    "result_excerpt": call_payload.get("result_excerpt"),
+                    "result_evidence_ref": call_payload.get("result_evidence_ref"),
+                },
+                "evidence_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
+            }
             if result_hash is not None:
                 raw_parents = call_payload.get("parent_artifact_ids", [])
-                parent_artifact_ids = [str(item) for item in raw_parents] if isinstance(raw_parents, list) else []
-                result_event["output_artifacts"] = [{
-                    "artifact_id": (
-                        f"artifact-tool-result-{provider_call_id or action.action_id}-"
-                        f"{action_nonce}-{index}"
-                    ),
-                    "artifact_type": "tool_result",
-                    "content_hash": result_hash,
-                    "parent_artifact_ids": parent_artifact_ids,
-                    "taint_labels": ["synthetic"],
-                    "trust_label": "derived",
-                    "source_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
-                }]
+                parent_artifact_ids = (
+                    [str(item) for item in raw_parents] if isinstance(raw_parents, list) else []
+                )
+                result_event["output_artifacts"] = [
+                    {
+                        "artifact_id": (
+                            f"artifact-tool-result-{provider_call_id or action.action_id}-"
+                            f"{action_nonce}-{index}"
+                        ),
+                        "artifact_type": "tool_result",
+                        "content_hash": result_hash,
+                        "parent_artifact_ids": parent_artifact_ids,
+                        "taint_labels": ["synthetic"],
+                        "trust_label": "derived",
+                        "source_ref_ids": [result_evidence_ref] if result_evidence_ref else [],
+                    }
+                ]
             source_events.append(result_event)
         state_specs = [
             ("memory", "persistent_memory", "memory_write", "memory_content"),
@@ -1080,6 +1108,21 @@ class SafeClawSubprocessVictimDriver:
                         else None
                     ),
                     "evidence_ref_ids": [f"checkpoint:{session_id}:{name}"],
+                }
+            )
+        for event in source_events:
+            payload = cast(dict[str, Any], event.setdefault("public_payload", {}))
+            payload.update(
+                {
+                    key: session.get(key)
+                    for key in (
+                        "actual_session_identity_sha256",
+                        "previous_delivery_session_identity_sha256",
+                        "workspace_identity_sha256",
+                        "memory_index_namespace_sha256",
+                        "restart_requested",
+                        "new_session_request_action_id",
+                    )
                 }
             )
         self._last_state = post_state
@@ -1185,6 +1228,8 @@ class SafeClawSubprocessVictimDriver:
                 },
             )
         finally:
+            if self._process is not None and self._process.poll() is None:
+                self._terminate_process()
             if self._stderr is not None:
                 self._stderr.close()
             if self._temporary is not None:
@@ -1196,19 +1241,26 @@ class SafeClawSubprocessVictimDriver:
         try:
             if process is not None and process.poll() is None:
                 try:
-                    response = self._send_bridge({"kind": "finish"})
-                    self._observe_request_ledgers(response)
-                    process.wait(timeout=30)
+                    with wall_clock_deadline(5):
+                        response = self._send_bridge({"kind": "finish"})
+                        self._observe_request_ledgers(response)
+                        process.wait(timeout=5)
                 except Exception:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=10)
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                        process.wait(timeout=10)
+                    self._terminate_process()
         finally:
             if self._stderr is not None and not self._stderr.closed:
                 self._stderr.close()
             if self._temporary is not None:
                 self._temporary.cleanup()
             self._process = None
+
+    def _terminate_process(self) -> None:
+        process = self._process
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)

@@ -46,7 +46,9 @@ class ModelCallResponseEvent(StrictModel):
     role: Literal["planner", "attacker"]
     latency_ms: NonNegativeInt
     retry_count: NonNegativeInt | None
+    upstream_attempts: list[dict[str, Any]] = Field(default_factory=list)
     provider_request_id: str | None
+    returned_model: str | None = None
     filtered_raw_response: str | None
     parsed_output: dict[str, Any]
     schema_validation: Literal["passed"]
@@ -64,6 +66,7 @@ class ModelCallErrorEvent(StrictModel):
     role: Literal["planner", "attacker"]
     latency_ms: NonNegativeInt
     retry_count: NonNegativeInt | None
+    upstream_attempts: list[dict[str, Any]] = Field(default_factory=list)
     error_category: str
     instrumentation_gap_reasons: list[str] = Field(default_factory=list)
     timestamp: str
@@ -246,6 +249,7 @@ class ObservableModelCallRecorder:
                     if isinstance((value := getattr(client, "last_retry_count", None)), int)
                     else None
                 ),
+                upstream_attempts=self._sanitized(getattr(client, "last_upstream_attempts", [])),
                 error_category=str(
                     self._sanitized(
                         type(exc).__name__ if not str(exc) else f"{type(exc).__name__}:{str(exc)}"
@@ -277,9 +281,11 @@ class ObservableModelCallRecorder:
             role=self.role,
             latency_ms=int((time.monotonic() - started) * 1000),
             retry_count=int(retry_count) if isinstance(retry_count, int) else None,
+            upstream_attempts=self._sanitized(getattr(client, "last_upstream_attempts", [])),
             provider_request_id=(
                 str(provider_request_id) if provider_request_id is not None else None
             ),
+            returned_model=getattr(client, "last_returned_model", None),
             filtered_raw_response=(
                 str(self._sanitized(raw_response)) if raw_response is not None else None
             ),

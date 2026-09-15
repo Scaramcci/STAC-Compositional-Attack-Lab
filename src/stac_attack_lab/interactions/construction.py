@@ -256,6 +256,8 @@ class ModelConstructionAttacker:
                     passed=False, reason_codes=["response_type_mismatch"]
                 )
             raise TypeError("construction_attacker_response_type_mismatch")
+        if value.action_type not in observation.legal_action_types:
+            raise ValueError("construction_attacker_used_illegal_action_type")
         if (
             value.delivery_surface is not None
             and value.delivery_surface not in manifest.allowed_delivery_surfaces

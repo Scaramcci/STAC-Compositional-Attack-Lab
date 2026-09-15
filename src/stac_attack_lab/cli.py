@@ -12,6 +12,7 @@ from stac_attack_lab.environments.safeclaw.preflight import (
     run_safeclaw_preflight,
 )
 from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
+from stac_attack_lab.execution.construction_admission import audit_construction_collection
 from stac_attack_lab.execution.safeclaw_formal import (
     load_safeclaw_formal_config,
     run_safeclaw_formal,
@@ -96,6 +97,9 @@ def _build_parser() -> argparse.ArgumentParser:
     mine = sample_sub.add_parser("mine")
     mine.add_argument("--collection", required=True)
     mine.add_argument("--output")
+    admission = sample_sub.add_parser("admission")
+    admission.add_argument("--collection", required=True)
+    admission.add_argument("--library", required=True)
     audit = sample_sub.add_parser("audit")
     audit.add_argument("--library", required=True)
     freeze = sample_sub.add_parser("freeze")
@@ -159,6 +163,13 @@ def _main(argv: list[str] | None = None) -> int:
                     )
                 )
             return 0
+        if args.sample_command == "admission":
+            report = audit_construction_collection(
+                _project_scoped_path(root, args.collection),
+                _project_scoped_path(root, args.library),
+            )
+            print(json.dumps(report, indent=2))
+            return 0 if report["pilot_admitted"] else 1
         library = _project_scoped_path(root, args.library)
         if args.sample_command == "audit":
             library_report = audit_sample_library_stage(library)

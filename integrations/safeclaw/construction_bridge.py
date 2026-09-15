@@ -14,6 +14,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import signal
 import sys
 import tempfile
 from pathlib import Path
@@ -170,7 +171,6 @@ def _structured_tool_observations(
                 str(message.get("toolName") or "") == "memory_search"
                 and isinstance(parsed_result, dict)
                 and parsed_result.get("results") == []
-                and not semantic_error
             )
             observation = (
                 "rejected"
@@ -184,6 +184,17 @@ def _structured_tool_observations(
                 "tool_name": str(message.get("toolName") or ""),
                 "result_observation": observation,
                 "result_empty": observed_empty,
+                "result_disabled": parsed_result.get("disabled")
+                if isinstance(parsed_result, dict)
+                else None,
+                "result_unavailable": parsed_result.get("unavailable")
+                if isinstance(parsed_result, dict)
+                else None,
+                "result_error": parsed_result.get("error")
+                if isinstance(parsed_result, dict)
+                else None,
+                "result_is_error": is_error,
+                "result_hash_scope": "redacted_text_content",
                 "result_hash": hashlib.sha256(result_text.encode()).hexdigest(),
                 "result_excerpt": result_text[:2000],
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
@@ -194,6 +205,20 @@ def _structured_tool_observations(
         projected.append(
             {
                 **call,
+                **(
+                    {
+                        key: result[key]
+                        for key in (
+                            "result_disabled",
+                            "result_unavailable",
+                            "result_error",
+                            "result_is_error",
+                            "result_hash_scope",
+                        )
+                    }
+                    if result
+                    else {}
+                ),
                 "result_observation": (result["result_observation"] if result else "not_observed"),
                 "result_empty": bool(result.get("result_empty")) if result else False,
                 "result_hash": result.get("result_hash") if result else None,
@@ -317,12 +342,24 @@ def _classify_response(
     )
 
 
+def _session_identity(session_key: Any) -> str | None:
+    if not isinstance(session_key, str) or not session_key or session_key == "***REDACTED***":
+        return None
+    return hashlib.sha256(session_key.encode()).hexdigest()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--upstream", required=True)
     parser.add_argument("--task", required=True)
     parser.add_argument("--model-config", required=True)
     args = parser.parse_args()
+
+    def terminate(signum: int, frame: Any) -> None:
+        del signum, frame
+        raise SystemExit(124)
+
+    signal.signal(signal.SIGTERM, terminate)
     upstream = Path(args.upstream).resolve()
     task_path = Path(args.task).resolve()
     task = json.loads(task_path.read_text(encoding="utf-8"))
@@ -341,6 +378,8 @@ def main() -> int:
     phase = "startup"
     current_key = None
     pending_restart = False
+    pending_lifecycle_action_id: str | None = None
+    last_delivery_identity: str | None = None
     session_index = 0
     seen_transcript_entry_ids: set[str] = set()
     provider_record_cursor = 0
@@ -432,12 +471,12 @@ def main() -> int:
             action_type = action["action_type"]
             if action_type == "start_new_session":
                 pending_restart = True
+                pending_lifecycle_action_id = str(action["action_id"])
                 current_key = None
                 _emit({"kind": "step", "action_type": action_type})
                 continue
             if action_type in {"retry", "reroute"}:
-                _emit({"kind": "step", "action_type": action_type})
-                continue
+                raise RuntimeError("safeclaw_construction_control_not_implemented")
             if action_type != "deliver_message":
                 raise RuntimeError("safeclaw_bridge_action_not_executable")
             if action.get("delivery_surface") not in SUPPORTED_DELIVERY_SURFACES:
@@ -459,6 +498,18 @@ def main() -> int:
                 raw_post_state = runner.capture_post_state()
                 public_post_state = _observable_state(raw_post_state, exact_secrets)
             current_key = result.pop("_session_key")
+            result["actual_session_identity_sha256"] = _session_identity(current_key)
+            result["previous_delivery_session_identity_sha256"] = last_delivery_identity
+            last_delivery_identity = result["actual_session_identity_sha256"]
+            result["restart_requested"] = pending_restart
+            result["new_session_request_action_id"] = pending_lifecycle_action_id
+            result["workspace_identity_sha256"] = _session_identity(
+                f"{judge.CONTAINER}:{judge.WORKSPACE}"
+            )
+            # Namespace identity, not proof that an index exists or contains an item.
+            result["memory_index_namespace_sha256"] = _session_identity(
+                f"{judge.CONTAINER}:openclaw:default-agent-memory-index"
+            )
             raw_api_response = result.pop("raw_api_response", None)
             relay_records = relay.records() if relay is not None else []
             action_relay_records = relay_records[provider_record_cursor:]
@@ -553,6 +604,7 @@ def main() -> int:
             else:
                 result["memory_retrieval_observation"] = "not_occurred"
             pending_restart = False
+            pending_lifecycle_action_id = None
             runner.session_results.append(result)
             _emit(
                 {

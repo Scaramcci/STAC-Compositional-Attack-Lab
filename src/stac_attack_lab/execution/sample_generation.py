@@ -48,6 +48,7 @@ from stac_attack_lab.interactions.safeclaw_collection import (
     SafeClawSubprocessVictimDriver,
 )
 from stac_attack_lab.models.factory import build_model_client
+from stac_attack_lab.models.openai_compatible import OpenAICompatibleClient, ProviderRequestLedger
 from stac_attack_lab.primitives.formal_registry import load_formal_registry
 from stac_attack_lab.prompts.loader import load_prompt
 from stac_attack_lab.recording.model_calls import ObservableModelCallRecorder
@@ -111,6 +112,8 @@ class SampleGenerationConfig(StrictModel):
     provider_allowed_tools: list[str] | None = None
     embedding_request_budget: PositiveInt = 128
     attacker_request_budget: PositiveInt | None = None
+    attacker_decision_budget: PositiveInt | None = None
+    attacker_http_502_retries: int = Field(default=0, ge=0, le=2)
     minimum_free_disk_gb: PositiveInt = 20
     output_root: str = "experiments/runs"
 
@@ -126,8 +129,12 @@ class SampleGenerationConfig(StrictModel):
             max_wall_time_seconds=self.max_wall_time_seconds,
             max_events=self.max_events,
             timeout_seconds=self.timeout_seconds,
-            max_attacker_requests=self.attacker_request_budget,
+            max_attacker_requests=self.attacker_decision_budget or self.attacker_request_budget,
         )
+        if self.attacker_http_502_retries and (
+            self.attacker_request_budget is None or self.attacker_decision_budget is None
+        ):
+            raise ValueError("attacker_retries_require_attempt_and_decision_budgets")
         if self.seed is not None and self.seeds:
             raise ValueError("sample_seed_and_seeds_are_mutually_exclusive")
         if self.seed is None and not self.seeds:
@@ -278,11 +285,10 @@ def _validate_collection_stage(
         )
     except Exception as exc:
         raise ValueError("sample_collection_stage_manifest_invalid") from exc
-    if stable_hash(stage.config.model_dump(mode="json")) != stage.config_hash:
+    serialized_config = json.loads(stage_path.read_text(encoding="utf-8"))["config"]
+    if stable_hash(serialized_config) != stage.config_hash:
         raise ValueError("sample_collection_stage_config_hash_mismatch")
-    if expected_config is not None and stage.config_hash != stable_hash(
-        expected_config.model_dump(mode="json")
-    ):
+    if expected_config is not None and stage.config != expected_config:
         raise ValueError("sample_collection_resume_config_mismatch")
     content_hashes = _tree_content_hashes(
         collection_root, excluded_names={COLLECTION_STAGE_MANIFEST}
@@ -454,8 +460,19 @@ def _collection_components(
     model_call_path = (
         project_root / config.output_root / config.library_version / "model_calls.jsonl"
     )
+    attacker_client = build_model_client(attacker_model_config)
+    if config.attacker_request_budget is not None:
+        if not isinstance(attacker_client, OpenAICompatibleClient):
+            raise ValueError("construction_attacker_budget_client_unsupported")
+        attacker_client.request_ledger = ProviderRequestLedger(
+            max_requests=config.attacker_request_budget,
+            path=model_call_path.parent / "attacker_upstream_attempts.jsonl",
+            batch_id=config.pipeline_id,
+        )
+    if isinstance(attacker_client, OpenAICompatibleClient):
+        attacker_client.http_502_retries = config.attacker_http_502_retries
     live_attacker = ModelConstructionAttacker(
-        client=build_model_client(attacker_model_config),
+        client=attacker_client,
         prompt_path=project_root / prompt_path,
         objective_id=config.construction_objective_id,
         public_attack_goal=config.public_attack_goal,
@@ -535,17 +552,22 @@ def collect_sample_interactions(
             max_wall_time_seconds=config.max_wall_time_seconds,
             max_events=config.max_events,
             timeout_seconds=config.timeout_seconds,
-            max_attacker_requests=config.attacker_request_budget,
+            max_attacker_requests=config.attacker_decision_budget or config.attacker_request_budget,
         ),
     )
-    summary = collect_interactions(
-        plan,
-        adapter,
-        build_root / "interactions/raw",
-        construction_attacker=attacker,
-    )
-    _record_collection_stage(summary.collection_root, config, registry.registry_hash)
-    return summary.collection_root
+    try:
+        summary = collect_interactions(
+            plan,
+            adapter,
+            build_root / "interactions/raw",
+            construction_attacker=attacker,
+        )
+        _record_collection_stage(summary.collection_root, config, registry.registry_hash)
+        return summary.collection_root
+    finally:
+        client = getattr(attacker, "client", None)
+        if isinstance(client, OpenAICompatibleClient) and client.request_ledger is not None:
+            client.request_ledger.close()
 
 
 def _mining_output_content_hashes(build_root: Path) -> dict[str, str]:
