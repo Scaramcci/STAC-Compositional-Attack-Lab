@@ -1073,6 +1073,58 @@ class SafeClawSubprocessVictimDriver:
                     }
                 ]
             source_events.append(result_event)
+        # Ordinary workspace reads are state observations, not semantic memory
+        # retrievals. Keep their path, result scope and provider evidence explicit.
+        persistence_reads = session.get("persistence_reads", [])
+        if isinstance(persistence_reads, list):
+            for read_index, raw_read in enumerate(persistence_reads):
+                if not isinstance(raw_read, dict):
+                    continue
+                path = raw_read.get("workspace_relative_path")
+                classification = str(raw_read.get("classification") or "")
+                if classification != "workspace_file":
+                    continue
+                observation = str(raw_read.get("result_observation") or "not_observed")
+                status = {"observed": "passed", "rejected": "rejected", "error": "error"}.get(
+                    observation, "not_observable"
+                )
+                read_id = str(raw_read.get("call_id") or f"{action.action_id}-{read_index}")
+                output_ids: list[str] = []
+                content_hash = raw_read.get("content_hash")
+                if isinstance(content_hash, str) and content_hash:
+                    output_ids = [f"artifact-file-read-{read_id}"]
+                source_events.append({
+                    "event_id": f"state-read-file-{read_id}",
+                    "session_id": session_id,
+                    "sequence_no": self._next_sequence(),
+                    "actor_role": "victim_system",
+                    "event_type": "state_read",
+                    "component_role": "workspace_file",
+                    "operation": "workspace_file_read",
+                    "status": status,
+                    "read_state_refs": [f"safeclaw_state:workspace:{path}"] if path else [],
+                    "output_artifacts": ([{
+                        "artifact_id": output_ids[0],
+                        "artifact_type": "workspace_file_read",
+                        "content_hash": str(content_hash),
+                        "parent_artifact_ids": [],
+                        "taint_labels": ["persistent", "synthetic"],
+                        "trust_label": "workspace_state",
+                        "source_ref_ids": [str(raw_read.get("result_evidence_ref") or "")],
+                    }] if output_ids else []),
+                    "public_payload": {
+                        "workspace_relative_path": path,
+                        "read_scope": raw_read.get("read_scope"),
+                        "content_hash_scope": raw_read.get("content_hash_scope"),
+                        "result_empty": bool(raw_read.get("result_empty")),
+                        "result_order_valid": bool(raw_read.get("result_order_valid")),
+                        "retrieval_class": "workspace_file",
+                    },
+                    "request_event_id": f"tool-call-{read_id}",
+                    "evidence_ref_ids": [
+                        str(value) for value in (raw_read.get("request_evidence_ref"), raw_read.get("result_evidence_ref")) if value
+                    ],
+                })
         state_specs = [
             ("memory", "persistent_memory", "memory_write", "memory_content"),
             ("workspace", "workspace_file", "workspace_write", "workspace_file_contents"),
@@ -1107,9 +1159,34 @@ class SafeClawSubprocessVictimDriver:
                         if name == "external" and len(tool_call_event_ids) == 1
                         else None
                     ),
+                    "output_artifacts": [
+                        {
+                            "artifact_id": f"artifact-state-{name}-{after[:16]}",
+                            "artifact_type": "persistent_state_version",
+                            "content_hash": after,
+                            "parent_artifact_ids": [],
+                            "taint_labels": ["persistent", "synthetic"],
+                            "trust_label": "workspace_state",
+                            "source_ref_ids": [f"checkpoint:{session_id}:{name}"],
+                        }
+                    ],
+                    "public_payload": {
+                        "state_version_hash": after,
+                        "state_hash_scope": "redacted_state_projection",
+                    },
                     "evidence_ref_ids": [f"checkpoint:{session_id}:{name}"],
                 }
             )
+        # Provider transcripts place the final assistant response after tool
+        # results and state mutations. The bridge projection may be assembled in
+        # separate passes, so enforce that observable order before persistence.
+        response_events = [
+            event for event in source_events if event.get("operation") == "extract_victim_response"
+        ]
+        if response_events:
+            source_events = [event for event in source_events if event.get("operation") != "extract_victim_response"] + response_events
+            for sequence_no, event in enumerate(source_events, start=1):
+                event["sequence_no"] = sequence_no
         for event in source_events:
             payload = cast(dict[str, Any], event.setdefault("public_payload", {}))
             payload.update(

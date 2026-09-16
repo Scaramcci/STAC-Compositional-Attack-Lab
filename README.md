@@ -2,7 +2,7 @@
 
 用于授权、隔离的 SafeClaw/OpenClaw 组合攻击研究。项目从真实 collection 轨迹提取带因果证据的 primitive chain，审计并冻结 sample library，再用配对条件评测 Planner、独立 Attacker、机制判定和 SafeClaw 官方判定。它不面向真实账号、生产系统或公网目标。
 
-当前代码基线是 Git `4456194ae8e98c0ced43975aa4f4c8cca672f946`。Victim 主线是 Ark endpoint `ep-20260909180104-hmx9m`，API root 是 `https://ark.cn-beijing.volces.com/api/v3`；Planner 与 Attacker 使用 `gpt-5.6-sol`，embedding 使用独立 `SAFECLAW_EMBEDDING_*` 配置。
+当前审查 HEAD 由 `git rev-parse HEAD` 确认；本轮改造未提交。复验默认入口为版本化 `revalidation prepare/offline`，默认 `execution_enabled=false`；不要从历史 run 复制配置或审核结论。Victim 主线是 Ark endpoint `ep-20260909180104-hmx9m`，API root 是 `https://ark.cn-beijing.volces.com/api/v3`；Planner 与 Attacker 使用 `gpt-5.6-sol`，embedding 使用独立 `SAFECLAW_EMBEDDING_*` 配置。
 
 ## 结构
 

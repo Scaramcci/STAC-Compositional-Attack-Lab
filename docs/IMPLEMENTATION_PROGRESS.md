@@ -1,3 +1,11 @@
+# Current status — 2026-09-16 (offline engineering round)
+
+- HEAD at review start: `b60d9b1e5588073a81cacf38c63900de70c70f86`; working tree is intentionally dirty with this round's uncommitted changes.
+- No directory matching the referenced `construction-cross-session-20260915-214932-33f82859` run is present on this checkout. Its reported facts are therefore not re-verified here and no fixture is presented as that run. Existing historical raw/bridge/mining/report artifacts were not modified.
+- Completed offline: bridge tool/result correlation and ordering metadata; bounded workspace path classification; explicit semantic-memory vs memory_get vs ordinary-file read states; persistent state version artifacts; driver read events; evidence-rich admission diagnostics; versioned disabled revalidation template and `revalidation prepare/offline` CLI.
+- Offline evidence remains synthetic or replay evidence. It does not establish a real SafeClaw cross-session run, semantic recall, attack success, runtime isolation, or official outcome.
+- Verification in this round: specialized persistence/normalization/admission/CLI tests and the new bridge→normalizer→admission regression are recorded in the handoff; full `make check` is still required after any environment-specific socket permission issue is resolved.
+
 # Implementation Progress
 
 更新时间：2026-09-15；当前审查 HEAD：`120be7403a214b5d6b32814b80fac02bc750762b`（本轮另有未提交修复）（运行时构建 hash 见各 run provenance）；服务器 pinned upstream 为 `a11f5cceaba0676be721021f8d232638fd111305`。

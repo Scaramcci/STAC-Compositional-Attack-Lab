@@ -1,3 +1,16 @@
+# Current workplan — 2026-09-16
+
+Current blocker: the referenced latest real construction run is absent from this checkout, and no live request is authorized in this round. The offline evidence chain is implemented and testable, but runtime network/isolation cleanup and official outcome remain pending.
+
+Execution order:
+
+1. Complete offline evidence-chain validation (bridge → durable artifacts → session transition → read → downstream consumption → normalization/mining → admission).
+2. After explicit authorization, run one fresh real revalidation from `configs/sample_generation/cross_session_revalidation.disabled.json` with a unique run/batch/output; enable execution only in that copied run config.
+3. Perform independent structural and runtime review.
+4. Only after approval, run pilot, then main/freeze, then the formal matrix.
+
+The synthetic regression is not a real construction success and cannot substitute for the missing run or grant pilot authorization.
+
 # Implementation Workplan
 
 更新时间：2026-09-15；当前审查 HEAD：`120be7403a214b5d6b32814b80fac02bc750762b`（本轮另有未提交修复）。当前证据和本地测试限制见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)；历史 memory relay 已通过、usage 可观测性已修复；当前新模型单条复验结果见下。仅保留一套执行顺序。
