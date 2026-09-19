@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    validate_provider_evidence_policy,
+)
 
 
 class SafeClawEmbeddingRuntime(StrictModel):
@@ -91,8 +94,7 @@ def build_safeclaw_model_config(
         "embedding_request_budget": embedding_request_budget,
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
-        "provider_evidence_policy": provider_evidence_policy
-        or {"enabled": False, "policy_id": "formal-disabled"},
+        "provider_evidence_policy": validate_provider_evidence_policy(provider_evidence_policy),
     }
     if batch_id:
         payload["batch_id"] = batch_id

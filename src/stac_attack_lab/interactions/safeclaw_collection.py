@@ -14,6 +14,10 @@ from typing import IO, Any, Literal, Protocol, cast
 from pydantic import Field, model_validator
 
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    provider_evidence_policy_hash,
+    validate_provider_evidence_policy,
+)
 from stac_attack_lab.environments.safeclaw.model_config import (
     SafeClawEmbeddingRuntime,
     build_safeclaw_model_config,
@@ -483,10 +487,7 @@ class SafeClawSubprocessVictimDriver:
         self.provider_timeout_seconds = provider_timeout_seconds
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
-        self.provider_evidence_policy = provider_evidence_policy or {
-            "enabled": False,
-            "policy_id": "formal-disabled",
-        }
+        self.provider_evidence_policy = validate_provider_evidence_policy(provider_evidence_policy)
         self.environment = environment if environment is not None else os.environ
         self.batch_id = batch_id
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -1127,6 +1128,7 @@ class SafeClawSubprocessVictimDriver:
                             "request_id": record.get("request_id"),
                             "batch_id": record.get("batch_id"),
                             "control_context_id": record.get("control_context_id"),
+                            "action_id": record.get("action_id"),
                             "rule_id": record.get("rule_id"),
                             "target_tool_call_id": target.get("target_tool_call_id"),
                             "target_tool_name": target.get("target_tool_name"),
@@ -1668,11 +1670,12 @@ class SafeClawSubprocessVictimDriver:
                 )
             self._checkpoints.append({"checkpoint_id": "victim-post", "state_hash": post_hash})
             self._process.wait(timeout=30)
+            evidence_records = self.boundary_evidence_snapshot()
             return ConstructionVictimResult(
                 episode_id=f"construction-episode-{self._task.source_task_id}",
                 source_events=final_events,
                 checkpoints=self._checkpoints,
-                evidence_records=self.boundary_evidence_snapshot(),
+                evidence_records=evidence_records,
                 model_hashes={"victim": self.model_hash},
                 config_hash=stable_hash(
                     {
@@ -1697,7 +1700,17 @@ class SafeClawSubprocessVictimDriver:
                     "provider_evidence_rule_id": str(
                         self.provider_evidence_policy.get("rule_id", "")
                     ),
+                    "provider_evidence_policy_hash": provider_evidence_policy_hash(
+                        self.provider_evidence_policy
+                    ),
+                    "provider_evidence_policy_json": json.dumps(
+                        self.provider_evidence_policy, sort_keys=True, separators=(",", ":")
+                    ),
                     "provider_evidence_batch_id": str(self.batch_id or ""),
+                    "provider_evidence_record_count": str(len(evidence_records)),
+                    "provider_evidence_ordered_digest": stable_hash(
+                        [item.get("record_sha256") for item in evidence_records]
+                    ),
                     "provider_error_categories": json.dumps(
                         sorted(
                             {

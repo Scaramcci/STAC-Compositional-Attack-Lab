@@ -16,9 +16,26 @@ from stac_attack_lab.environments.safeclaw.provider_relay import (
     ProviderRelayServer,
     RunningProviderRelay,
     _extract_provider_usage,
+    _request_tool_result_projections,
+    _response_tool_calls,
+    _target_argument_projections,
     chat_completions_url,
     relay_runtime_from_model_config,
 )
+
+
+def _experimental_policy(tool_name: str, pointer: str) -> dict[str, object]:
+    return {
+        "policy_id": "stac.synthetic-exact-test",
+        "policy_version": "1.0",
+        "mode": "experimental",
+        "enabled": True,
+        "rule_id": EXACT_DERIVATION_RULE,
+        "target_selectors": [{"tool_name": tool_name, "json_pointer": pointer}],
+        "projection_kind": "utf8-string-v1",
+        "applicability": "synthetic_only",
+        "max_projection_bytes": 16384,
+    }
 
 
 def _post(url: str, payload: dict[str, object], token: str = "relay-token") -> tuple[int, bytes]:
@@ -51,6 +68,7 @@ def _config(upstream: str, ledger: Path, *, limit: int = 2) -> ProviderRelayConf
         timeout_seconds=3,
         allowed_tools=("add",),
         ledger_path=str(ledger),
+        evidence_path=str(ledger.with_suffix(".evidence.jsonl")),
     )
 
 
@@ -158,11 +176,8 @@ def test_request_boundary_projects_only_real_tool_messages_and_response_argument
                 ledger_path=str(tmp_path / "ledger.jsonl"),
                 evidence_path=str(tmp_path / "evidence.jsonl"),
                 batch_id="batch",
-                derivation_policy={
-                    "enabled": True,
-                    "rule_id": EXACT_DERIVATION_RULE,
-                    "target_selectors": [{"tool_name": "add", "json_pointer": "/value"}],
-                },
+                control_token="control-token",
+                derivation_policy=_experimental_policy("add", "/value"),
             ),
         )
         with RunningProviderRelay(relay):
@@ -431,3 +446,187 @@ def test_relay_records_provider_usage_and_requests_ark_stream_usage(tmp_path: Pa
             "total_tokens": 10,
         }
         assert record["provider_usage_observation"] == "complete"
+
+
+@pytest.mark.parametrize(
+    ("body", "content_type", "reason"),
+    [
+        (
+            b'{"choices":[{"index":0,"message":{"tool_calls":[]}},{"index":1,"message":{"tool_calls":[]}}]}',
+            "application/json",
+            "response_choice_count_unsupported",
+        ),
+        (
+            b'{"choices":[{"finish_reason":"length","message":{"tool_calls":[]}}]}',
+            "application/json",
+            "response_finish_length",
+        ),
+        (
+            b'data: {"choices":[{"index":0,"delta":{}}]}\n\n',
+            "text/event-stream",
+            "response_sse_truncated",
+        ),
+        (
+            b'data: {"choices":[{"index":0,"delta":{}}]}\n\n'
+            b'data: {"choices":[{"index":1,"delta":{}}]}\n\n'
+            b"data: [DONE]\n\n",
+            "text/event-stream",
+            "response_choice_count_unsupported",
+        ),
+    ],
+)
+def test_response_parser_fails_closed_on_ambiguous_or_incomplete_protocol(
+    body: bytes, content_type: str, reason: str
+) -> None:
+    calls, status = _response_tool_calls(body, content_type)
+    assert calls == []
+    assert status == reason
+
+
+def test_sse_tool_fragments_are_rebuilt_with_choice_and_tool_index() -> None:
+    body = (
+        b'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c1",'
+        b'"function":{"name":"ex","arguments":"{\\"command\\":\\"A"}}]}}]}\n\n'
+        b'data: {"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,'
+        b'"function":{"name":"ec","arguments":"\\"}"}}]}}]}\n\n'
+        b"data: [DONE]\n\n"
+    )
+    calls, status = _response_tool_calls(body, "text/event-stream")
+    assert status == "complete"
+    assert calls[0]["function"] == {"name": "exec", "arguments": '{"command":"A"}'}
+
+
+def test_sensitive_synthetic_projection_is_not_retained() -> None:
+    sources, unsupported = _request_tool_result_projections(
+        {
+            "messages": [
+                {
+                    "role": "tool",
+                    "tool_call_id": "secret-result",
+                    "content": "Authorization: Bearer SYNTHETIC_FAKE_CREDENTIAL",
+                }
+            ]
+        },
+        retain=True,
+    )
+    assert "projection_base64" not in sources[0]
+    assert unsupported[0]["reason_code"] == "source_projection_sensitive_not_retained"
+    targets, target_unsupported = _target_argument_projections(
+        json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "tool_calls": [
+                                {
+                                    "id": "c",
+                                    "function": {
+                                        "name": "exec",
+                                        "arguments": json.dumps(
+                                            {"command": "token=SYNTHETIC_FAKE_CREDENTIAL"}
+                                        ),
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        ).encode(),
+        "application/json",
+        _experimental_policy("exec", "/command"),
+    )
+    assert targets == []
+    assert target_unsupported[0]["reason_code"] == "target_projection_sensitive_not_retained"
+
+
+def test_pre_request_evidence_failure_sends_no_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with MockProviderServer([_text_response()], max_requests=1) as upstream:
+        relay = ProviderRelayServer(
+            ("127.0.0.1", 0), _config(upstream.url, tmp_path / "ledger.jsonl")
+        )
+        monkeypatch.setattr(
+            relay,
+            "record_evidence",
+            lambda _value: (_ for _ in ()).throw(RuntimeError("injected")),
+        )
+        with RunningProviderRelay(relay):
+            status, body = _post(relay.url + "/chat/completions", {"model": "fake"})
+    assert status == 500
+    assert b"provider_evidence_write_failed" in body
+    assert upstream.state.requests == []
+    assert relay.state.accepted_requests == 1
+
+
+def test_response_evidence_failure_is_not_retried_or_reported_as_502(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with MockProviderServer([_text_response()], max_requests=1) as upstream:
+        relay = ProviderRelayServer(
+            ("127.0.0.1", 0), _config(upstream.url, tmp_path / "ledger.jsonl")
+        )
+        original = relay.record_evidence
+
+        def fail_response(value: dict[str, object]) -> dict[str, object]:
+            if value.get("record_type") == "provider_response":
+                raise RuntimeError("injected")
+            return original(value)
+
+        monkeypatch.setattr(relay, "record_evidence", fail_response)
+        with RunningProviderRelay(relay):
+            status, body = _post(relay.url + "/chat/completions", {"model": "fake"})
+    assert status == 500
+    assert b"provider_response_evidence_write_failed" in body
+    assert len(upstream.state.requests) == 1
+    assert relay.state.accepted_requests == 1
+    assert relay.state.records[-1]["accounting_state"] == (
+        "upstream_response_received_evidence_incomplete"
+    )
+
+
+def test_context_state_changes_only_after_persistent_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    relay = ProviderRelayServer(
+        ("127.0.0.1", 0),
+        _config("http://127.0.0.1:9/v1", tmp_path / "ledger.jsonl"),
+    )
+    original = relay.record_evidence
+    monkeypatch.setattr(
+        relay,
+        "record_evidence",
+        lambda _value: (_ for _ in ()).throw(RuntimeError("open-failure")),
+    )
+    with pytest.raises(RuntimeError):
+        relay.open_evidence_context(
+            {
+                "action_id": "a",
+                "workspace_identity_sha256": "a" * 64,
+                "logical_session_id": "s",
+            }
+        )
+    assert relay.state.active_evidence_context is None
+    monkeypatch.setattr(relay, "record_evidence", original)
+    context = relay.open_evidence_context(
+        {
+            "action_id": "a",
+            "workspace_identity_sha256": "a" * 64,
+            "logical_session_id": "s",
+        }
+    )
+    monkeypatch.setattr(
+        relay,
+        "record_evidence",
+        lambda _value: (_ for _ in ()).throw(RuntimeError("close-failure")),
+    )
+    with pytest.raises(RuntimeError):
+        relay.close_evidence_context(
+            {
+                "control_context_id": context["control_context_id"],
+                "actual_session_identity_sha256": "b" * 64,
+            }
+        )
+    assert relay.state.active_evidence_context is not None
+    relay.server_close()

@@ -50,6 +50,17 @@
   "provider_request_budget": 40,
   "provider_request_budget_scope": "collection_run",
   "provider_timeout_seconds": 90,
+  "provider_evidence_policy": {
+    "policy_id": "stac.provider-evidence.disabled",
+    "policy_version": "1.0",
+    "mode": "disabled",
+    "enabled": false,
+    "rule_id": null,
+    "target_selectors": [],
+    "projection_kind": "utf8-string-v1",
+    "applicability": "synthetic_only",
+    "max_projection_bytes": 16384
+  },
   "embedding_request_budget": 12,
   "attacker_request_budget": 48,
   "attacker_decision_budget": 16,

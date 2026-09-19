@@ -17,6 +17,10 @@ from stac_attack_lab.datasets.library import (
     freeze_primitive_library,
 )
 from stac_attack_lab.datasets.primitive_chain import SampleLibraryManifest
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    disabled_provider_evidence_policy,
+    validate_provider_evidence_policy,
+)
 from stac_attack_lab.environments.safeclaw.model_config import SafeClawEmbeddingRuntime
 from stac_attack_lab.extraction.chains import construct_chain_candidates
 from stac_attack_lab.extraction.filtering import (
@@ -110,6 +114,9 @@ class SampleGenerationConfig(StrictModel):
     provider_request_budget_scope: Literal["collection_run"] = "collection_run"
     provider_timeout_seconds: PositiveInt = 90
     provider_allowed_tools: list[str] | None = None
+    provider_evidence_policy: dict[str, Any] = Field(
+        default_factory=disabled_provider_evidence_policy
+    )
     embedding_request_budget: PositiveInt = 128
     attacker_request_budget: PositiveInt | None = None
     attacker_decision_budget: PositiveInt | None = None
@@ -152,6 +159,9 @@ class SampleGenerationConfig(StrictModel):
             set(self.provider_allowed_tools)
         ):
             raise ValueError("duplicate_sample_provider_allowed_tool")
+        self.provider_evidence_policy = validate_provider_evidence_policy(
+            self.provider_evidence_policy
+        )
         if self.source_adapter == "jsonl_authorized_fixture":
             if self.source_fixture_path is None:
                 raise ValueError("fixture_adapter_requires_source_fixture_path")
@@ -511,6 +521,7 @@ def _collection_components(
         provider_timeout_seconds=config.provider_timeout_seconds,
         provider_allowed_tools=config.provider_allowed_tools,
         embedding_request_budget=config.embedding_request_budget,
+        provider_evidence_policy=config.provider_evidence_policy,
         environment=env,
         batch_id=config.pipeline_id,
     )

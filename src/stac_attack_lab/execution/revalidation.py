@@ -108,6 +108,9 @@ def replay_bridge_responses(
     config_path: Path,
 ) -> dict[str, Any]:
     """Replay recorded bridge action/response pairs through the live driver mapper."""
+    from stac_attack_lab.environments.safeclaw.evidence_policy import (
+        provider_evidence_policy_hash,
+    )
     from stac_attack_lab.execution.sample_generation import (
         _record_collection_stage,
         load_sample_generation_config,
@@ -244,6 +247,7 @@ def replay_bridge_responses(
     driver._embedding_requests_spent = 0
     driver._current_provider_requests = 0
     driver._current_embedding_requests = 0
+    driver.provider_evidence_policy = config.provider_evidence_policy
     source_events: list[dict[str, Any]] = []
     session_ids: list[str] = []
     for action, response in action_pairs:
@@ -272,6 +276,7 @@ def replay_bridge_responses(
         "".join(json.dumps(item, sort_keys=True) + "\n" for item in evidence_records),
         encoding="utf-8",
     )
+    evidence_path.chmod(0o600)
     manifest = ConstructionManifest(
         acquisition_mode="adversarial_trace",
         construction_objective_id=config.construction_objective_id,
@@ -333,21 +338,23 @@ def replay_bridge_responses(
             "replay_version": REPLAY_VERSION,
             "live_requests_performed": "false",
             "synthetic_instrumentation": "false",
-            "provider_evidence_policy_mode": (
-                "experimental"
-                if evidence_records
-                and all(
-                    item.get("rule_id") == "stac.experimental.exact_tool_result_to_argument.v1"
-                    for item in evidence_records
-                    if item.get("record_type") in {"provider_request", "provider_response"}
-                )
-                else "disabled"
+            "provider_evidence_policy_mode": config.provider_evidence_policy["mode"],
+            "provider_evidence_policy_id": config.provider_evidence_policy["policy_id"],
+            "provider_evidence_policy_hash": provider_evidence_policy_hash(
+                config.provider_evidence_policy
+            ),
+            "provider_evidence_policy_json": json.dumps(
+                config.provider_evidence_policy, sort_keys=True, separators=(",", ":")
             ),
             "provider_evidence_batch_id": str(
                 next(
                     (item.get("batch_id") for item in evidence_records if item.get("batch_id")),
                     "",
                 )
+            ),
+            "provider_evidence_record_count": str(len(evidence_records)),
+            "provider_evidence_ordered_digest": stable_hash(
+                [item.get("record_sha256") for item in evidence_records]
             ),
         },
     )
@@ -371,13 +378,75 @@ def replay_bridge_responses(
 
     registry = load_formal_registry(root / config.registry_path)
     _record_collection_stage(collection, config, registry.registry_hash)
+    unsupported_reasons: dict[str, int] = {}
+    for record in evidence_records:
+        for field in ("unsupported_source_projections", "unsupported_target_projections"):
+            values = record.get(field, [])
+            if not isinstance(values, list):
+                continue
+            for value in values:
+                if isinstance(value, dict) and value.get("reason_code"):
+                    reason = str(value["reason_code"])
+                    unsupported_reasons[reason] = unsupported_reasons.get(reason, 0) + 1
+    compatibility_report = {
+        "schema_version": "1.0",
+        "mode": "offline_bridge_replay",
+        "status": "unsupported_inputs_observed" if unsupported_reasons else "supported_subset",
+        "supported": [
+            "openai_nonstream_single_choice_tool_calls",
+            "openai_sse_single_choice_indexed_tool_call_fragments",
+            "string_tool_result_utf8_projection",
+        ],
+        "unsupported_reason_counts": unsupported_reasons,
+        "conflicting": [],
+        "real_provider_payload_compatibility": "pending_not_exercised",
+        "strong_derivation_independent": True,
+    }
+    compatibility_path = analysis_root / "provider_compatibility_report.json"
+    _atomic_json(compatibility_path, compatibility_report)
+    attempts = [
+        item
+        for item in evidence_records
+        if item.get("record_type") == "provider_request"
+        and item.get("send_state") == "attempted"
+    ]
+    outcomes = [
+        item
+        for item in evidence_records
+        if item.get("record_type") == "provider_response"
+        or (
+            item.get("record_type") == "provider_request"
+            and item.get("send_state") == "transport_error"
+        )
+    ]
+    attempt_ids = [str(item.get("request_id")) for item in attempts if item.get("request_id")]
+    outcome_ids = [str(item.get("request_id")) for item in outcomes if item.get("request_id")]
+    accounting_report = {
+        "schema_version": "1.0",
+        "status": "pending",
+        "reason_code": "budget_ledger_not_part_of_bridge_replay_input",
+        "evidence_attempt_count": len(attempts),
+        "evidence_outcome_count": len(outcomes),
+        "duplicate_attempt_request_ids": sorted(
+            {request_id for request_id in attempt_ids if attempt_ids.count(request_id) > 1}
+        ),
+        "attempts_without_outcome": sorted(set(attempt_ids) - set(outcome_ids)),
+        "outcomes_without_attempt": sorted(set(outcome_ids) - set(attempt_ids)),
+        "budget_ledger_status": "unavailable",
+        "network_isolation_review": "pending",
+    }
+    accounting_path = analysis_root / "provider_attempt_reconciliation.json"
+    _atomic_json(accounting_path, accounting_report)
     diagnostics["finish_seen"] = finish_seen
     diagnostics["source_event_count"] = len(source_events)
+    diagnostics["provider_compatibility_report"] = str(compatibility_path)
+    diagnostics["provider_attempt_reconciliation"] = str(accounting_path)
     return {
         "status": "passed",
         "collection": collection,
         "trajectory": raw_path,
         "diagnostics": diagnostics,
+        "provider_compatibility": compatibility_report,
     }
 
 
@@ -762,7 +831,9 @@ def offline_revalidation(
         "input_sha256": input_hashes,
         "processing_source_sha256": _processing_source_hashes(root),
         "compatibility_notes": (
-            ["production strong-consumption evidence is not currently available"]
+            [
+                "real provider payload compatibility not exercised; exact derivation remains policy-controlled"
+            ]
             if bridge_responses is not None
             else []
         ),

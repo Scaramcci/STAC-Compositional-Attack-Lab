@@ -9,6 +9,9 @@ from time import monotonic
 import pytest
 
 from stac_attack_lab.diagnostics.openclaw_mock import MockProviderServer, MockResponse
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    provider_evidence_policy_hash,
+)
 from stac_attack_lab.environments.safeclaw.provider_relay import (
     EXACT_DERIVATION_RULE,
     ProviderRelayConfig,
@@ -29,6 +32,20 @@ from stac_attack_lab.interactions.normalizer import normalize_source_events
 from stac_attack_lab.interactions.safeclaw_collection import SafeClawSubprocessVictimDriver
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _experimental_policy(tool_name: str, pointer: str) -> dict[str, object]:
+    return {
+        "policy_id": "stac.synthetic-exact-test",
+        "policy_version": "1.0",
+        "mode": "experimental",
+        "enabled": True,
+        "rule_id": EXACT_DERIVATION_RULE,
+        "target_selectors": [{"tool_name": tool_name, "json_pointer": pointer}],
+        "projection_kind": "utf8-string-v1",
+        "applicability": "synthetic_only",
+        "max_projection_bytes": 16384,
+    }
 
 
 def _trajectory() -> RawInteractionTrajectory:
@@ -710,12 +727,8 @@ def test_bridge_driver_normalizer_admission_file_chain(
                 ledger_path=str(tmp_path / "ledger.jsonl"),
                 evidence_path=str(tmp_path / "evidence.jsonl"),
                 batch_id="fake-batch",
-                derivation_policy={
-                    "enabled": True,
-                    "mode": "experimental",
-                    "rule_id": EXACT_DERIVATION_RULE,
-                    "target_selectors": [{"tool_name": "exec", "json_pointer": "/command"}],
-                },
+                control_token="control-token",
+                derivation_policy=_experimental_policy("exec", "/command"),
             ),
         )
         with RunningProviderRelay(relay):
@@ -807,11 +820,16 @@ def test_bridge_driver_normalizer_admission_file_chain(
     )
     assert use_event["public_payload"]["artifact_use_evidence"] == []
     assert use_event["public_payload"]["artifact_derivation_candidates"]
+    policy = _experimental_policy("exec", "/command")
     trajectory = _trajectory().model_copy(
         update={
             "provenance": {
                 "provider_evidence_policy_mode": "experimental",
                 "provider_evidence_batch_id": "fake-batch",
+                "provider_evidence_policy_hash": provider_evidence_policy_hash(policy),
+                "provider_evidence_policy_json": json.dumps(
+                    policy, sort_keys=True, separators=(",", ":")
+                ),
             }
         }
     )
@@ -899,6 +917,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
         output_root=str(tmp_path / "disabled-output"),
         execution_enabled=False,
         allowed_source_splits=["synthetic"],
+        provider_evidence_policy=policy,
     )
     (run_root / "runtime_config.json").write_text(json.dumps(config))
     bridge_responses = tmp_path / "request-boundary-bridge.jsonl"

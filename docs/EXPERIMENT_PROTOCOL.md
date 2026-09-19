@@ -2,6 +2,13 @@
 
 ## Request-boundary evidence contract (experimental engineering policy)
 
+The versioned policy is configuration-owned. Its canonical fields are `policy_id`,
+`policy_version`, `mode`, `enabled`, `rule_id`, `target_selectors`, `projection_kind`,
+`applicability`, and `max_projection_bytes`. The relay, trajectory, replay, and verifier bind
+the same canonical policy hash. Evidence record claims never authorize a rule. Formal/default
+configuration remains disabled; implementation enablement, permission to make a real request,
+research-protocol acceptance, and formal admission are four independent decisions.
+
 The evidence layers are independent and strictly non-transitive:
 
 1. **A: observed tool execution** means that a tool call/result pair was observed in the
@@ -56,6 +63,31 @@ before the call; `response_received` is written only after an HTTP response is o
 bounded response projection is parsed. Each retry has a new request/attempt ID and append-only
 records. A bridge-controlled context record supplies action/workspace/session binding; model text
 cannot set or override it. Evidence metadata is local and is not added to the upstream payload.
+
+The verifier requires a unique ordered lifecycle: context open, request prepared, request
+attempted, response received, and completed context close. `attempted` proves only that the local
+transport attempt began. `response_received` proves that the relay obtained an HTTP response; it
+does not prove model reasoning. A transport error, aborted context, duplicate request/response,
+duplicate close, mismatched request hash, or ambiguous source/target fails closed.
+
+`arguments_json_base64` is decoded as strict UTF-8 JSON. Duplicate keys, NaN/Infinity, excessive
+depth/size, invalid JSON Pointer escapes/array indexes, absent targets, and non-string targets are
+rejected. Canonical JSON hashing and the selected string projection are recomputed independently.
+No field search, normalization, wrapper stripping, or substring fallback is permitted.
+
+Base64 is storage encoding, not redaction. Disabled policy never retains complete projections.
+Enabled policy is synthetic-only and retains only bounded fields needed by configured selectors.
+Credential-like content is not retained; placeholders cannot support exact equality. The evidence
+file is private (mode 0600), and its seal binds contiguous sequence, record count, and ordered
+record hashes. SHA-256 establishes internal consistency only: the controlled relay/config
+snapshot, sealed manifest, and evidence file remain trusted inputs, and coordinated rewriting of
+all of them is outside this non-signature threat model.
+
+Supported parsing is deliberately narrow: one OpenAI-compatible choice, indexed SSE tool-call
+fragments, string tool-result content, complete finish, and SSE `[DONE]`. Content-block arrays,
+binary/image results, multiple choices, incomplete/content-filtered output, malformed events,
+conflicting IDs/names, and unsafe retained content are reported as unsupported or conflicting.
+Compatibility status is reported separately from the strong-derivation result.
 
 ## Gate sequence
 

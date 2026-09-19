@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import base64
+import contextlib
 import hashlib
 import hmac
 import json
 import os
+import re
 import subprocess
 import threading
 import time
@@ -18,10 +20,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    DEFAULT_MAX_PROJECTION_BYTES,
+    UTF8_STRING_PROJECTION,
+    provider_evidence_policy_hash,
+    validate_provider_evidence_policy,
+)
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    EXACT_DERIVATION_RULE as EXACT_DERIVATION_RULE,
+)
+
 REQUEST_EVIDENCE_VERSION = "provider-request-boundary-v1"
-EXACT_DERIVATION_RULE = "stac.experimental.exact_tool_result_to_argument.v1"
-UTF8_STRING_PROJECTION = "utf8-string-v1"
-MAX_EVIDENCE_PROJECTION_BYTES = 16_384
+MAX_EVIDENCE_PROJECTION_BYTES = DEFAULT_MAX_PROJECTION_BYTES
+SENSITIVE_PROJECTION = re.compile(
+    r"(?i)(authorization\s*:|bearer\s+[a-z0-9._-]+|api[_-]?key\s*[:=]|secret\s*[:=]|token\s*[:=])"
+)
 
 
 def _canonical_bytes(value: object) -> bytes:
@@ -85,7 +98,16 @@ def _request_tool_result_projections(
                 }
             )
             continue
-        projection = _utf8_projection(content, retain=retain)
+        safe_to_retain = retain and SENSITIVE_PROJECTION.search(content) is None
+        projection = _utf8_projection(content, retain=safe_to_retain)
+        if retain and not safe_to_retain:
+            unsupported.append(
+                {
+                    "message_index": index,
+                    "tool_result_call_id": call_id,
+                    "reason_code": "source_projection_sensitive_not_retained",
+                }
+            )
         projections.append(
             {
                 "tool_result_call_id": call_id,
@@ -103,36 +125,61 @@ def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str,
         value = json.loads(text)
         if not isinstance(value, dict):
             return [], "response_json_not_object"
-        calls: list[dict[str, Any]] = []
-        for choice in value.get("choices", []):
-            if not isinstance(choice, dict):
-                continue
-            message = choice.get("message")
-            if isinstance(message, dict) and isinstance(message.get("tool_calls"), list):
-                calls.extend(call for call in message["tool_calls"] if isinstance(call, dict))
-        return calls, "complete"
-    calls_by_index: dict[int, dict[str, Any]] = {}
+        choices = value.get("choices")
+        if not isinstance(choices, list) or len(choices) != 1 or not isinstance(choices[0], dict):
+            return [], "response_choice_count_unsupported"
+        choice = choices[0]
+        finish_reason = choice.get("finish_reason")
+        if finish_reason in {"length", "content_filter"}:
+            return [], f"response_finish_{finish_reason}"
+        message = choice.get("message")
+        calls = message.get("tool_calls", []) if isinstance(message, dict) else []
+        if not isinstance(calls, list) or any(not isinstance(call, dict) for call in calls):
+            return [], "response_tool_calls_invalid"
+        ids = [call.get("id") for call in calls]
+        if any(not isinstance(call_id, str) or not call_id for call_id in ids):
+            return [], "response_tool_call_id_missing"
+        if len(ids) != len(set(ids)):
+            return [], "response_tool_call_id_duplicate"
+        return list(calls), "complete"
+    calls_by_index: dict[tuple[int, int], dict[str, Any]] = {}
     done = False
-    for line in text.splitlines():
-        if not line.startswith("data:"):
+    finish_reasons: list[str] = []
+    choice_indexes: set[int] = set()
+    events: list[str] = []
+    data_lines: list[str] = []
+    for line in [*text.splitlines(), ""]:
+        if line == "":
+            if data_lines:
+                events.append("\n".join(data_lines))
+                data_lines = []
             continue
-        raw_event = line[5:].strip()
+        if line.startswith("data:"):
+            data_lines.append(line[5:].lstrip())
+    for raw_event in events:
         if raw_event == "[DONE]":
             done = True
             continue
         event = json.loads(raw_event)
         if not isinstance(event, dict):
-            continue
+            return [], "response_sse_event_not_object"
         for choice in event.get("choices", []):
             if not isinstance(choice, dict):
-                continue
+                return [], "response_sse_choice_invalid"
+            choice_index = choice.get("index", 0)
+            if type(choice_index) is not int:
+                return [], "response_sse_choice_index_invalid"
+            choice_indexes.add(choice_index)
+            finish_reason = choice.get("finish_reason")
+            if isinstance(finish_reason, str):
+                finish_reasons.append(finish_reason)
             delta = choice.get("delta")
             if not isinstance(delta, dict) or not isinstance(delta.get("tool_calls"), list):
                 continue
             for call in delta["tool_calls"]:
                 if not isinstance(call, dict) or not isinstance(call.get("index"), int):
-                    continue
-                index = call["index"]
+                    return [], "response_sse_tool_call_index_invalid"
+                index = (choice_index, call["index"])
                 merged = calls_by_index.setdefault(
                     index,
                     {
@@ -142,6 +189,8 @@ def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str,
                     },
                 )
                 if isinstance(call.get("id"), str):
+                    if merged["id"] not in {None, call["id"]}:
+                        return [], "response_sse_tool_call_id_conflict"
                     merged["id"] = call["id"]
                 function = call.get("function")
                 if isinstance(function, dict):
@@ -149,7 +198,19 @@ def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str,
                         merged["function"]["name"] += function["name"]
                     if isinstance(function.get("arguments"), str):
                         merged["function"]["arguments"] += function["arguments"]
-    return list(calls_by_index.values()), "complete" if done else "response_sse_truncated"
+    if len(choice_indexes) > 1:
+        return [], "response_choice_count_unsupported"
+    if any(reason in {"length", "content_filter"} for reason in finish_reasons):
+        return [], "response_finish_incomplete"
+    if not done:
+        return [], "response_sse_truncated"
+    calls = list(calls_by_index.values())
+    ids = [call.get("id") for call in calls]
+    if any(not isinstance(call_id, str) or not call_id for call_id in ids):
+        return [], "response_tool_call_id_missing"
+    if len(ids) != len(set(ids)):
+        return [], "response_tool_call_id_duplicate"
+    return calls, "complete"
 
 
 def _json_pointer(value: object, pointer: str) -> object:
@@ -222,6 +283,14 @@ def _target_argument_projections(
                     {
                         "target_tool_call_id": call_id,
                         "reason_code": "target_argument_not_nonempty_string",
+                    }
+                )
+                continue
+            if SENSITIVE_PROJECTION.search(selected) or SENSITIVE_PROJECTION.search(arguments_text):
+                unsupported.append(
+                    {
+                        "target_tool_call_id": call_id,
+                        "reason_code": "target_projection_sensitive_not_retained",
                     }
                 )
                 continue
@@ -352,6 +421,12 @@ class ProviderRelayConfig:
     control_token: str | None = None
     derivation_policy: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        policy = validate_provider_evidence_policy(self.derivation_policy or None)
+        object.__setattr__(self, "derivation_policy", policy)
+        if policy["enabled"] and not self.control_token:
+            raise ValueError("provider_relay_evidence_control_token_required")
+
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> ProviderRelayConfig:
         allowed = value.get("allowed_tools")
@@ -370,9 +445,7 @@ class ProviderRelayConfig:
             evidence_path=str(value.get("evidence_path") or "/tmp/stac-provider-evidence.jsonl"),
             batch_id=(str(value.get("batch_id")) if value.get("batch_id") else None),
             control_token=(str(value.get("control_token")) if value.get("control_token") else None),
-            derivation_policy=(
-                dict(derivation_policy) if isinstance(derivation_policy, dict) else {}
-            ),
+            derivation_policy=validate_provider_evidence_policy(derivation_policy),
         )
         if not config.upstream_base_url or not config.upstream_api_key or not config.ingress_token:
             raise ValueError("provider_relay_missing_required_config")
@@ -382,14 +455,8 @@ class ProviderRelayConfig:
             set(config.allowed_tools)
         ):
             raise ValueError("provider_relay_duplicate_allowed_tool")
-        if config.derivation_policy.get("enabled") is True:
-            if config.derivation_policy.get("rule_id") != EXACT_DERIVATION_RULE:
-                raise ValueError("provider_relay_unknown_derivation_rule")
-            if not config.control_token:
-                raise ValueError("provider_relay_evidence_control_token_required")
-            selectors = config.derivation_policy.get("target_selectors")
-            if not isinstance(selectors, list) or not selectors:
-                raise ValueError("provider_relay_derivation_selectors_required")
+        if config.derivation_policy.get("enabled") is True and not config.control_token:
+            raise ValueError("provider_relay_evidence_control_token_required")
         return config
 
 
@@ -495,6 +562,9 @@ class _PersistentEvidence:
         self._mutex = threading.Lock()
         self.sequence = 0
         path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+        os.close(descriptor)
+        path.chmod(0o600)
         if path.exists():
             for item in _parse_jsonl_records(
                 path.read_bytes(), corruption="provider_evidence_corrupt"
@@ -698,6 +768,9 @@ class _RelayHandler(BaseHTTPRequestHandler):
             "unsupported_source_projections": source_unsupported,
             "rule_id": config.derivation_policy.get("rule_id"),
             "policy_enabled": config.derivation_policy.get("enabled") is True,
+            "policy_id": config.derivation_policy["policy_id"],
+            "policy_version": config.derivation_policy["policy_version"],
+            "policy_hash": provider_evidence_policy_hash(config.derivation_policy),
         }
         try:
             prepared_record = self.server.record_evidence(
@@ -761,27 +834,53 @@ class _RelayHandler(BaseHTTPRequestHandler):
             target_projections, target_unsupported = _target_argument_projections(
                 body, content_type, config.derivation_policy
             )
-            response_evidence_record = self.server.record_evidence(
-                {
-                    **evidence_base,
-                    "record_type": "provider_response",
-                    "send_state": "response_received",
-                    "http_status": status,
-                    "response_sha256": hashlib.sha256(body).hexdigest(),
-                    "response_content_type": content_type,
-                    "target_tool_arguments": target_projections,
-                    "unsupported_target_projections": target_unsupported,
-                }
-            )
+            try:
+                response_evidence_record = self.server.record_evidence(
+                    {
+                        **evidence_base,
+                        "record_type": "provider_response",
+                        "send_state": "response_received",
+                        "http_status": status,
+                        "response_sha256": hashlib.sha256(body).hexdigest(),
+                        "response_content_type": content_type,
+                        "target_tool_arguments": target_projections,
+                        "unsupported_target_projections": target_unsupported,
+                    }
+                )
+            except RuntimeError as exc:
+                with contextlib.suppress(RuntimeError):
+                    self.server.record(
+                        {
+                            "sequence": sequence,
+                            "accepted": True,
+                            "status": 500,
+                            "error_category": "provider_response_evidence_write_failed",
+                            "accounting_state": "upstream_response_received_evidence_incomplete",
+                            "upstream_request_performed": True,
+                            "request_id": request_id,
+                            "original_error": type(exc).__name__,
+                            "final_tools": final_tools,
+                            "duration_ms": round((time.monotonic() - started) * 1000, 3),
+                        }
+                    )
+                self._write(
+                    500,
+                    b'{"error":{"message":"provider_response_evidence_write_failed"}}',
+                    "application/json",
+                )
+                return
         else:
-            self.server.record_evidence(
-                {
-                    **evidence_base,
-                    "record_type": "provider_request",
-                    "send_state": "transport_error",
-                    "error_category": error_category,
-                }
-            )
+            try:
+                self.server.record_evidence(
+                    {
+                        **evidence_base,
+                        "record_type": "provider_request",
+                        "send_state": "transport_error",
+                        "error_category": error_category,
+                    }
+                )
+            except RuntimeError:
+                error_category = "provider_transport_and_evidence_write_failed"
         provider_usage, usage_observation, usage_reasons = _extract_provider_usage(
             body, content_type
         )
@@ -883,7 +982,6 @@ class ProviderRelayServer(ThreadingHTTPServer):
                 "workspace_identity_sha256": workspace,
                 "logical_session_id": logical_session_id,
             }
-            self.state.active_evidence_context = dict(context)
         record = self.record_evidence(
             {
                 "batch_id": self.budget.batch_id,
@@ -892,6 +990,10 @@ class ProviderRelayServer(ThreadingHTTPServer):
                 **context,
             }
         )
+        with self.state.lock:
+            if self.state.active_evidence_context is not None:
+                raise RuntimeError("evidence_context_already_active")
+            self.state.active_evidence_context = dict(context)
         return {**context, "evidence_record_id": record["record_id"]}
 
     def close_evidence_context(self, value: dict[str, Any]) -> dict[str, Any]:
@@ -902,7 +1004,6 @@ class ProviderRelayServer(ThreadingHTTPServer):
             context = self.state.active_evidence_context
             if context is None or context.get("control_context_id") != context_id:
                 raise RuntimeError("evidence_context_not_active")
-            self.state.active_evidence_context = None
         record = self.record_evidence(
             {
                 "batch_id": self.budget.batch_id,
@@ -915,6 +1016,11 @@ class ProviderRelayServer(ThreadingHTTPServer):
                 "close_state": close_state,
             }
         )
+        with self.state.lock:
+            current = self.state.active_evidence_context
+            if current is None or current.get("control_context_id") != context_id:
+                raise RuntimeError("evidence_context_not_active")
+            self.state.active_evidence_context = None
         return {"control_context_id": context_id, "evidence_record_id": record["record_id"]}
 
 
@@ -1356,9 +1462,7 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
         "timeout_seconds": value.pop("provider_timeout_seconds", 90),
         "allowed_tools": allowed_tools,
         "provider_compat": value.pop("provider_compat", "openai"),
-        "derivation_policy": value.pop(
-            "provider_evidence_policy", {"enabled": False, "policy_id": "formal-disabled"}
-        ),
+        "derivation_policy": value.pop("provider_evidence_policy", None),
         "batch_id": value.pop("batch_id", None),
     }
     embedding_provider = value.get("embedding_provider")

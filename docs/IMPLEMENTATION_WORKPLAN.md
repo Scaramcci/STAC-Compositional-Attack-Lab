@@ -1,5 +1,25 @@
 # Current workplan — 2026-09-19 (authoritative)
 
+The current uncommitted worktree, based on inspected HEAD `473f9751…`, has completed deterministic implementation for strict policy binding, lifecycle binding, argument/projection recomputation, conservative response parsing, bounded persistence-failure handling, bundle sealing, redaction boundaries, and independent compatibility/accounting reports. No real request is authorized by this state.
+
+Remaining work requiring external evidence is one separately authorized compatibility run: confirm the real provider's request message representation, non-stream/SSE choice and finish semantics, tool-call fragmentation, and bridge projection against the relay payload. Keep the prepared configuration disabled until final review; use one synthetic task/seed, at most one Victim compatibility request, zero automatic retries, the existing wall clock, and a unique run/output/batch ID. Keep the exact rule disabled unless that review explicitly authorizes the synthetic experimental policy. Do not proceed to pilot, main, freeze, or formal evaluation.
+
+Offline review remains allowed: inspect `provider_compatibility_report.json`, `provider_attempt_reconciliation.json`, the evidence bundle seal, structural admission, runtime review, and authorization as separate facts. A compatibility pass cannot approve a research metric or establish an official outcome.
+
+Disabled preparation command (do not run as part of this round):
+
+```bash
+STAC_PYTHON=/home/scarramcci/miniconda3/envs/stac/bin/python \
+  bash scripts/run_cross_session_revalidation.sh prepare \
+  --template experiments/runs/provider-evidence-offline-20260919-135009/next_compatibility_config.disabled.json \
+  --run-id <new-unique-compatibility-run-id>
+```
+
+After independent config review and separate live authorization, only that prepared run may have
+`execution_enabled` changed to true and be invoked with `live --run-root ... --authorize-live`.
+The command is intentionally not included as an executable copy/paste sequence here because no
+live authorization exists in this round.
+
 The request-boundary producer, common bridge/replay mapping, and independent deterministic verifier are implemented and fake/offline tested. `inputToolResultCallIds`, transcript order, model self-report, caller-provided equality, and event-wide labels remain untrusted.
 
 Execution order:

@@ -1,6 +1,35 @@
-# Current status — 2026-09-19 (authoritative)
+# Current status — 2026-09-19 provider-evidence hardening (authoritative)
 
-- Baseline HEAD is `df7f8da8032ba7f1dac420639038de4a35bf2b3a`; Python is `.venv/bin/python` 3.12.3. Pinned SafeClaw upstream remains clean at `a11f5cceaba0676be721021f8d232638fd111305`. This round is uncommitted and preserved all pre-existing and historical artifacts.
+- Inspected baseline HEAD: `473f9751eb8883270f63835e8fb4ed430fb0255c`; this round is uncommitted. Runtime: `/home/scarramcci/miniconda3/envs/stac/bin/python` 3.11.16. Pinned SafeClawArena remains clean at `a11f5cceaba0676be721021f8d232638fd111305`. Historical runs and evidence were not modified.
+- Provider evidence now uses one validated policy contract shared by sample config, relay, live mapper, replay provenance, and verifier. The canonical default is disabled. An enabled contract must name policy/version/mode/rule, an allowlisted tool plus valid JSON Pointer, UTF-8 projection kind, synthetic-only scope, and bounded sizes. Evidence records cannot enable a rule, and replay no longer derives policy from `rule_id` or an empty `all(...)` result.
+- Context verification resolves exactly one open → prepared → attempted → response → completed close lifecycle. It rejects duplicate attempts/responses/closes, transport-error conflicts, ordering errors, missing identities, and any mismatch in batch, request hash/ID, attempt, control context, action, logical/actual session, workspace, source call, consumer call, or candidate refs. Missing evidence is `unknown`; explicit contradiction is `failed`.
+- Derivation verification strictly decodes `arguments_json_base64`, checks byte length/hash and UTF-8, rejects duplicate JSON keys and non-standard constants, limits size/depth, recomputes canonical argument hash, resolves only the configured JSON Pointer, and recomputes the selected UTF-8 projection before exact equality. Exact equality remains a narrow synthetic engineering rule, not semantic causality or official success.
+- Relay response parsing isolates `(choice index, tool index)`, rejects multiple choices, duplicate/conflicting call IDs, incomplete finish reasons and missing SSE `DONE`, and supports indexed name/argument fragments plus usage-only/empty-delta chunks. Real-provider payload compatibility remains pending because this round used only deterministic data and local fake HTTP.
+- Evidence persistence is fail-closed before network I/O. If an upstream response was already received and response-evidence persistence fails, the relay does not retry, retains the reserved request count, records `upstream_response_received_evidence_incomplete` when possible, and returns a diagnostic 500 rather than a fabricated provider 502. Context memory state changes only after its open/close record is durable.
+- Disabled mode retains hashes/lengths but no full source/target text. Enabled synthetic mode stores bounded bytes only for configured evidence; credential-like synthetic strings are not retained and derivation becomes unknown. Evidence files are mode 0600. Bundle verification requires contiguous sequence plus sealed count and ordered digest; per-record hashes alone are insufficient.
+- Fresh disabled-policy replay: `experiments/runs/provider-evidence-offline-20260919-135009/analyses/bridge-replay-20260919-135018-d129aef9/`. Bridge replay and mining passed; the intentionally empty fixture produced 0 accepted samples, audit/admission failed, runtime remained pending, authorization absent, official outcome not evaluated. It also emitted independent compatibility and attempt-reconciliation reports.
+- Synthetic experimental positive evidence is covered by the production relay → fake HTTP → bridge/common mapper → normalize/mine/audit/admission test. Contradictory/rehashed inputs are rejected by standalone pure-function tests. Neither result is a real provider run.
+
+## Current readiness
+
+| Area | Status | Limit |
+|---|---|---|
+| Offline verifier correctness | ready for review | SHA-256 proves internal consistency, not origin authenticity or resistance to coordinated rewriting |
+| Supported interface subset | fake HTTP verified | real provider SSE/JSON payload samples remain unverified |
+| Experimental exact rule | implemented, default disabled | synthetic-only; not a formal metric or execution authorization |
+| Runtime review | pending | network isolation, cleanup, and budget/evidence ledger closure need a real bounded run |
+| Execution authorization | absent | enabling policy does not authorize requests |
+| Official outcome | not evaluated | only official evaluator output can set it |
+
+The reviewed follow-up template is
+`experiments/runs/provider-evidence-offline-20260919-135009/next_compatibility_config.disabled.json`.
+It remains `execution_enabled=false`, keeps the evidence policy disabled, permits at most one
+Attacker, one Victim, and one Embedding request, sets zero retries, and has a 300-second wall
+clock. Preparing from it does not authorize live execution.
+
+The sections below are historical records and do not override this status.
+
+- Historical baseline HEAD was `df7f8da8032ba7f1dac420639038de4a35bf2b3a`; Python was `.venv/bin/python` 3.12.3. Pinned SafeClaw upstream was `a11f5cceaba0676be721021f8d232638fd111305`.
 - The production relay now records append-only, per-record-hashed evidence from the final serialized provider payload after filtering/compatibility transforms. It distinguishes `prepared`, `attempted`, transport failure, and `response_received`; binds a control-owned action/workspace/logical-session context to the bridge-observed actual session; and never sends audit metadata upstream.
 - The bridge exports those records and records raw-before-redaction projection hashes for observed tool results and decoded argument values. The common live/replay mapper creates artifact-specific context and derivation candidates. It does not create semantic-use claims, trust `inputToolResultCallIds`, infer from adjacency, or spread a claim to unrelated context inputs.
 - Independent verification loads the current trajectory's hashed evidence file and recomputes record hashes, batch/request/response/context bindings, source artifact/version/scope, target call and configured JSON Pointer. Experimental rule `stac.experimental.exact_tool_result_to_argument.v1` compares exact UTF-8 bytes without normalization. Caller-authored `passed`, equal hashes, old `artifact_use_evidence`, model text, or copied refs cannot pass it.

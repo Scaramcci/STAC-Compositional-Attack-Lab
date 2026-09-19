@@ -309,6 +309,11 @@
           "default": null,
           "title": "Provider Allowed Tools"
         },
+        "provider_evidence_policy": {
+          "additionalProperties": true,
+          "title": "Provider Evidence Policy",
+          "type": "object"
+        },
         "provider_request_budget": {
           "default": 128,
           "exclusiveMinimum": 0,

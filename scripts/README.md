@@ -11,9 +11,9 @@
 
 复验入口不复制历史 `experiments/runs`，不自动启用 live，不探测 provider，也不负责清理其他 run。prepare 会验证模板并写禁用配置、不可变 prepared snapshot、配置审核和 provenance；live 必须同时有仅改变 `execution_enabled` 的运行配置和 `--authorize-live`。launch reservation 在 collection 前原子创建，失败进程不能覆盖获胜进程的 live review/summary；可能已产生请求后的失败不会删除 marker。`max_tokens` 是 collection action 后累计的 Victim usage 检查，不是请求前硬 token 上限。
 
-每次 offline 都写 `<RUN>/analyses/<mode-timestamp-id>/`，不覆盖旧分析。退出码：0 表示所需离线检查通过但 runtime review 仍可 pending；10 表示检查完成但门槛未满足；20 表示输入不足/blocked；30 表示配置或程序错误。live 的 2 表示执行和离线检查完成、等待 runtime review。查看 `<analysis>/offline_summary.json`、`offline_provenance.json` 和 `bridge_replay_diagnostics.json`；历史输入只读引用，不得把派生报告写回历史 run。
+每次 offline 都写 `<RUN>/analyses/<mode-timestamp-id>/`，不覆盖旧分析。退出码：0 表示所需离线检查通过但 runtime review 仍可 pending；10 表示检查完成但门槛未满足；20 表示输入不足/blocked；30 表示配置或程序错误。live 的 2 表示执行和离线检查完成、等待 runtime review。查看 `<analysis>/offline_summary.json`、`offline_provenance.json`、`bridge_replay_diagnostics.json`、`provider_compatibility_report.json` 和 `provider_attempt_reconciliation.json`；历史输入只读引用，不得把派生报告写回历史 run。
 
-`inputToolResultCallIds` 仍没有可信生产者并始终只作诊断。当前 relay/bridge 路径可生成 request-boundary context projection；版本化的 exact UTF-8 verifier 仅在显式 synthetic/experimental policy 下复算强派生，正式默认禁用。fake HTTP/replay 成功只证明工程链路，不证明真实模型、攻击或 official outcome。默认禁用准备命令为：
+`inputToolResultCallIds` 仍没有可信生产者并始终只作诊断。当前 relay/bridge 路径可生成 request-boundary context projection；版本化 policy 必须来自 runtime config，evidence 不能自授权。exact UTF-8 verifier 仅在显式 synthetic/experimental policy 下严格重算 arguments JSON、selector 和 projection，正式默认禁用。fake HTTP/replay 成功只证明工程链路，不证明真实模型、攻击或 official outcome。默认禁用准备命令为：
 
 ```bash
 STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prepare \
@@ -22,3 +22,9 @@ STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prep
 ```
 
 该命令仅生成 `execution_enabled=false` 配置，不是 live 授权。任何单条真实兼容性复验仍需单独审核 policy、provider payload 形状、预算和最终配置后再授权。
+
+本轮提供的有界兼容性模板位于
+`experiments/runs/provider-evidence-offline-20260919-135009/next_compatibility_config.disabled.json`：
+Attacker/Victim/Embedding 各最多 1 次、自动重试 0、墙钟 300 秒、provider evidence policy
+保持 disabled。后续应先用它执行 `prepare --template ... --run-id <new-unique-id>`，再审查生成的
+config/source hash；本轮不得执行 `live`。
