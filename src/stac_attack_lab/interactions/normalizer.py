@@ -104,6 +104,7 @@ def normalize_source_events(
     edges: list[InteractionEdge] = []
     unresolved: list[UnresolvedInteractionLink] = []
     artifact_producers: dict[str, str] = {}
+    artifact_producer_sequences: dict[str, int] = {}
     event_ids: set[str] = set()
 
     ordered = sorted(
@@ -121,6 +122,7 @@ def normalize_source_events(
             if artifact.artifact_id in artifact_producers:
                 raise ValueError(f"duplicate_source_artifact_id:{artifact.artifact_id}")
             artifact_producers[artifact.artifact_id] = event_id
+            artifact_producer_sequences[artifact.artifact_id] = int(raw["sequence_no"])
             artifacts.append(artifact)
             output_ids.append(artifact.artifact_id)
         normalized_status, public_payload = _normalized_status_and_payload(raw)
@@ -179,6 +181,17 @@ def normalize_source_events(
                     UnresolvedInteractionLink(
                         link_id=f"unresolved-artifact-{event.event_id}-{artifact_id}",
                         reason_code="missing_artifact_producer",
+                        target_event_id=event.event_id,
+                        source_ref_ids=[artifact_id],
+                    )
+                )
+                continue
+            if artifact_producer_sequences[artifact_id] >= event.sequence_no:
+                unresolved.append(
+                    UnresolvedInteractionLink(
+                        link_id=f"unresolved-artifact-order-{event.event_id}-{artifact_id}",
+                        reason_code="artifact_producer_not_before_consumer",
+                        source_event_id=source_event_id,
                         target_event_id=event.event_id,
                         source_ref_ids=[artifact_id],
                     )

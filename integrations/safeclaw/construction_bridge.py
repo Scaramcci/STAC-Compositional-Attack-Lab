@@ -13,8 +13,8 @@ import contextlib
 import hashlib
 import importlib.util
 import json
-import subprocess
 import signal
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -35,6 +35,10 @@ from stac_attack_lab.environments.safeclaw.redaction import redact_value
 SUPPORTED_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
 MEMORY_RETRIEVAL_TOOLS = frozenset({"memory_search", "memory_get"})
 PERSISTENCE_FILE_TOOLS = frozenset({"read", "write", "edit"})
+CONTROLLED_WORKSPACE_PREFIXES = (
+    "/root/.openclaw/workspace/",
+    "/workspace/",
+)
 
 
 def _normalise_workspace_path(value: Any) -> str | None:
@@ -42,8 +46,15 @@ def _normalise_workspace_path(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
     candidate = value.replace("\\", "/").strip()
-    if not candidate or candidate.startswith("/"):
+    if not candidate:
         return None
+    if candidate.startswith("/"):
+        for prefix in CONTROLLED_WORKSPACE_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix) :]
+                break
+        else:
+            return None
     parts = [part for part in candidate.split("/") if part not in {"", "."}]
     if not parts or any(part == ".." for part in parts):
         return None
@@ -59,6 +70,26 @@ def _tool_path(arguments_projection: str) -> str | None:
                 if path:
                     return path
     return None
+
+
+def _write_content_hash(tool_name: str, arguments_projection: str) -> str | None:
+    if tool_name != "write":
+        return None
+    with contextlib.suppress(json.JSONDecodeError):
+        value = json.loads(arguments_projection)
+        if isinstance(value, dict) and isinstance(value.get("content"), str):
+            return hashlib.sha256(value["content"].encode()).hexdigest()
+    return None
+
+
+def _observation_class(tool_name: str) -> str:
+    return {
+        "memory_search": "semantic_memory_search",
+        "memory_get": "direct_memory_get",
+        "read": "workspace_file_read",
+        "write": "workspace_file_write",
+        "edit": "workspace_file_edit",
+    }.get(tool_name, "other_tool")
 
 
 def _load_judge(upstream: Path) -> ModuleType:
@@ -176,8 +207,22 @@ def _structured_tool_observations(
                     "arguments_hash": hashlib.sha256(projection.encode()).hexdigest(),
                     "arguments_projection": projection,
                     "workspace_relative_path": _tool_path(projection),
+                    "write_content_hash": _write_content_hash(tool_name, projection),
                     "request_line_number": line_number,
                     "request_evidence_ref": f"openclaw-session-entry:{entry_id}",
+                    # Some pinned/fake gateways can expose an explicit provider
+                    # correlation instead of forcing us to infer use from
+                    # transcript adjacency.  Preserve only call ids here; the
+                    # driver resolves them to observed result artifacts.
+                    "input_result_call_ids": [
+                        str(value)
+                        for value in (
+                            block.get("inputToolResultCallIds")
+                            or message.get("inputToolResultCallIds")
+                            or []
+                        )
+                        if str(value)
+                    ],
                 }
         if message.get("role") in {"toolResult", "tool"}:
             call_id = str(message.get("toolCallId") or message.get("toolUseId") or "")
@@ -194,10 +239,8 @@ def _structured_tool_observations(
                 or parsed_result.get("unavailable") is True
                 or parsed_result.get("disabled") is True
             )
-            observed_empty = (
-                str(message.get("toolName") or "") == "memory_search"
-                and isinstance(parsed_result, dict)
-                and parsed_result.get("results") == []
+            observed_empty = not result_text or (
+                isinstance(parsed_result, dict) and parsed_result.get("results") == []
             )
             observation = (
                 "rejected"
@@ -228,9 +271,13 @@ def _structured_tool_observations(
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
             }
     projected = []
-    for call_id, call in sorted(calls.items(), key=lambda item: (item[1].get("request_line_number", 0), item[0])):
+    for call_id, call in sorted(
+        calls.items(), key=lambda item: (item[1].get("request_line_number", 0), item[0])
+    ):
         result = results.get(call_id)
-        if result is not None and int(result.get("result_line_number", 0)) <= int(call.get("request_line_number", 0)):
+        if result is not None and int(result.get("result_line_number", 0)) <= int(
+            call.get("request_line_number", 0)
+        ):
             result = None
         item = {
             "call_id": call_id,
@@ -246,19 +293,21 @@ def _structured_tool_observations(
             "result_is_error": result.get("result_is_error") if result else None,
             "result_hash_scope": result.get("result_hash_scope") if result else None,
             "result_hash": result.get("result_hash") if result else None,
-            "result_excerpt": result.get("result_excerpt") if result and call["tool_name"] in MEMORY_RETRIEVAL_TOOLS else None,
+            "result_excerpt": result.get("result_excerpt")
+            if result and call["tool_name"] in MEMORY_RETRIEVAL_TOOLS
+            else None,
             "result_evidence_ref": result.get("result_evidence_ref") if result else None,
+            "request_line_number": call.get("request_line_number"),
+            "result_line_number": result.get("result_line_number") if result else None,
+            "result_order_valid": result is not None,
+            "observation_class": _observation_class(call["tool_name"]),
+            "workspace_relative_path": call.get("workspace_relative_path"),
+            "write_content_hash": call.get("write_content_hash"),
+            "input_result_call_ids": call.get("input_result_call_ids", []),
+            "use_evidence_kind": (
+                "explicit_provider_output_reference" if call.get("input_result_call_ids") else None
+            ),
         }
-        # Keep the historical semantic-memory projection wire-compatible; the
-        # richer ordering/path diagnostics are attached to file observations.
-        if call["tool_name"] in PERSISTENCE_FILE_TOOLS:
-            item.update({
-                "workspace_relative_path": call.get("workspace_relative_path"),
-                "request_line_number": call.get("request_line_number"),
-                "result_line_number": result.get("result_line_number") if result else None,
-                "result_order_valid": result is not None,
-                "observation_class": "workspace_file",
-            })
         projected.append(item)
     return projected, observed_ids
 
@@ -613,8 +662,12 @@ def main() -> int:
                     "content_excerpt": item["result_excerpt"],
                     # Upstream may provide a source/version reference. An empty
                     # list is intentional: a result hash alone is not lineage.
-                    "parent_artifact_ids": [str(v) for v in item.get("parent_artifact_ids", []) if str(v)],
+                    "parent_artifact_ids": [
+                        str(v) for v in item.get("parent_artifact_ids", []) if str(v)
+                    ],
                     "request_event_id": f"tool-call-{item['call_id']}",
+                    "request_line_number": item.get("request_line_number"),
+                    "result_line_number": item.get("result_line_number"),
                     "evidence_ref_ids": [
                         item["request_evidence_ref"],
                         item["result_evidence_ref"],
@@ -634,11 +687,32 @@ def main() -> int:
                     "result_observation": item.get("result_observation"),
                     "result_empty": bool(item.get("result_empty")),
                     "result_order_valid": bool(item.get("result_order_valid")),
+                    "request_line_number": item.get("request_line_number"),
+                    "result_line_number": item.get("result_line_number"),
                     "request_evidence_ref": item.get("request_evidence_ref"),
                     "result_evidence_ref": item.get("result_evidence_ref"),
                 }
                 for item in tool_observations
-                if item.get("tool_name") in PERSISTENCE_FILE_TOOLS
+                if item.get("tool_name") == "read"
+            ]
+            result["persistence_writes"] = [
+                {
+                    "call_id": item["call_id"],
+                    "classification": item.get("observation_class"),
+                    "workspace_relative_path": item.get("workspace_relative_path"),
+                    "content_hash": item.get("write_content_hash"),
+                    "content_hash_scope": "redacted_text_content"
+                    if item.get("write_content_hash")
+                    else None,
+                    "result_observation": item.get("result_observation"),
+                    "result_order_valid": bool(item.get("result_order_valid")),
+                    "request_line_number": item.get("request_line_number"),
+                    "result_line_number": item.get("result_line_number"),
+                    "request_evidence_ref": item.get("request_evidence_ref"),
+                    "result_evidence_ref": item.get("result_evidence_ref"),
+                }
+                for item in tool_observations
+                if item.get("tool_name") in {"write", "edit"}
             ]
             if observed_retrievals:
                 result["memory_retrieval_observation"] = "observed"

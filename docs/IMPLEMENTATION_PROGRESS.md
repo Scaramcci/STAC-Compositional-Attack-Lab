@@ -1,10 +1,12 @@
-# Current status — 2026-09-16 (offline engineering round)
+# Current status — 2026-09-19 (offline evidence-chain engineering)
 
-- HEAD at review start: `b60d9b1e5588073a81cacf38c63900de70c70f86`; working tree is intentionally dirty with this round's uncommitted changes.
-- No directory matching the referenced `construction-cross-session-20260915-214932-33f82859` run is present on this checkout. Its reported facts are therefore not re-verified here and no fixture is presented as that run. Existing historical raw/bridge/mining/report artifacts were not modified.
-- Completed offline: bridge tool/result correlation and ordering metadata; bounded workspace path classification; explicit semantic-memory vs memory_get vs ordinary-file read states; persistent state version artifacts; driver read events; evidence-rich admission diagnostics; versioned disabled revalidation template and `revalidation prepare/offline` CLI.
-- Offline evidence remains synthetic or replay evidence. It does not establish a real SafeClaw cross-session run, semantic recall, attack success, runtime isolation, or official outcome.
-- Verification in this round: specialized persistence/normalization/admission/CLI tests and the new bridge→normalizer→admission regression are recorded in the handoff; full `make check` is still required after any environment-specific socket permission issue is resolved.
+- Review-start HEAD is `3e7e40fc6ff837cd3871991b32566f6d7203acf4`; the working tree is intentionally dirty with uncommitted user/round changes. No commit, reset, clean, or push was performed.
+- The real run `construction-cross-session-20260915-214932-33f82859` is present and was re-verified read-only. It is complete with four distinct actual-session identities, one stable workspace/index namespace, three lifecycle requests, Attacker/Victim/Embedding attempts 8/16/0, candidate/accepted/negative 1/1/0, and a passing library audit. Structural admission still fails: the historical projection does not preserve a reliable file-version write→read link or explicit downstream consumption. Runtime review remains pending and official outcome remains `not_evaluated`.
+- Offline implementation now distinguishes semantic `memory_search`, direct `memory_get`, ordinary workspace-file reads, and unknown/not-observed/not-occurred/error/empty states. It preserves bounded paths, request/result order and refs, content-hash scope, file-version lineage, session/workspace identity, context reachability, and only explicitly correlated downstream consumption.
+- Admission schema `1.2` reports observed/failed/unknown per gate, reason codes, evidence and missing facts; file, semantic-search, and direct-get chains are separate. Accepted samples, structural admission, runtime review, live authorization, and official outcome remain independent.
+- A new read-only-input replay was written to `experiments/runs/offline-replay-cross-session-20260919-evidence-v2/`. Mine and audit pass, admission fails as expected; the old raw/bridge/mining/report files were not modified. Its input and processing hashes are in `offline_provenance.json`.
+- Current verification: 33 focused tests pass. The first sandboxed `make check` reached 229 passed with 6 loopback-socket permission failures; the permitted local-socket rerun then passed completely: ruff format/check, mypy (71 source files), and **235 tests**. `git diff --check` also passes.
+- The positive end-to-end regression is synthetic bridge-shaped evidence, not a real construction success. No real provider request, diagnostic, construction, pilot, main, freeze, or formal evaluation was run in this round.
 
 # Implementation Progress
 

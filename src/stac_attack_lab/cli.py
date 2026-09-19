@@ -13,6 +13,11 @@ from stac_attack_lab.environments.safeclaw.preflight import (
 )
 from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
 from stac_attack_lab.execution.construction_admission import audit_construction_collection
+from stac_attack_lab.execution.revalidation import (
+    launch_live_revalidation,
+    offline_revalidation,
+    prepare_revalidation,
+)
 from stac_attack_lab.execution.safeclaw_formal import (
     load_safeclaw_formal_config,
     run_safeclaw_formal,
@@ -25,7 +30,6 @@ from stac_attack_lab.execution.sample_generation import (
     mine_sample_collection,
 )
 from stac_attack_lab.execution.sample_preflight import run_sample_collection_preflight
-from stac_attack_lab.execution.revalidation import offline_revalidation, prepare_revalidation
 from stac_attack_lab.recording.formal_run_recorder import FormalRunRecorder
 from stac_attack_lab.reporting.formal_report import build_formal_report
 from stac_attack_lab.schema_registry import SCHEMA_MODELS, validate_schema_registry
@@ -110,12 +114,18 @@ def _build_parser() -> argparse.ArgumentParser:
     revalidation = sub.add_parser("revalidation", help="offline preparation and evidence replay")
     rv_sub = revalidation.add_subparsers(dest="revalidation_command", required=True)
     rv_prepare = rv_sub.add_parser("prepare")
-    rv_prepare.add_argument("--template", default="configs/sample_generation/cross_session_revalidation.disabled.json")
+    rv_prepare.add_argument(
+        "--template", default="configs/sample_generation/cross_session_revalidation.disabled.json"
+    )
     rv_prepare.add_argument("--run-id")
     rv_offline = rv_sub.add_parser("offline")
     rv_offline.add_argument("--run-root", required=True)
     rv_offline.add_argument("--collection")
     rv_offline.add_argument("--library")
+    rv_offline.add_argument("--bridge-responses")
+    rv_live = rv_sub.add_parser("live")
+    rv_live.add_argument("--run-root", required=True)
+    rv_live.add_argument("--authorize-live", action="store_true")
 
     safeclaw = sub.add_parser("safeclaw")
     safeclaw_sub = safeclaw.add_subparsers(dest="safeclaw_command", required=True)
@@ -150,17 +160,28 @@ def _main(argv: list[str] | None = None) -> int:
 
     if args.command == "revalidation":
         if args.revalidation_command == "prepare":
-            run_root = prepare_revalidation(root, _project_scoped_path(root, args.template), args.run_id)
+            run_root = prepare_revalidation(
+                root, _project_scoped_path(root, args.template), args.run_id
+            )
             print(run_root)
             return 0
+        if args.revalidation_command == "live":
+            report = launch_live_revalidation(
+                root,
+                _project_scoped_path(root, args.run_root),
+                authorized=args.authorize_live,
+            )
+            print(json.dumps(report, indent=2, sort_keys=True, default=str))
+            return 0 if report.get("execution_status") == "completed" else 1
         report = offline_revalidation(
             root,
             _project_scoped_path(root, args.run_root),
             _project_scoped_path(root, args.collection) if args.collection else None,
             _project_scoped_path(root, args.library) if args.library else None,
+            _project_scoped_path(root, args.bridge_responses) if args.bridge_responses else None,
         )
         print(json.dumps(report, indent=2, sort_keys=True, default=str))
-        return 0 if not any(stage.get("status") == "failed" for stage in report.get("stages", [])) else 1
+        return 0 if report.get("overall_status") == "passed" else 1
 
     if args.command == "sample":
         if args.sample_command in {"collect-preflight", "collect", "collect-and-mine"}:

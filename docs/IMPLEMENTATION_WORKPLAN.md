@@ -1,15 +1,15 @@
-# Current workplan — 2026-09-16
+# Current workplan — 2026-09-19
 
-Current blocker: the referenced latest real construction run is absent from this checkout, and no live request is authorized in this round. The offline evidence chain is implemented and testable, but runtime network/isolation cleanup and official outcome remain pending.
+Current blocker: the latest real run is present, but its historical bridge projection lacks file-version lineage and explicit read-result consumption, so it correctly remains structurally unadmitted. Runtime network/isolation/cleanup evidence is also pending, and no live request is authorized in this round.
 
 Execution order:
 
-1. Complete offline evidence-chain validation (bridge → durable artifacts → session transition → read → downstream consumption → normalization/mining → admission).
+1. Complete offline evidence-chain validation (bridge → durable artifacts → session transition → read → downstream consumption → normalization/mining → admission). **Implemented; focused tests pass, full socket-dependent check still needs a permitted environment.**
 2. After explicit authorization, run one fresh real revalidation from `configs/sample_generation/cross_session_revalidation.disabled.json` with a unique run/batch/output; enable execution only in that copied run config.
 3. Perform independent structural and runtime review.
 4. Only after approval, run pilot, then main/freeze, then the formal matrix.
 
-The synthetic regression is not a real construction success and cannot substitute for the missing run or grant pilot authorization.
+The synthetic regression is not a real construction success and cannot upgrade the historical run or grant pilot authorization. The single real revalidation in step 2 must remain disabled until separately authorized.
 
 # Implementation Workplan
 

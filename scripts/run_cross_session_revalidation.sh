@@ -14,8 +14,12 @@ case "${1:-prepare}" in
     shift
     exec "$PY" -m stac_attack_lab.cli revalidation offline "$@"
     ;;
+  live)
+    shift
+    exec "$PY" -m stac_attack_lab.cli revalidation live "$@"
+    ;;
   *)
-    echo "usage: $0 [prepare [--run-id ID] [--template PATH] | offline --run-root PATH [--collection PATH] [--library PATH]]" >&2
+    echo "usage: $0 [prepare ... | offline --run-root PATH ... | live --run-root PATH --authorize-live]" >&2
     exit 2
     ;;
 esac

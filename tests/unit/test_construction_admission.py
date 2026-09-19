@@ -43,6 +43,8 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
                 previous_delivery_session_identity_sha256=stable_hash("session-1"),
                 new_session_request_action_id="restart-1",
             )
+        if e["event_id"] == "e7":
+            e["public_payload"]["use_evidence_kind"] = "explicit_provider_output_reference"
     fixture = tmp_path / "fixture.jsonl"
     fixture.write_text(json.dumps(source) + "\n")
     config = load_sample_generation_config(

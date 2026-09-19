@@ -2,7 +2,7 @@
 
 用于授权、隔离的 SafeClaw/OpenClaw 组合攻击研究。项目从真实 collection 轨迹提取带因果证据的 primitive chain，审计并冻结 sample library，再用配对条件评测 Planner、独立 Attacker、机制判定和 SafeClaw 官方判定。它不面向真实账号、生产系统或公网目标。
 
-当前审查 HEAD 由 `git rev-parse HEAD` 确认；本轮改造未提交。复验默认入口为版本化 `revalidation prepare/offline`，默认 `execution_enabled=false`；不要从历史 run 复制配置或审核结论。Victim 主线是 Ark endpoint `ep-20260909180104-hmx9m`，API root 是 `https://ark.cn-beijing.volces.com/api/v3`；Planner 与 Attacker 使用 `gpt-5.6-sol`，embedding 使用独立 `SAFECLAW_EMBEDDING_*` 配置。
+当前审查 HEAD 始终以 `git rev-parse HEAD` 和 run provenance 为准；不要在多处复制易失效的 commit 值。复验默认入口为版本化 `revalidation prepare/offline`，默认 `execution_enabled=false`；不要从历史 run 复制配置或审核结论。Victim 主线是 Ark endpoint `ep-20260909180104-hmx9m`，API root 是 `https://ark.cn-beijing.volces.com/api/v3`；Planner 与 Attacker 使用 `gpt-5.6-sol`，embedding 使用独立 `SAFECLAW_EMBEDDING_*` 配置。
 
 ## 结构
 
@@ -60,6 +60,16 @@ STAC_PYTHON=python bash scripts/run_formal_evaluation.sh --run-id <unique-run-id
 
 当前 `data/primitive_libraries/frozen/safeclaw-main` 不存在，因此 formal 入口应在 Victim episode 前清楚地 fail closed；本次整理没有生成假库，也没有运行正式实验。
 
+跨会话单条复验的安全入口（prepare/offline 均不访问 provider）：
+
+```bash
+STAC_PYTHON=python bash scripts/run_cross_session_revalidation.sh prepare
+STAC_PYTHON=python bash scripts/run_cross_session_revalidation.sh offline \
+  --run-root experiments/runs/<prepared-run>
+```
+
+真实 `live` 子命令要求另行授权、prepared config 显式启用以及 `--authorize-live`，并以同一 run 内的原子标记防重复启动；详见 [scripts/README.md](scripts/README.md)。
+
 统一诊断入口：
 
 ```bash
@@ -68,4 +78,4 @@ python scripts/diagnostics/run_openclaw_diagnostics.py --mode live
 python scripts/diagnostics/run_openclaw_diagnostics.py --mode memory-live --run-id <unique-run-id>
 ```
 
-`live` 只用于受控的文本与单一 `add` 往返检查；`memory-live` 只用于普通合成 memory 写入、跨会话 `memory_search`/`memory_get` 观测，不是攻击或 collection。详见 [教师向项目指南](docs/PROJECT_GUIDE_ZH.md)、[Linux 运行说明](docs/LINUX_TMUX_RUNBOOK_ZH.md) 和 [安全边界](SECURITY.md)。
+`live` 只用于受控的文本与单一 `add` 往返检查；`memory-live` 只用于普通合成 memory 写入、跨会话 `memory_search`/`memory_get` 观测，不是攻击或 collection。详见 [项目结构说明](docs/PROJECT_STRUCTURE_ZH.md)、[Linux 运行说明](docs/LINUX_TMUX_RUNBOOK_ZH.md) 和 [安全边界](SECURITY.md)。

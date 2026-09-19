@@ -10,6 +10,13 @@
       "title": "Elapsed Wall Time Ms",
       "type": "integer"
     },
+    "legal_action_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Legal Action Types",
+      "type": "array"
+    },
     "legal_reroute_ids": {
       "items": {
         "type": "string"

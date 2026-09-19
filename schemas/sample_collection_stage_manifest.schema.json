@@ -30,6 +30,39 @@
           "title": "Allowed Victim Models",
           "type": "array"
         },
+        "attacker_decision_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attacker Decision Budget"
+        },
+        "attacker_http_502_retries": {
+          "default": 0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Attacker Http 502 Retries",
+          "type": "integer"
+        },
+        "attacker_request_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attacker Request Budget"
+        },
         "attacker_stage_implemented": {
           "default": false,
           "title": "Attacker Stage Implemented",

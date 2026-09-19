@@ -79,6 +79,14 @@ def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None
             "result_hash": observations[0]["result_hash"],
             "result_excerpt": "memory/MEMORY.md:1 SYNTHETIC_CANARY",
             "result_evidence_ref": "openclaw-session-entry:result-entry",
+            "request_line_number": 1,
+            "result_line_number": 2,
+            "result_order_valid": True,
+            "observation_class": "semantic_memory_search",
+            "workspace_relative_path": None,
+            "write_content_hash": None,
+            "input_result_call_ids": [],
+            "use_evidence_kind": None,
         }
     ]
     repeated, _ = project(raw, seen, [])
