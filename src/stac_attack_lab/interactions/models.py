@@ -101,6 +101,7 @@ class RawInteractionTrajectory(StrictModel):
     session_ids: list[str]
     event_refs: list[SourceReference]
     checkpoint_refs: list[SourceReference]
+    evidence_refs: list[SourceReference] = Field(default_factory=list)
     model_hashes: dict[str, str]
     config_hash: str
     collection_seed: int

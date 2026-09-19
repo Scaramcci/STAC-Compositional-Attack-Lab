@@ -54,6 +54,7 @@ def build_safeclaw_model_config(
     embedding_request_budget: int = 128,
     provider_context_window: int = 200000,
     provider_max_output_tokens: int = 1024,
+    provider_evidence_policy: dict[str, Any] | None = None,
     batch_id: str | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     target_api_key = environment.get(target_api_key_env)
@@ -90,6 +91,8 @@ def build_safeclaw_model_config(
         "embedding_request_budget": embedding_request_budget,
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
+        "provider_evidence_policy": provider_evidence_policy
+        or {"enabled": False, "policy_id": "formal-disabled"},
     }
     if batch_id:
         payload["batch_id"] = batch_id

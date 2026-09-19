@@ -92,6 +92,7 @@ class ConstructionVictimResult(StrictModel):
     episode_id: str
     source_events: list[dict[str, Any]] = Field(default_factory=list)
     checkpoints: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_records: list[dict[str, Any]] = Field(default_factory=list)
     model_hashes: dict[str, str]
     config_hash: str
     status: Literal["complete", "partial", "blocked", "error"]
@@ -116,6 +117,8 @@ class ConstructionVictimDriver(Protocol):
     def finish(self) -> ConstructionVictimResult: ...
 
     def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]: ...
+
+    def boundary_evidence_snapshot(self) -> list[dict[str, Any]]: ...
 
     def diagnostic_snapshot(self) -> str | None: ...
 
@@ -365,6 +368,7 @@ class SafeClawConstructionInteractionAdapter:
                 session_ids=list(dict.fromkeys(session_ids)),
                 source_events=partial_events,
                 checkpoints=partial_checkpoints,
+                evidence_records=self.driver.boundary_evidence_snapshot(),
                 model_hashes={"victim": self.driver.model_hash},
                 config_hash=stable_hash({"task": task.source_task_id, "seed": seed}),
                 status="partial" if partial_events else "error",
@@ -395,6 +399,7 @@ class SafeClawConstructionInteractionAdapter:
             session_ids=list(dict.fromkeys(session_ids)),
             source_events=all_events,
             checkpoints=all_checkpoints,
+            evidence_records=result.evidence_records,
             model_hashes=result.model_hashes,
             config_hash=result.config_hash,
             status=final_status,
@@ -440,55 +445,6 @@ def safeclaw_task_set_hash(task_set: SafeClawConstructionTaskSet) -> str:
     return stable_hash(task_set.model_dump(mode="json"))
 
 
-def replay_bridge_action_responses(
-    records: list[dict[str, Any]], *, task_id: str, workspace_version_seed: str = "replay"
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    """Replay complete action/response records through the live driver's mapper.
-
-    The records must contain both sides of the boundary. Missing actions or
-    responses are rejected instead of being inferred from tool order.
-    """
-    driver = object.__new__(SafeClawSubprocessVictimDriver)
-    driver._budget = CollectionBudget()
-    driver._started_at = monotonic()
-    driver._last_state = {}
-    driver._new_session_pending = False
-    driver._event_sequence = 0
-    driver._events = []
-    driver._checkpoints = []
-    driver._workspace_versions = {}
-    driver._provider_call_occurrences = {}
-    driver._provider_requests_spent = 0
-    driver._embedding_requests_spent = 0
-    driver._current_provider_requests = 0
-    driver._current_embedding_requests = 0
-    sessions: list[str] = []
-
-    def response_sender(value: dict[str, Any]) -> Any:
-        def send(_request: dict[str, Any]) -> dict[str, Any]:
-            return value
-
-        return send
-
-    del task_id, workspace_version_seed
-    for index, record in enumerate(records, start=1):
-        if not isinstance(record.get("action"), dict):
-            raise ValueError(f"bridge_replay_action_missing:{index}")
-        if not isinstance(record.get("response"), dict):
-            raise ValueError(f"bridge_replay_response_missing:{index}")
-        action = ConstructionAttackerAction.model_validate(record["action"])
-        response = cast(dict[str, Any], record["response"])
-        if action.action_type == "deliver_message" and (
-            not isinstance(response.get("session"), dict) or "post_state" not in response
-        ):
-            raise ValueError(f"bridge_replay_state_missing:{index}")
-
-        driver._send_bridge = response_sender(response)  # type: ignore[method-assign]
-        step = driver.apply(action)
-        sessions.append(step.session_id)
-    return list(driver._events), list(driver._checkpoints), list(dict.fromkeys(sessions))
-
-
 class SafeClawSubprocessVictimDriver:
     """Runs one isolated SafeClaw victim container for an adaptive construction trace."""
 
@@ -510,6 +466,7 @@ class SafeClawSubprocessVictimDriver:
         provider_timeout_seconds: int = 90,
         provider_allowed_tools: list[str] | None = None,
         embedding_request_budget: int = 128,
+        provider_evidence_policy: dict[str, Any] | None = None,
         environment: Mapping[str, str] | None = None,
         batch_id: str | None = None,
     ) -> None:
@@ -526,6 +483,10 @@ class SafeClawSubprocessVictimDriver:
         self.provider_timeout_seconds = provider_timeout_seconds
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
+        self.provider_evidence_policy = provider_evidence_policy or {
+            "enabled": False,
+            "policy_id": "formal-disabled",
+        }
         self.environment = environment if environment is not None else os.environ
         self.batch_id = batch_id
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -544,10 +505,11 @@ class SafeClawSubprocessVictimDriver:
         self._embedding_requests_spent = 0
         self._current_provider_requests = 0
         self._current_embedding_requests = 0
+        self._boundary_evidence_records: list[dict[str, Any]] = []
+        self._boundary_evidence_record_ids: set[str] = set()
         # Only versions established by an observed successful write are eligible
         # for later file-read lineage. Edits without a post-image invalidate it.
         self._workspace_versions: dict[tuple[str, str], tuple[str, str, str]] = {}
-        self._provider_call_occurrences: dict[str, int] = {}
 
     @staticmethod
     def _accepted_request_count(records: Any) -> int:
@@ -579,6 +541,27 @@ class SafeClawSubprocessVictimDriver:
     def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return append-only observations collected before an abort."""
         return list(self._events), list(self._checkpoints)
+
+    def boundary_evidence_snapshot(self) -> list[dict[str, Any]]:
+        return list(getattr(self, "_boundary_evidence_records", []))
+
+    def _ingest_boundary_evidence(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+        if not hasattr(self, "_boundary_evidence_records"):
+            self._boundary_evidence_records = []
+            self._boundary_evidence_record_ids = set()
+        raw_records = response.get("provider_boundary_evidence", [])
+        if not isinstance(raw_records, list):
+            return []
+        current: list[dict[str, Any]] = []
+        for raw in raw_records:
+            if not isinstance(raw, dict) or not isinstance(raw.get("record_id"), str):
+                continue
+            record = dict(raw)
+            current.append(record)
+            if record["record_id"] not in self._boundary_evidence_record_ids:
+                self._boundary_evidence_record_ids.add(record["record_id"])
+                self._boundary_evidence_records.append(record)
+        return current
 
     def diagnostic_snapshot(self) -> str | None:
         """Return a bounded, redacted bridge stderr tail before cleanup."""
@@ -643,6 +626,7 @@ class SafeClawSubprocessVictimDriver:
             provider_timeout_seconds=self.provider_timeout_seconds,
             provider_allowed_tools=self.provider_allowed_tools,
             embedding_request_budget=embedding_remaining,
+            provider_evidence_policy=self.provider_evidence_policy,
             batch_id=self.batch_id,
         )
         self._started_at = monotonic()
@@ -703,6 +687,8 @@ class SafeClawSubprocessVictimDriver:
         self._last_state = dict(self._pre_state)
         pre_hash = stable_hash(self._pre_state)
         self._checkpoints = [{"checkpoint_id": "victim-pre", "state_hash": pre_hash}]
+        self._boundary_evidence_records = []
+        self._boundary_evidence_record_ids = set()
         return ConstructionObservation(
             task_id=task.source_task_id,
             session_index=0,
@@ -766,6 +752,18 @@ class SafeClawSubprocessVictimDriver:
                 ),
             }
         )
+        return self.map_bridge_action_response(action, response)
+
+    def map_bridge_action_response(
+        self,
+        action: ConstructionAttackerAction,
+        response: dict[str, Any],
+    ) -> ConstructionVictimStep:
+        """Purely map one recorded action/bridge response into source events.
+
+        Replay initializes the same bounded driver state and calls this method;
+        it performs no subprocess, provider, Docker, or model operation.
+        """
         self._observe_request_ledgers(response)
         # Model action IDs may repeat across retries; bind every attempt to a local nonce.
         action_nonce = self._event_sequence + 1
@@ -792,6 +790,7 @@ class SafeClawSubprocessVictimDriver:
                 public_stage_status={"lifecycle": "new_session_pending"},
             )
         session = cast(dict[str, Any], response.get("session", {}))
+        boundary_records = self._ingest_boundary_evidence(response)
         session["provider_request_ledger"] = response.get("provider_request_ledger", [])
         session["embedding_request_ledger"] = response.get("embedding_request_ledger", [])
         post_state = cast(dict[str, Any], response.get("post_state", {}))
@@ -883,8 +882,11 @@ class SafeClawSubprocessVictimDriver:
                     retrieved_parents = []
                 evidence_refs = raw_retrieval.get("evidence_ref_ids", [])
                 evidence_refs = [str(item).strip() for item in evidence_refs if str(item).strip()]
+                retrieval_occurrence = stable_hash(
+                    [session_id, retrieval_id, action_nonce, retrieval_index]
+                )[:16]
                 retrieval_event: dict[str, Any] = {
-                    "event_id": f"state-read-memory-{retrieval_id}",
+                    "event_id": f"state-read-memory-{retrieval_id}-{retrieval_occurrence}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "_provider_order": int(raw_retrieval.get("result_line_number") or 900_001) * 10
@@ -1026,13 +1028,7 @@ class SafeClawSubprocessVictimDriver:
         if isinstance(tool_observations, list) and tool_observations:
             tool_calls = tool_observations
         indexed_tool_calls = list(enumerate(tool_calls if isinstance(tool_calls, list) else []))
-        result_artifacts_by_call: dict[str, tuple[int, str]] = {}
-        call_id_counts: dict[str, int] = {}
-        for _, item in indexed_tool_calls:
-            if isinstance(item, dict):
-                item_call_id = str(item.get("id") or item.get("call_id") or "")
-                if item_call_id:
-                    call_id_counts[item_call_id] = call_id_counts.get(item_call_id, 0) + 1
+        result_artifacts_by_call: dict[str, list[tuple[int, str, str]]] = {}
         request_lines = sorted(
             {
                 int(cast(int | str, item.get("request_line_number")))
@@ -1045,38 +1041,122 @@ class SafeClawSubprocessVictimDriver:
                 continue
             result_call_id = str(raw_call.get("id") or raw_call.get("call_id") or "")
             result_line = raw_call.get("result_line_number")
-            if (
-                result_call_id
-                and result_line is not None
-                and call_id_counts.get(result_call_id) == 1
-            ):
+            if result_call_id and result_line is not None:
+                occurrence = stable_hash(
+                    [
+                        session.get("actual_session_identity_sha256") or session_id,
+                        result_call_id,
+                        action_nonce,
+                        result_index,
+                    ]
+                )[:16]
                 result_artifact_id = (
-                    f"artifact-file-read-{result_call_id}-{action_nonce}-{result_index}"
+                    f"artifact-file-read-{result_call_id}-{occurrence}"
                     if raw_call.get("tool_name") == "read"
-                    else f"artifact-recall-{result_call_id}-{action_nonce}-{result_index}"
+                    else f"artifact-recall-{result_call_id}-{occurrence}"
                     if raw_call.get("tool_name") in {"memory_search", "memory_get"}
-                    else f"artifact-tool-result-{result_call_id}-{action_nonce}-{result_index}"
+                    else f"artifact-tool-result-{result_call_id}-{occurrence}"
                 )
-                result_artifacts_by_call[result_call_id] = (
-                    int(result_line),
-                    result_artifact_id,
+                result_artifacts_by_call.setdefault(result_call_id, []).append(
+                    (
+                        int(result_line),
+                        result_artifact_id,
+                        str(raw_call.get("raw_result_projection_sha256") or ""),
+                    )
                 )
+        closed_contexts = {
+            str(record.get("control_context_id")): record
+            for record in boundary_records
+            if record.get("record_type") == "control_context"
+            and record.get("context_state") == "closed"
+            and record.get("close_state") == "completed"
+            and record.get("action_id") == action.action_id
+            and record.get("actual_session_identity_sha256")
+            == session.get("actual_session_identity_sha256")
+            and record.get("workspace_identity_sha256") == session.get("workspace_identity_sha256")
+        }
+        boundary_links_by_consumer: dict[str, list[dict[str, Any]]] = {}
+        for record in boundary_records:
+            context_record = closed_contexts.get(str(record.get("control_context_id")))
+            if (
+                record.get("record_type") != "provider_response"
+                or record.get("send_state") != "response_received"
+                or context_record is None
+                or record.get("action_id") != action.action_id
+                or record.get("workspace_identity_sha256")
+                != session.get("workspace_identity_sha256")
+            ):
+                continue
+            sources = record.get("source_tool_results", [])
+            targets = record.get("target_tool_arguments", [])
+            if not isinstance(sources, list) or not isinstance(targets, list):
+                continue
+            for target in targets:
+                if not isinstance(target, dict) or not isinstance(
+                    target.get("target_tool_call_id"), str
+                ):
+                    continue
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    source_call_id = source.get("tool_result_call_id")
+                    candidates = result_artifacts_by_call.get(str(source_call_id), [])
+                    matching = [
+                        (line, artifact_id)
+                        for line, artifact_id, raw_hash in candidates
+                        if raw_hash
+                        and raw_hash == source.get("projection_sha256")
+                        and source.get("projection_complete") is True
+                    ]
+                    if len(matching) != 1:
+                        continue
+                    _, artifact_id = matching[0]
+                    response_ref = (
+                        f"provider-evidence:{record['record_id']}:{record.get('record_sha256')}"
+                    )
+                    context_ref = (
+                        f"provider-evidence:{context_record['record_id']}:"
+                        f"{context_record.get('record_sha256')}"
+                    )
+                    boundary_links_by_consumer.setdefault(
+                        str(target["target_tool_call_id"]), []
+                    ).append(
+                        {
+                            "source_artifact_id": artifact_id,
+                            "source_tool_result_call_id": source_call_id,
+                            "request_id": record.get("request_id"),
+                            "batch_id": record.get("batch_id"),
+                            "control_context_id": record.get("control_context_id"),
+                            "rule_id": record.get("rule_id"),
+                            "target_tool_call_id": target.get("target_tool_call_id"),
+                            "target_tool_name": target.get("target_tool_name"),
+                            "target_json_pointer": target.get("target_json_pointer"),
+                            "evidence_ref_ids": [response_ref, context_ref],
+                        }
+                    )
         tool_call_event_ids: list[str] = []
-        call_event_ids: dict[str, str] = {}
+        tool_call_event_by_provider_id: dict[str, str] = {}
         for index, tool_call in indexed_tool_calls:
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
             provider_call_id = (
                 str(call_payload.get("id") or call_payload.get("call_id") or "") or None
             )
-            occurrences = getattr(self, "_provider_call_occurrences", {})
-            self._provider_call_occurrences = occurrences
-            call_key = provider_call_id or f"{action.action_id}-{index}"
-            occurrence = occurrences.get(call_key, 0) + 1
-            occurrences[call_key] = occurrence
-            tool_call_event_id = f"tool-call-{call_key}-{action_nonce}-{index}-{occurrence}"
-            if provider_call_id:
-                call_event_ids[provider_call_id] = tool_call_event_id
+            call_occurrence = stable_hash(
+                [
+                    session.get("actual_session_identity_sha256") or session_id,
+                    provider_call_id or action.action_id,
+                    action_nonce,
+                    index,
+                ]
+            )[:16]
+            tool_call_event_id = (
+                f"tool-call-{provider_call_id}-{call_occurrence}"
+                if provider_call_id
+                else f"tool-call-{action.action_id}-{call_occurrence}"
+            )
             tool_call_event_ids.append(tool_call_event_id)
+            if provider_call_id:
+                tool_call_event_by_provider_id[provider_call_id] = tool_call_event_id
             request_line = call_payload.get("request_line_number")
             context_inputs: list[str] = []
             if request_line is not None:
@@ -1085,40 +1165,22 @@ class SafeClawSubprocessVictimDriver:
                 lower_bound = max(prior_request_lines, default=-1)
                 context_inputs = [
                     artifact_id
-                    for result_line, artifact_id in result_artifacts_by_call.values()
+                    for values in result_artifacts_by_call.values()
+                    for result_line, artifact_id, _ in values
                     if lower_bound < result_line < request_line_int
                 ]
-            explicit_result_call_ids = call_payload.get("input_result_call_ids", [])
-            raw_consumption = call_payload.get("consumption_evidence", [])
-            verified_consumption: list[dict[str, str]] = []
-            if isinstance(raw_consumption, list):
-                for item in raw_consumption:
-                    if not isinstance(item, dict):
-                        continue
-                    source_call_id = str(item.get("source_result_call_id") or "")
-                    artifact = result_artifacts_by_call.get(source_call_id)
-                    evidence_ref = str(item.get("evidence_ref") or "")
-                    kind = str(item.get("kind") or "")
-                    rule = str(item.get("verification_rule") or "")
-                    if (
-                        artifact
-                        and evidence_ref
-                        and kind
-                        in {"deterministic_output_reference", "deterministic_argument_derivation"}
-                        and rule
-                    ):
-                        verified_consumption.append(
-                            {
-                                "source_result_call_id": source_call_id,
-                                "artifact_id": artifact[1],
-                                "evidence_ref": evidence_ref,
-                                "kind": kind,
-                                "verification_rule": rule,
-                                "source_field": str(item.get("source_field") or "tool_result"),
-                                "target_field": str(item.get("target_field") or "tool_arguments"),
-                            }
-                        )
-            semantic_inputs = [item["artifact_id"] for item in verified_consumption]
+            boundary_links = boundary_links_by_consumer.get(str(provider_call_id), [])
+            verified_inputs = [
+                str(item["source_artifact_id"])
+                for item in boundary_links
+                if isinstance(item.get("source_artifact_id"), str)
+            ]
+            boundary_refs = [
+                str(ref)
+                for item in boundary_links
+                for ref in item.get("evidence_ref_ids", [])
+                if isinstance(ref, str)
+            ]
             source_events.append(
                 {
                     "event_id": tool_call_event_id,
@@ -1130,30 +1192,33 @@ class SafeClawSubprocessVictimDriver:
                     "component_role": "effect_tool",
                     "operation": "safeclaw.tool_request",
                     "status": "attempted",
-                    "input_artifact_ids": semantic_inputs,
+                    "input_artifact_ids": list(dict.fromkeys(verified_inputs)),
                     "public_payload": {
                         **call_payload,
                         "provider_tool_call_id": provider_call_id,
                         "execution_result_observed": call_payload.get("result_observation")
                         in {"observed", "rejected", "error"},
-                        "transcript_predecessor_artifact_ids": context_inputs,
-                        "context_reachability_evidence": call_payload.get(
-                            "context_reachability_evidence", []
+                        "context_reachability_status": "unknown",
+                        "transcript_order_candidate_artifact_ids": context_inputs,
+                        "artifact_context_evidence": boundary_links,
+                        "artifact_derivation_candidates": boundary_links,
+                        "artifact_use_evidence": [],
+                        "reported_input_result_call_ids": call_payload.get(
+                            "reported_input_result_call_ids", []
                         ),
-                        "consumption_evidence": verified_consumption,
-                        "explicit_input_result_call_ids": explicit_result_call_ids,
-                        "explicit_input_result_call_ids_contract": call_payload.get(
-                            "input_result_call_ids_contract",
-                            "unsupported_untrusted_compatibility_field",
-                        ),
+                        "correlation_contract": call_payload.get("correlation_contract"),
                     },
-                    "evidence_ref_ids": [
-                        str(
-                            call_payload.get("request_evidence_ref")
-                            or f"bridge:{session_id}:tool:{index}"
+                    "evidence_ref_ids": list(
+                        dict.fromkeys(
+                            [
+                                str(
+                                    call_payload.get("request_evidence_ref")
+                                    or f"bridge:{session_id}:tool:{index}"
+                                ),
+                                *boundary_refs,
+                            ]
                         )
-                    ]
-                    + [item["evidence_ref"] for item in verified_consumption],
+                    ),
                 }
             )
             result_observation = str(call_payload.get("result_observation", "not_observed"))
@@ -1173,7 +1238,7 @@ class SafeClawSubprocessVictimDriver:
             )
             result_event: dict[str, Any] = {
                 "event_id": (
-                    f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
+                    f"tool-result-{provider_call_id or action.action_id}-{call_occurrence}"
                 ),
                 "session_id": session_id,
                 "sequence_no": self._next_sequence(),
@@ -1201,6 +1266,8 @@ class SafeClawSubprocessVictimDriver:
                             "result_error",
                             "result_is_error",
                             "result_hash_scope",
+                            "raw_result_projection_sha256",
+                            "result_redaction_changed",
                         )
                     },
                     "result_hash": call_payload.get("result_hash"),
@@ -1218,7 +1285,7 @@ class SafeClawSubprocessVictimDriver:
                     {
                         "artifact_id": (
                             f"artifact-tool-result-{provider_call_id or action.action_id}-"
-                            f"{action_nonce}-{index}"
+                            f"{call_occurrence}"
                         ),
                         "artifact_type": "tool_result",
                         "content_hash": result_hash,
@@ -1257,49 +1324,65 @@ class SafeClawSubprocessVictimDriver:
                 if value
             ]
             provider_order = int(raw_operation.get("result_line_number") or 900_001) * 10 + 1
-            workspace_identity = str(session.get("workspace_identity_sha256") or "")
+            workspace_identity = session.get("workspace_identity_sha256")
             state_ref = (
-                f"safeclaw_state:workspace:{workspace_identity}:file:{path}"
+                f"safeclaw_state:workspace_file:{workspace_identity}:{path}"
                 if path and workspace_identity
                 else None
             )
-            version_key = (workspace_identity, str(path)) if path and workspace_identity else None
+            workspace_key = (
+                (str(workspace_identity), str(path))
+                if workspace_identity and isinstance(path, str)
+                else None
+            )
+            operation_occurrence = stable_hash(
+                [
+                    workspace_identity,
+                    path,
+                    content_hash,
+                    session_id,
+                    call_id,
+                    action_nonce,
+                    operation_index,
+                    kind,
+                ]
+            )[:16]
             if kind == "write":
                 classification = str(raw_operation.get("classification") or "")
                 is_exact_write = classification == "workspace_file_write"
-                occurrence_identity = stable_hash(
+                write_occurrence = stable_hash(
                     [
                         workspace_identity,
                         path,
                         content_hash,
                         session_id,
+                        call_id,
                         action_nonce,
                         operation_index,
                     ]
                 )[:24]
                 version_id = (
-                    f"artifact-file-version-{occurrence_identity}"
+                    f"artifact-file-version-{write_occurrence}"
                     if status == "passed"
-                    and version_key
+                    and workspace_key
                     and content_hash
                     and is_exact_write
-                    and raw_operation.get("content_hash_scope")
+                    and len(evidence_refs) >= 2
+                    and raw_operation.get("result_order_valid") is True
                     else None
                 )
-                if version_key and (not version_id or classification == "workspace_file_edit"):
-                    self._workspace_versions.pop(version_key, None)
+                if workspace_key and (not version_id or classification == "workspace_file_edit"):
+                    self._workspace_versions.pop(workspace_key, None)
                 if version_id and isinstance(content_hash, str):
-                    assert version_key is not None
-                    self._workspace_versions[version_key] = (
+                    assert workspace_key is not None
+                    self._workspace_versions[workspace_key] = (
                         content_hash,
                         version_id,
-                        str(raw_operation.get("content_hash_scope")),
+                        str(raw_operation.get("content_hash_scope") or "unknown"),
                     )
                 source_events.append(
                     {
-                        "event_id": (
-                            f"state-write-file-{call_id}-{action_nonce}-{operation_index}"
-                        ),
+                        "event_id": f"state-write-file-{call_id}-{operation_occurrence}",
                         "session_id": session_id,
                         "sequence_no": self._next_sequence(),
                         "_provider_order": provider_order,
@@ -1327,41 +1410,77 @@ class SafeClawSubprocessVictimDriver:
                             if version_id
                             else []
                         ),
-                        "request_event_id": call_event_ids.get(call_id),
+                        "request_event_id": tool_call_event_by_provider_id.get(call_id),
                         "public_payload": {
                             "workspace_relative_path": path,
                             "content_hash_scope": raw_operation.get("content_hash_scope"),
                             "version_observation": "observed" if version_id else "unknown",
+                            "path_scope": "lexically_normalized_controlled_workspace",
+                            "realpath_verified": False,
                         },
                         "evidence_ref_ids": evidence_refs,
                     }
                 )
                 continue
-            prior = self._workspace_versions.get(version_key) if version_key else None
-            read_scope = raw_operation.get("read_scope")
-            content_scope = raw_operation.get("content_hash_scope")
+            prior = self._workspace_versions.get(workspace_key) if workspace_key else None
+            read_complete = raw_operation.get("read_completeness") in {
+                "complete_content",
+                "synthetic_exact_content",
+            }
             version_match = bool(
                 prior
+                and read_complete
                 and isinstance(content_hash, str)
                 and content_hash == prior[0]
-                and content_scope == prior[2]
-                and read_scope == "complete_redacted_utf8_file_content"
-                and raw_operation.get("content_complete") is True
+                and raw_operation.get("content_hash_scope") == prior[2]
             )
-            read_artifact_id = (
-                result_artifacts_by_call.get(
+            read_occurrence = stable_hash(
+                [
+                    workspace_identity,
+                    path,
+                    content_hash,
+                    session_id,
                     call_id,
-                    (
-                        0,
-                        f"artifact-file-read-{call_id}-{action_nonce}-{operation_index}",
-                    ),
-                )[1]
+                    action_nonce,
+                    operation_index,
+                ]
+            )[:16]
+            read_artifact_id = (
+                f"artifact-file-read-{call_id}-{read_occurrence}"
                 if status == "passed" and content_hash and not raw_operation.get("result_empty")
                 else None
             )
+            if read_artifact_id:
+                for candidate_event in source_events:
+                    candidate_payload = candidate_event.get("public_payload", {})
+                    if not isinstance(candidate_payload, dict):
+                        continue
+                    candidates = candidate_payload.get("artifact_derivation_candidates", [])
+                    if not isinstance(candidates, list):
+                        continue
+                    matched = False
+                    for candidate in candidates:
+                        if (
+                            isinstance(candidate, dict)
+                            and candidate.get("source_tool_result_call_id") == call_id
+                        ):
+                            candidate["source_artifact_id"] = read_artifact_id
+                            matched = True
+                    if matched:
+                        old_inputs = candidate_event.get("input_artifact_ids", [])
+                        candidate_event["input_artifact_ids"] = list(
+                            dict.fromkeys(
+                                [
+                                    read_artifact_id
+                                    if item.startswith("artifact-file-read-")
+                                    else item
+                                    for item in old_inputs
+                                ]
+                            )
+                        )
             source_events.append(
                 {
-                    "event_id": f"state-read-file-{call_id}-{action_nonce}-{operation_index}",
+                    "event_id": f"state-read-file-{call_id}-{read_occurrence}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "_provider_order": provider_order,
@@ -1398,8 +1517,16 @@ class SafeClawSubprocessVictimDriver:
                         "retrieval_class": "workspace_file_read",
                         "retrieval_hit": bool(read_artifact_id),
                         "version_match": version_match,
+                        "read_completeness": raw_operation.get("read_completeness", "unknown"),
+                        "path_scope": "lexically_normalized_controlled_workspace",
+                        "realpath_verified": False,
+                        "provider_tool_call_id": call_id,
+                        "raw_result_projection_sha256": raw_operation.get(
+                            "raw_result_projection_sha256"
+                        ),
+                        "result_redaction_changed": raw_operation.get("result_redaction_changed"),
                     },
-                    "request_event_id": call_event_ids.get(call_id),
+                    "request_event_id": tool_call_event_by_provider_id.get(call_id),
                     "evidence_ref_ids": evidence_refs,
                 }
             )
@@ -1419,6 +1546,7 @@ class SafeClawSubprocessVictimDriver:
             if before == after:
                 continue
             state_ref = f"safeclaw_state:{name}"
+            state_occurrence = stable_hash([after, session_id, action.action_id, action_nonce])[:24]
             source_events.append(
                 {
                     "event_id": f"state-write-{name}-{action.action_id}-{action_nonce}",
@@ -1439,7 +1567,7 @@ class SafeClawSubprocessVictimDriver:
                     ),
                     "output_artifacts": [
                         {
-                            "artifact_id": f"artifact-state-{name}-{after[:16]}",
+                            "artifact_id": f"artifact-state-{name}-{state_occurrence}",
                             "artifact_type": "persistent_state_version",
                             "content_hash": after,
                             "parent_artifact_ids": [],
@@ -1544,6 +1672,7 @@ class SafeClawSubprocessVictimDriver:
                 episode_id=f"construction-episode-{self._task.source_task_id}",
                 source_events=final_events,
                 checkpoints=self._checkpoints,
+                evidence_records=self.boundary_evidence_snapshot(),
                 model_hashes={"victim": self.model_hash},
                 config_hash=stable_hash(
                     {
@@ -1562,6 +1691,13 @@ class SafeClawSubprocessVictimDriver:
                     "victim_provider_http_request_count": str(self._provider_requests_spent),
                     "embedding_http_request_count": str(self._embedding_requests_spent),
                     "provider_request_budget_scope": "collection_run",
+                    "provider_evidence_policy_mode": str(
+                        self.provider_evidence_policy.get("mode", "disabled")
+                    ),
+                    "provider_evidence_rule_id": str(
+                        self.provider_evidence_policy.get("rule_id", "")
+                    ),
+                    "provider_evidence_batch_id": str(self.batch_id or ""),
                     "provider_error_categories": json.dumps(
                         sorted(
                             {

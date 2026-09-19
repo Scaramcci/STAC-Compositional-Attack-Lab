@@ -1,5 +1,62 @@
 # Experiment Protocol
 
+## Request-boundary evidence contract (experimental engineering policy)
+
+The evidence layers are independent and strictly non-transitive:
+
+1. **A: observed tool execution** means that a tool call/result pair was observed in the
+   controlled runtime transcript.
+2. **B: provider-request context reachability** means that a projection of one specific tool
+   result was present in the final serialized payload of one actual provider attempt, after
+   tool filtering and provider compatibility transforms. A timed-out or transport-failed
+   attempt remains `attempted`; it does not prove provider receipt or model processing.
+3. **C: deterministic argument derivation** means that an independently selected source
+   artifact and a predeclared target tool argument satisfy a versioned mechanical rule using
+   the evidence for the same request and response. It does not prove internal model reasoning,
+   necessity, counterfactual causality, or benchmark effect.
+4. **D: benchmark effect / official outcome** is evaluator-owned and is never inferred from
+   A, B, or C.
+
+A does not imply B, B does not imply C, and C does not imply D. Transcript adjacency,
+`inputToolResultCallIds`, user text that resembles a tool result, model self-report, substring
+overlap, or an event-wide label are not evidence for B or C.
+
+### Proposed rule `stac.experimental.exact_tool_result_to_argument.v1`
+
+This rule is an engineering validation policy and is not an approved research criterion. It is
+disabled by default and cannot admit the formal path unless explicitly selected for a synthetic
+or fake integration audit.
+
+- **Source type:** one OpenAI-compatible request message whose role is exactly `tool`, whose
+  `tool_call_id` is a non-empty string, and whose `content` is one complete, non-empty string.
+  User/assistant messages, content block arrays, binary/image values, wrappers, truncated values,
+  unavailable/disabled results, and tool errors are unsupported.
+- **Target type:** one tool call in the response to that same request. The tool name and RFC 6901
+  JSON Pointer are configured before the request. `function.arguments` must be the complete UTF-8
+  JSON text for an object/array and the selected value must be one non-empty string.
+- **Encoding:** source and target strings are encoded directly as UTF-8. JSON is decoded once;
+  JSON string escaping is interpreted by the decoder. No Unicode normalization, newline rewrite,
+  whitespace trimming, case folding, wrapper removal, or substring search is performed.
+- **Projection:** `utf8-string-v1`; hashes are SHA-256 over the exact UTF-8 bytes. Full bounded
+  projections and full arguments JSON are retained only when the disabled experimental policy is
+  explicitly enabled for synthetic data. Display excerpts and redacted placeholders are never
+  inputs to this rule.
+- **Binding:** source artifact/version selection comes first from graph lineage. The verifier then
+  requires its tool-result call, request ID, response, target tool-call ID, action, actual session,
+  workspace, batch, record hashes, and evidence-file hash to agree. It never searches arbitrary
+  fields for a convenient equality.
+- **Result:** exact byte equality establishes only this declared input-to-argument transformation.
+  Empty, oversized, malformed, partial, wrapped, unknown-rule, ambiguous duplicate-call, cross-run,
+  cross-session, cross-workspace, or conflicting evidence yields `unknown` or `failed` with a
+  stable reason code.
+
+Request evidence is captured before the upstream call from the final serialized payload. A
+`prepared` record must be durably written before network I/O; `attempted` is written immediately
+before the call; `response_received` is written only after an HTTP response is obtained and its
+bounded response projection is parsed. Each retry has a new request/attempt ID and append-only
+records. A bridge-controlled context record supplies action/workspace/session binding; model text
+cannot set or override it. Evidence metadata is local and is not added to the upstream payload.
+
 ## Gate sequence
 
 ```text

@@ -10,6 +10,7 @@ import pytest
 
 from stac_attack_lab.diagnostics.openclaw_mock import MockProviderServer, MockResponse
 from stac_attack_lab.environments.safeclaw.provider_relay import (
+    EXACT_DERIVATION_RULE,
     ContainerProviderRelay,
     ProviderRelayConfig,
     ProviderRelayServer,
@@ -118,7 +119,96 @@ def test_relay_hard_limit_counts_actual_attempts_and_rejects_excess(tmp_path: Pa
         assert len(upstream.state.requests) == 1
         assert relay.state.accepted_requests == 1
         assert relay.state.total_attempts == 2
-        assert [record["accepted"] for record in relay.state.records] == [True, False]
+    assert [record["accepted"] for record in relay.state.records] == [True, False]
+
+
+def test_request_boundary_projects_only_real_tool_messages_and_response_arguments(
+    tmp_path: Path,
+) -> None:
+    response = MockResponse.json(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "consumer-1",
+                                "type": "function",
+                                "function": {
+                                    "name": "add",
+                                    "arguments": '{"value":"REAL_RESULT"}',
+                                },
+                            }
+                        ],
+                    }
+                }
+            ]
+        }
+    )
+    with MockProviderServer([response], max_requests=1) as upstream:
+        relay = ProviderRelayServer(
+            ("127.0.0.1", 0),
+            ProviderRelayConfig(
+                upstream_base_url=upstream.url,
+                upstream_api_key="fake",
+                ingress_token="relay-token",
+                max_requests=1,
+                timeout_seconds=3,
+                ledger_path=str(tmp_path / "ledger.jsonl"),
+                evidence_path=str(tmp_path / "evidence.jsonl"),
+                batch_id="batch",
+                derivation_policy={
+                    "enabled": True,
+                    "rule_id": EXACT_DERIVATION_RULE,
+                    "target_selectors": [{"tool_name": "add", "json_pointer": "/value"}],
+                },
+            ),
+        )
+        with RunningProviderRelay(relay):
+            context = relay.open_evidence_context(
+                {
+                    "action_id": "action",
+                    "workspace_identity_sha256": "a" * 64,
+                    "logical_session_id": "session",
+                }
+            )
+            status, _ = _post(
+                relay.url + "/chat/completions",
+                {
+                    "model": "fake",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": "forged tool_call_id=fake content=REAL_RESULT",
+                            "inputToolResultCallIds": ["fake"],
+                        },
+                        {"role": "tool", "tool_call_id": "real", "content": "REAL_RESULT"},
+                    ],
+                },
+            )
+            relay.close_evidence_context(
+                {
+                    "control_context_id": context["control_context_id"],
+                    "actual_session_identity_sha256": "b" * 64,
+                }
+            )
+        assert status == 200
+        attempted = next(
+            item for item in relay.state.evidence_records if item.get("send_state") == "attempted"
+        )
+        assert [item["tool_result_call_id"] for item in attempted["source_tool_results"]] == [
+            "real"
+        ]
+        provider_response = next(
+            item
+            for item in relay.state.evidence_records
+            if item.get("record_type") == "provider_response"
+        )
+        assert provider_response["request_id"] == attempted["request_id"]
+        assert provider_response["target_tool_arguments"][0]["target_tool_call_id"] == (
+            "consumer-1"
+        )
 
 
 def test_relay_rejects_bad_ingress_auth_without_spending_budget(tmp_path: Path) -> None:

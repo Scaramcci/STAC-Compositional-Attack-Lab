@@ -6,6 +6,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from stac_attack_lab.execution.provider_evidence import (
+    load_provider_evidence,
+    verify_context_candidate,
+    verify_derivation_candidate,
+)
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.models import InteractionGraph, RawInteractionTrajectory
 
@@ -23,74 +28,174 @@ def construction_admission(
     *,
     accepted_count: int,
     library_audit_passed: bool,
+    provider_evidence_records: dict[str, dict[str, Any]] | None = None,
+    provider_evidence_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Validate each causal fact independently; labels alone never prove use."""
-    event_ids = [event.event_id for event in graph.events]
-    artifact_ids = [artifact.artifact_id for artifact in graph.artifacts]
+    """Evaluate graph facts without conflating review or launch authorization."""
+    identity_field = "actual_session_identity_sha256"
     events = {event.event_id: event for event in graph.events}
     artifacts = {artifact.artifact_id: artifact for artifact in graph.artifacts}
 
-    def ref_locatable(value: str) -> bool:
-        if value in events or value in artifacts:
-            return True
-        namespace, separator, identity = value.partition(":")
-        return bool(separator and namespace.strip() and identity.strip())
+    def gate(
+        name: str,
+        state: str,
+        *,
+        event_ids: list[str] | None = None,
+        edge_ids: list[str] | None = None,
+        evidence_refs: list[str] | None = None,
+        missing: list[str] | None = None,
+        reason_code: str | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "state": state,
+            "observed": state == "observed",
+            "reason_code": reason_code or f"{name}_{state}",
+            "evidence_event_ids": event_ids or [],
+            "evidence_edge_ids": edge_ids or [],
+            "evidence_ref_ids": evidence_refs or [],
+            "missing": missing or [],
+        }
 
-    integrity_reasons: list[str] = []
+    integrity_findings: list[dict[str, Any]] = []
+
+    def integrity(reason_code: str, **detail: Any) -> None:
+        integrity_findings.append({"state": "failed", "reason_code": reason_code, **detail})
+
+    event_ids = [event.event_id for event in graph.events]
+    artifact_ids = [artifact.artifact_id for artifact in graph.artifacts]
+    graph_payload = graph.model_dump(mode="json", exclude={"graph_hash"})
+    if stable_hash(graph_payload) != graph.graph_hash:
+        integrity("graph_hash_mismatch")
     if len(event_ids) != len(set(event_ids)):
-        integrity_reasons.append("duplicate_event_id")
+        integrity("duplicate_event_id")
     if len(artifact_ids) != len(set(artifact_ids)):
-        integrity_reasons.append("duplicate_artifact_id")
+        integrity("duplicate_artifact_id")
     for artifact in graph.artifacts:
-        if artifact.producer_event_id not in events:
-            integrity_reasons.append("missing_artifact_producer")
-        elif artifact.artifact_id not in events[artifact.producer_event_id].output_artifact_ids:
-            integrity_reasons.append("artifact_producer_inconsistent")
-        if any(parent not in artifacts for parent in artifact.parent_artifact_ids):
-            integrity_reasons.append("missing_parent_artifact")
-        producer = events.get(artifact.producer_event_id) if artifact.producer_event_id else None
+        producer = events.get(str(artifact.producer_event_id))
+        if producer is None:
+            integrity("artifact_producer_missing", artifact_id=artifact.artifact_id)
+        elif artifact.artifact_id not in producer.output_artifact_ids:
+            integrity("artifact_producer_inconsistent", artifact_id=artifact.artifact_id)
         for parent_id in artifact.parent_artifact_ids:
             parent = artifacts.get(parent_id)
-            parent_producer = (
-                events.get(parent.producer_event_id)
-                if parent is not None and parent.producer_event_id is not None
-                else None
-            )
-            if producer and parent_producer and parent_producer.sequence_no >= producer.sequence_no:
-                integrity_reasons.append("parent_artifact_out_of_order")
+            if parent is None:
+                integrity("parent_artifact_missing", artifact_id=artifact.artifact_id)
+            elif producer is not None:
+                parent_producer = events.get(str(parent.producer_event_id))
+                if parent_producer is None or parent_producer.sequence_no >= producer.sequence_no:
+                    integrity("parent_artifact_not_before_child", artifact_id=artifact.artifact_id)
     for event in graph.events:
-        if any(item not in artifacts for item in event.input_artifact_ids):
-            integrity_reasons.append("missing_consumed_artifact")
-        for item in event.input_artifact_ids:
-            producer_id = artifacts[item].producer_event_id if item in artifacts else None
-            producer = events.get(producer_id) if producer_id is not None else None
-            if producer and producer.sequence_no >= event.sequence_no:
-                integrity_reasons.append("artifact_consumption_out_of_order")
+        for artifact_id in event.input_artifact_ids:
+            consumed_artifact = artifacts.get(artifact_id)
+            producer = (
+                events.get(str(consumed_artifact.producer_event_id)) if consumed_artifact else None
+            )
+            if consumed_artifact is None or producer is None:
+                integrity(
+                    "consumer_artifact_missing", event_id=event.event_id, artifact_id=artifact_id
+                )
+            elif producer.sequence_no >= event.sequence_no:
+                integrity(
+                    "artifact_consumption_out_of_order",
+                    event_id=event.event_id,
+                    artifact_id=artifact_id,
+                )
     for edge in graph.edges:
         source, target = events.get(edge.source_event_id), events.get(edge.target_event_id)
         if source is None or target is None:
-            integrity_reasons.append("edge_endpoint_missing")
+            integrity("edge_event_missing", edge_id=edge.edge_id)
         elif source.sequence_no >= target.sequence_no:
-            integrity_reasons.append("edge_out_of_order")
-        if edge.artifact_id and (
-            source is None
-            or target is None
-            or edge.artifact_id not in artifacts
-            or edge.artifact_id not in source.output_artifact_ids
-            or edge.artifact_id not in target.input_artifact_ids
-        ):
-            integrity_reasons.append("edge_artifact_inconsistent")
-        if not edge.evidence_ref_ids or any(
-            not ref_locatable(value) for value in edge.evidence_ref_ids
-        ):
-            integrity_reasons.append("edge_evidence_unresolvable")
-    integrity_reasons.extend(link.reason_code for link in graph.unresolved_links)
-    integrity_reasons = list(dict.fromkeys(integrity_reasons))
+            integrity("edge_out_of_order", edge_id=edge.edge_id)
+        if edge.artifact_id:
+            if edge.artifact_id not in artifacts:
+                integrity("edge_artifact_missing", edge_id=edge.edge_id)
+            elif source and edge.artifact_id not in source.output_artifact_ids:
+                integrity("edge_source_artifact_inconsistent", edge_id=edge.edge_id)
+            elif target and edge.artifact_id not in target.input_artifact_ids:
+                integrity("edge_target_artifact_inconsistent", edge_id=edge.edge_id)
+    for unresolved in graph.unresolved_links:
+        integrity(unresolved.reason_code, link_id=unresolved.link_id)
 
-    gate_names = (
+    writes = [
+        event
+        for event in graph.events
+        if event.event_type == "state_write"
+        and event.component_role in {"persistent_memory", "workspace_file"}
+    ]
+    reads = [
+        event
+        for event in graph.events
+        if event.event_type == "state_read"
+        and event.component_role in {"persistent_memory", "workspace_file"}
+    ]
+    lifecycle = [
+        event
+        for event in graph.events
+        if event.event_type == "lifecycle"
+        and event.status == "passed"
+        and event.operation in {"request_new_session", "restart", "new_session_started"}
+    ]
+
+    def has_locatable_refs(event: Any, artifact_ids_for_event: list[str]) -> bool:
+        refs = {ref for ref in event.evidence_ref_ids if isinstance(ref, str) and ref.strip()}
+        artifact_refs = {
+            ref
+            for artifact_id in artifact_ids_for_event
+            if artifact_id in artifacts
+            for ref in artifacts[artifact_id].source_ref_ids
+            if isinstance(ref, str) and ref.strip()
+        }
+        internal_event_refs = {
+            ref
+            for ref in artifact_refs
+            if ref.startswith("event:") and ref.removeprefix("event:") in events
+        }
+        return bool(refs & artifact_refs or internal_event_refs)
+
+    def strong_use(use: Any, artifact_id: str) -> tuple[str, list[str], str]:
+        candidates = use.public_payload.get("artifact_derivation_candidates", [])
+        if not isinstance(candidates, list) or artifact_id not in artifacts:
+            return "unknown", [], "derivation_candidate_missing"
+        source_artifact = artifacts[artifact_id]
+        source_event = events.get(str(source_artifact.producer_event_id))
+        if source_event is None:
+            return "failed", [], "derivation_source_event_missing"
+        evaluations = []
+        for candidate in candidates:
+            if (
+                not isinstance(candidate, dict)
+                or candidate.get("source_artifact_id") != artifact_id
+            ):
+                continue
+            evaluations.append(
+                verify_derivation_candidate(
+                    trajectory=trajectory,
+                    source_artifact=source_artifact,
+                    source_event=source_event,
+                    consumer_event=use,
+                    candidate=candidate,
+                    records=provider_evidence_records or {},
+                    bundle_status=provider_evidence_status
+                    or {"state": "unknown", "reason_code": "provider_evidence_not_supplied"},
+                )
+            )
+        observed = next((value for value in evaluations if value["state"] == "observed"), None)
+        if observed:
+            return "observed", list(observed["evidence_ref_ids"]), str(observed["reason_code"])
+        failed = next((value for value in evaluations if value["state"] == "failed"), None)
+        value = failed or (evaluations[0] if evaluations else None)
+        return (
+            str(value["state"]) if value else "unknown",
+            list(value.get("evidence_ref_ids", [])) if value else [],
+            str(value["reason_code"]) if value else "derivation_candidate_missing",
+        )
+
+    candidates: list[dict[str, Any]] = []
+    successful_paths: list[tuple[Any, Any, Any, Any]] = []
+    context_paths: list[list[str]] = []
+    required_candidate_gates = (
         "reliable_write",
-        "write_read_order",
-        "write_version_consistent",
+        "write_version_artifact",
         "post_state_evidence",
         "reliable_read",
         "persistence_class_consistent",
@@ -98,362 +203,396 @@ def construction_admission(
         "workspace_scope_consistent",
         "read_matches_write_version",
         "valid_lifecycle_transition",
-        "read_consumer_same_session",
-        "context_reachability",
+        "consumer_order",
+        "consumer_session_consistent",
+        "artifact_edge_bound",
         "downstream_consumption",
     )
-    candidates: list[dict[str, Any]] = []
-    causal_paths: list[list[str]] = []
-    context_paths: list[list[str]] = []
-    writes = [
-        e
-        for e in graph.events
-        if e.event_type == "state_write"
-        and e.component_role in {"persistent_memory", "workspace_file"}
-    ]
-    reads = [
-        e
-        for e in graph.events
-        if e.event_type == "state_read"
-        and e.component_role in {"persistent_memory", "workspace_file"}
-    ]
-    lifecycle = [
-        e
-        for e in graph.events
-        if e.event_type == "lifecycle"
-        and e.status == "passed"
-        and e.operation in {"request_new_session", "restart", "new_session_started"}
-    ]
-
-    def state(value: bool | None) -> str:
-        return "observed" if value is True else "failed" if value is False else "unknown"
-
     for write in writes:
         for read in reads:
-            gates: dict[str, dict[str, Any]] = {
-                name: {
-                    "state": "unknown",
-                    "reason_code": f"{name}_not_evaluated",
-                    "evidence_ref_ids": [],
-                }
-                for name in gate_names
-            }
-
-            def record(
-                name: str,
-                value: bool | None,
-                evidence: list[str] | None = None,
-                reason: str | None = None,
-            ) -> None:
-                gates[name] = {  # noqa: B023 - invoked before the candidate loop advances
-                    "state": state(value),
-                    "reason_code": reason or f"{name}_{state(value)}",
-                    "evidence_ref_ids": evidence or [],
-                }
-
-            write_artifacts = [
-                artifacts[item] for item in write.output_artifact_ids if item in artifacts
-            ]
-            record("write_read_order", write.sequence_no < read.sequence_no)
-            reliable_write = (
+            gates: dict[str, dict[str, Any]] = {}
+            write_refs_ok = has_locatable_refs(write, write.output_artifact_ids)
+            write_ok = bool(
                 write.status == "passed"
-                and bool(write.evidence_ref_ids)
-                and all(ref_locatable(value) for value in write.evidence_ref_ids)
-                and bool(write_artifacts)
+                and write_refs_ok
+                and write.output_artifact_ids
+                and write.post_state_ref
+                and write.write_state_refs
+                and write.post_state_ref != write.pre_state_ref
             )
-            record("reliable_write", reliable_write, write.evidence_ref_ids + [write.event_id])
-            write_versions = [
-                a
-                for a in write_artifacts
-                if a.producer_event_id == write.event_id
-                and a.source_ref_ids
-                and all(ref_locatable(value) for value in a.source_ref_ids)
+            gates["reliable_write"] = gate(
+                "reliable_write",
+                "observed" if write_ok else "failed",
+                event_ids=[write.event_id],
+                evidence_refs=list(write.evidence_ref_ids),
+                missing=[] if write_ok else ["passed write with locatable request/result evidence"],
+            )
+            produced = [
+                artifact_id
+                for artifact_id in write.output_artifact_ids
+                if artifact_id in artifacts
+                and artifacts[artifact_id].producer_event_id == write.event_id
             ]
-            record(
-                "write_version_consistent",
-                bool(write_versions),
-                [a.artifact_id for a in write_versions],
+            gates["write_version_artifact"] = gate(
+                "write_version_artifact",
+                "observed" if produced else "failed",
+                event_ids=[write.event_id],
+                missing=[] if produced else ["producer-bound version artifact"],
             )
-            record(
+            post_ok = bool(
+                write.post_state_ref
+                and write.write_state_refs
+                and write.post_state_ref != write.pre_state_ref
+                and write_refs_ok
+            )
+            gates["post_state_evidence"] = gate(
                 "post_state_evidence",
-                bool(write.post_state_ref and write.write_state_refs),
-                [write.post_state_ref] if write.post_state_ref else [],
+                "observed" if post_ok else "failed",
+                event_ids=[write.event_id],
+                evidence_refs=list(write.evidence_ref_ids),
+                missing=[] if post_ok else ["changed post_state_ref with locatable evidence"],
             )
-            reliable_read = (
+            read_refs_ok = has_locatable_refs(read, read.output_artifact_ids)
+            read_ok = (
                 read.status == "passed"
                 and read.public_payload.get("retrieval_hit") is True
                 and bool(read.output_artifact_ids)
                 and read.public_payload.get("result_empty") is not True
-                and bool(read.evidence_ref_ids)
-                and all(ref_locatable(value) for value in read.evidence_ref_ids)
+                and read_refs_ok
             )
-            record("reliable_read", reliable_read, read.evidence_ref_ids + [read.event_id])
-            class_match = write.component_role == read.component_role
-            record("persistence_class_consistent", class_match)
-            writer_session, reader_session = (
-                _identity(write, "actual_session_identity_sha256"),
-                _identity(read, "actual_session_identity_sha256"),
+            gates["reliable_read"] = gate(
+                "reliable_read",
+                "observed" if read_ok else "failed",
+                event_ids=[read.event_id],
+                evidence_refs=list(read.evidence_ref_ids),
+                missing=[] if read_ok else ["non-empty successful read with locatable evidence"],
             )
-            session_change: bool | None = (
-                None
-                if not writer_session or not reader_session
-                else writer_session != reader_session
+            class_ok = write.component_role == read.component_role
+            gates["persistence_class_consistent"] = gate(
+                "persistence_class_consistent",
+                "observed" if class_ok else "failed",
+                event_ids=[write.event_id, read.event_id],
             )
-            record("actual_session_changed", session_change, [write.event_id, read.event_id])
-            required_scope = ["workspace_identity_sha256"] + (
+            write_identity, read_identity = (
+                _identity(write, identity_field),
+                _identity(read, identity_field),
+            )
+            session_state = (
+                "unknown"
+                if not write_identity or not read_identity
+                else "observed"
+                if write_identity != read_identity
+                else "failed"
+            )
+            gates["actual_session_changed"] = gate(
+                "actual_session_changed",
+                session_state,
+                event_ids=[write.event_id, read.event_id],
+                missing=[]
+                if session_state == "observed"
+                else ["distinct actual session identities"],
+            )
+            scope_fields = ["workspace_identity_sha256"] + (
                 ["memory_index_namespace_sha256"]
                 if read.component_role == "persistent_memory"
                 else []
             )
             scope_values = [
-                (_identity(write, field), _identity(read, field)) for field in required_scope
+                (_identity(write, field), _identity(read, field)) for field in scope_fields
             ]
-            scope_match: bool | None = (
-                None
+            scope_state = (
+                "unknown"
                 if any(not left or not right for left, right in scope_values)
-                else all(left == right for left, right in scope_values)
+                else "observed"
+                if all(left == right for left, right in scope_values)
+                else "failed"
             )
-            record("workspace_scope_consistent", scope_match, [write.event_id, read.event_id])
-            matching = set(write.output_artifact_ids) & set(read.input_artifact_ids)
-            matching |= {
-                a.artifact_id
-                for a in graph.artifacts
-                if a.artifact_id in read.output_artifact_ids
-                and set(a.parent_artifact_ids) & set(write.output_artifact_ids)
+            gates["workspace_scope_consistent"] = gate(
+                "workspace_scope_consistent",
+                scope_state,
+                event_ids=[write.event_id, read.event_id],
+                missing=[]
+                if scope_state == "observed"
+                else ["equal, observed workspace and required namespace identities"],
+            )
+            lineage_ids = set(produced) & set(read.input_artifact_ids)
+            lineage_ids |= {
+                artifact_id
+                for artifact_id in read.output_artifact_ids
+                if artifact_id in artifacts
+                and set(artifacts[artifact_id].parent_artifact_ids) & set(produced)
             }
-            version_match = bool(matching)
+            version_ok = bool(lineage_ids)
             if read.component_role == "workspace_file":
-                version_match = (
-                    version_match
-                    and bool(read.public_payload.get("version_match"))
-                    and bool(read.public_payload.get("workspace_relative_path"))
+                version_ok = bool(
+                    version_ok
                     and write.public_payload.get("workspace_relative_path")
                     == read.public_payload.get("workspace_relative_path")
-                    and write.public_payload.get("content_hash_scope")
-                    == read.public_payload.get("content_hash_scope")
-                    == "redacted_utf8_content_projection"
-                    and read.public_payload.get("read_scope")
-                    == "complete_redacted_utf8_file_content"
+                    and read.public_payload.get("version_match") is True
                 )
-            record("read_matches_write_version", version_match, sorted(matching))
+            gates["read_matches_write_version"] = gate(
+                "read_matches_write_version",
+                "observed" if version_ok else "failed",
+                event_ids=[write.event_id, read.event_id],
+                missing=[]
+                if version_ok
+                else ["same controlled resource and producer-bound version"],
+            )
             lifecycle_id = read.public_payload.get("new_session_request_action_id")
             transition = next(
                 (
                     item
                     for item in lifecycle
-                    if lifecycle_id
+                    if isinstance(lifecycle_id, str)
+                    and lifecycle_id
                     and item.lifecycle_id == lifecycle_id
                     and write.sequence_no < item.sequence_no < read.sequence_no
+                    and bool(item.evidence_ref_ids)
                 ),
                 None,
             )
-            record(
+            lifecycle_state = (
+                "unknown"
+                if not isinstance(lifecycle_id, str) or not lifecycle_id
+                else ("observed" if transition else "failed")
+            )
+            gates["valid_lifecycle_transition"] = gate(
                 "valid_lifecycle_transition",
-                transition is not None if lifecycle_id else False,
-                [transition.event_id] if transition else [],
-                "lifecycle_binding_missing" if not lifecycle_id else None,
+                lifecycle_state,
+                event_ids=[transition.event_id] if transition else [],
+                evidence_refs=list(transition.evidence_ref_ids) if transition else [],
+                missing=[] if transition else ["explicit matching lifecycle action binding"],
             )
 
+            consumers: list[Any] = []
+            matching_edges: list[Any] = []
             for edge in graph.edges:
+                use = events.get(edge.target_event_id)
                 if (
-                    edge.source_event_id != read.event_id
-                    or not edge.artifact_id
-                    or edge.artifact_id not in read.output_artifact_ids
+                    edge.source_event_id == read.event_id
+                    and use is not None
+                    and edge.observable
+                    and edge.artifact_id in read.output_artifact_ids
+                    and edge.artifact_id in use.input_artifact_ids
                 ):
-                    continue
-                consumer = events.get(edge.target_event_id)
-                if consumer is None or consumer.sequence_no <= read.sequence_no:
-                    continue
-                same_session: bool | None = None
-                consumer_session = _identity(consumer, "actual_session_identity_sha256")
-                if reader_session and consumer_session:
-                    same_session = reader_session == consumer_session
-                record(
-                    "read_consumer_same_session", same_session, [read.event_id, consumer.event_id]
-                )
-                reachability = consumer.public_payload.get("context_reachability_evidence")
-                reachability_refs = reachability if isinstance(reachability, list) else []
-                reachable = bool(reachability_refs)
-                record(
-                    "context_reachability",
-                    reachable,
-                    [str(item) for item in reachability_refs],
-                )
-                if reachable:
-                    context_paths.append([write.event_id, read.event_id, consumer.event_id])
-                claims = consumer.public_payload.get("consumption_evidence", [])
-                claim = (
-                    next(
-                        (
-                            item
-                            for item in claims
-                            if isinstance(item, dict)
-                            and item.get("artifact_id") == edge.artifact_id
-                            and item.get("kind")
-                            in {
-                                "deterministic_output_reference",
-                                "deterministic_argument_derivation",
-                            }
-                            and item.get("verification_rule")
-                            and item.get("source_field")
-                            and item.get("target_field")
-                            and item.get("evidence_ref") in consumer.evidence_ref_ids
-                        ),
-                        None,
-                    )
-                    if isinstance(claims, list)
-                    else None
-                )
-                consumed = bool(claim) and same_session is True
-                record(
-                    "downstream_consumption",
-                    consumed,
-                    [edge.edge_id, str(claim.get("evidence_ref"))] if claim else [],
-                )
-                if all(
-                    gates[name]["state"] == "observed"
-                    for name in gate_names
-                    if name != "context_reachability"
-                ):
-                    causal_paths.append([write.event_id, read.event_id, consumer.event_id])
-            candidates.append(
-                {
-                    "write_event_id": write.event_id,
-                    "read_event_id": read.event_id,
-                    "read_class": read.public_payload.get("retrieval_class"),
-                    "gates": gates,
-                    "blocking_reason_codes": [
-                        value["reason_code"]
-                        for value in gates.values()
-                        if value["state"] != "observed"
-                        and value["reason_code"] != "context_reachability_failed"
-                    ],
-                }
+                    consumers.append(use)
+                    matching_edges.append(edge)
+            ordered = [use for use in consumers if use.sequence_no > read.sequence_no]
+            gates["consumer_order"] = gate(
+                "consumer_order",
+                "observed" if ordered else ("failed" if consumers else "unknown"),
+                event_ids=[read.event_id] + [use.event_id for use in ordered],
             )
+            same_session = [
+                use
+                for use in ordered
+                if _identity(use, identity_field) == read_identity
+                and use.session_id == read.session_id
+                and read_identity is not None
+            ]
+            gates["consumer_session_consistent"] = gate(
+                "consumer_session_consistent",
+                "observed" if same_session else ("failed" if ordered else "unknown"),
+                event_ids=[read.event_id] + [use.event_id for use in ordered],
+            )
+            bound = [
+                (edge, use)
+                for edge, use in zip(matching_edges, consumers, strict=True)
+                if use in same_session
+            ]
+            gates["artifact_edge_bound"] = gate(
+                "artifact_edge_bound",
+                "observed" if bound else ("failed" if consumers else "unknown"),
+                edge_ids=[edge.edge_id for edge, _ in bound],
+            )
+            evaluated = [
+                (edge, use, state, refs, reason)
+                for edge, use in bound
+                if edge.artifact_id is not None
+                for state, refs, reason in [strong_use(use, edge.artifact_id)]
+            ]
+            verified = [value for value in evaluated if value[2] == "observed"]
+            derivation_state = (
+                "observed"
+                if verified
+                else "failed"
+                if any(value[2] == "failed" for value in evaluated)
+                else "unknown"
+            )
+            gates["downstream_consumption"] = gate(
+                "downstream_consumption",
+                derivation_state,
+                event_ids=[read.event_id] + [use.event_id for _, use, _, _, _ in verified],
+                edge_ids=[edge.edge_id for edge, _, _, _, _ in verified],
+                evidence_refs=[ref for _, _, _, refs, _ in verified for ref in refs],
+                missing=[] if verified else ["edge-bound deterministic derivation evidence"],
+                reason_code=(
+                    "downstream_consumption_observed"
+                    if verified
+                    else next(
+                        (value[4] for value in evaluated if value[2] == derivation_state),
+                        "derivation_candidate_missing",
+                    )
+                ),
+            )
+            # Request-boundary context evidence is a separate, currently optional fact.
+            context_verified = []
+            for edge, use in bound:
+                edge_artifact = artifacts.get(str(edge.artifact_id))
+                if edge_artifact is None:
+                    continue
+                source_event = events.get(str(edge_artifact.producer_event_id))
+                if source_event is None:
+                    continue
+                claims = use.public_payload.get("artifact_context_evidence", [])
+                if not isinstance(claims, list):
+                    continue
+                for claim in claims:
+                    if (
+                        not isinstance(claim, dict)
+                        or claim.get("source_artifact_id") != edge.artifact_id
+                    ):
+                        continue
+                    verification = verify_context_candidate(
+                        trajectory=trajectory,
+                        source_artifact=edge_artifact,
+                        source_event=source_event,
+                        consumer_event=use,
+                        candidate=claim,
+                        records=provider_evidence_records or {},
+                        bundle_status=provider_evidence_status
+                        or {
+                            "state": "unknown",
+                            "reason_code": "provider_evidence_not_supplied",
+                        },
+                    )
+                    if verification["state"] == "observed":
+                        context_verified.append(use)
+                        break
+            gates["context_reachability"] = gate(
+                "context_reachability",
+                "observed" if context_verified else "unknown",
+                event_ids=[read.event_id] + [use.event_id for use in context_verified],
+            )
+            passed = not integrity_findings and all(
+                gates[name]["state"] == "observed" for name in required_candidate_gates
+            )
+            candidate = {
+                "write_event_id": write.event_id,
+                "read_event_id": read.event_id,
+                "read_class": read.public_payload.get("retrieval_class"),
+                "status": "passed" if passed else "failed",
+                "gates": gates,
+                "blocking_reason_codes": [
+                    gates[name]["reason_code"]
+                    for name in required_candidate_gates
+                    if gates[name]["state"] != "observed"
+                ],
+            }
+            candidates.append(candidate)
+            for edge, use, _, _, _ in verified:
+                if passed:
+                    successful_paths.append((write, read, use, edge))
+            for use in context_verified:
+                context_paths.append([write.event_id, read.event_id, use.event_id])
 
     def aggregate_gate(name: str) -> dict[str, Any]:
         values = [candidate["gates"][name] for candidate in candidates]
-        if any(value["state"] == "observed" for value in values):
-            selected = next(value for value in values if value["state"] == "observed")
-            return dict(selected)
-        if any(value["state"] == "failed" for value in values):
-            selected = next(value for value in values if value["state"] == "failed")
-            return dict(selected)
-        return {"state": "unknown", "reason_code": f"{name}_unknown", "evidence_ref_ids": []}
+        if not values:
+            return gate(name, "unknown", missing=["no write/read candidate"])
+        rank = {"observed": 3, "failed": 2, "unknown": 1, "not_applicable": 0}
+        return max(values, key=lambda value: rank[value["state"]])
 
-    checks_detail = {name: aggregate_gate(name) for name in gate_names}
-    checks: dict[str, bool | None] = {
+    evidence_diagnostics = {
+        name: aggregate_gate(name) for name in (*required_candidate_gates, "context_reachability")
+    }
+    path_ids = [
+        [write.event_id, read.event_id, use.event_id] for write, read, use, _ in successful_paths
+    ]
+    required_checks = {
         "trajectory_complete": trajectory.collection_status == "complete"
         and trajectory.failure_category is None,
-        "normalization_consistent": not integrity_reasons,
+        "graph_integrity": not integrity_findings,
+        "normalization_consistent": not graph.unresolved_links,
         "source_trajectory_bound": graph.source_trajectory_hash
         == stable_hash(trajectory.model_dump(mode="json")),
-        "actual_session_and_scope_identity": checks_detail["actual_session_changed"]["state"]
-        == "observed"
-        and checks_detail["workspace_scope_consistent"]["state"] == "observed",
-        "cross_session_persistence_read_use": bool(causal_paths),
-        "workspace_file_persistence_read_use": any(
-            events[path[1]].component_role == "workspace_file" for path in causal_paths
+        "reliable_write": evidence_diagnostics["reliable_write"]["state"] == "observed",
+        "post_state_evidence": evidence_diagnostics["post_state_evidence"]["state"] == "observed",
+        "valid_lifecycle_transition": evidence_diagnostics["valid_lifecycle_transition"]["state"]
+        == "observed",
+        "consumer_session_consistent": evidence_diagnostics["consumer_session_consistent"]["state"]
+        == "observed",
+        "actual_session_and_scope_identity": (
+            evidence_diagnostics["actual_session_changed"]["state"] == "observed"
+            and evidence_diagnostics["workspace_scope_consistent"]["state"] == "observed"
         ),
-        "semantic_memory_search_read_use": any(
-            events[path[1]].public_payload.get("retrieval_class") == "semantic_memory_search"
-            for path in causal_paths
-        ),
-        "direct_memory_get_read_use": any(
-            events[path[1]].public_payload.get("retrieval_class") == "direct_memory_get"
-            for path in causal_paths
-        ),
+        "cross_session_persistence_read_use": bool(path_ids),
         "accepted_sample_target": accepted_count >= 1,
         "library_audit": library_audit_passed,
+    }
+    capability_checks = {
+        "workspace_file_persistence_read_use": any(
+            read.component_role == "workspace_file" for _, read, _, _ in successful_paths
+        ),
+        "semantic_memory_search_read_use": any(
+            read.public_payload.get("retrieval_class") == "semantic_memory_search"
+            for _, read, _, _ in successful_paths
+        ),
+        "direct_memory_get_read_use": any(
+            read.public_payload.get("retrieval_class") == "direct_memory_get"
+            for _, read, _, _ in successful_paths
+        ),
+    }
+    structural_passed = all(required_checks.values())
+    runtime_review = {
+        "status": "pending",
+        "items": [
+            {"reason_code": code, "state": "unknown"}
+            for code in (
+                "runtime_budget_ledger_review_pending",
+                "runtime_batch_identity_review_pending",
+                "runtime_network_isolation_review_pending",
+                "runtime_cleanup_review_pending",
+            )
+        ],
+    }
+    authorization = {
+        "status": "absent",
+        "granted": False,
+        "reason_code": "execution_authorization_not_granted",
+    }
+    checks: dict[str, bool | None] = {
+        **required_checks,
+        **capability_checks,
         "runtime_budget_isolation_cleanup_review": None,
     }
     return {
-        "schema_version": "1.3",
+        "schema_version": "2.0",
         "trajectory_id": trajectory.trajectory_id,
-        "structural_checks_passed": all(
-            v is True
-            for k, v in checks.items()
-            if k
-            not in {
-                "runtime_budget_isolation_cleanup_review",
-                "workspace_file_persistence_read_use",
-                "semantic_memory_search_read_use",
-                "direct_memory_get_read_use",
-            }
-        ),
-        "pilot_admitted": False,
-        "pipeline_execution": {"status": "completed"},
+        "pipeline_execution": {"status": "not_executed"},
         "input_integrity": {
-            "status": "passed" if not integrity_reasons else "failed",
-            "reason_codes": integrity_reasons,
+            "status": "passed" if not integrity_findings else "failed",
+            "findings": integrity_findings,
         },
-        "structural_admission": {
-            "status": "passed"
-            if all(
-                v is True
-                for k, v in checks.items()
-                if k
-                not in {
-                    "runtime_budget_isolation_cleanup_review",
-                    "workspace_file_persistence_read_use",
-                    "semantic_memory_search_read_use",
-                    "direct_memory_get_read_use",
-                }
-            )
-            else "failed"
-        },
-        "execution_authorization": {"status": "absent"},
+        "structural_admission": {"status": "passed" if structural_passed else "failed"},
+        "structural_checks_passed": structural_passed,
+        "runtime_review": runtime_review,
+        "execution_authorization": authorization,
+        "official_outcome": {"status": "not_evaluated"},
+        "pilot_admitted": bool(
+            structural_passed and runtime_review["status"] == "passed" and authorization["granted"]
+        ),
         "checks": checks,
-        "failed_gates": [
-            k
-            for k, v in checks.items()
-            if v is False
-            and k
-            not in {
-                "workspace_file_persistence_read_use",
-                "semantic_memory_search_read_use",
-                "direct_memory_get_read_use",
-            }
-        ],
-        "pending_reviews": [k for k, v in checks.items() if v is None],
-        "causal_paths": causal_paths,
+        "failed_gates": [name for name, value in required_checks.items() if value is False],
+        "pending_reviews": ["runtime_budget_isolation_cleanup_review"],
+        "causal_paths": path_ids,
         "context_reachability_paths": context_paths,
         "candidate_diagnostics": candidates,
-        "evidence_diagnostics": checks_detail,
+        "evidence_diagnostics": evidence_diagnostics,
         "accepted_count": accepted_count,
-        "runtime_review": {
-            "status": "pending",
-            "items": [
-                {
-                    "reason_code": "runtime_budget_ledger_review_pending",
-                    "state": "unknown",
-                    "explanation": (
-                        "Counts alone do not prove complete, crash-safe budget accounting."
-                    ),
-                },
-                {
-                    "reason_code": "runtime_batch_identity_review_pending",
-                    "state": "unknown",
-                    "explanation": "Batch identity must be checked against every provider ledger.",
-                },
-                {
-                    "reason_code": "runtime_network_isolation_review_pending",
-                    "state": "unknown",
-                    "explanation": "No network topology evidence is part of the interaction graph.",
-                },
-                {
-                    "reason_code": "runtime_cleanup_review_pending",
-                    "state": "unknown",
-                    "explanation": (
-                        "Container/process cleanup requires separately recorded evidence."
-                    ),
-                },
-            ],
-        },
-        "official_outcome": "not_evaluated",
         "note": (
-            "ordinary file reads, memory_get and semantic memory_search remain separately "
-            "classified; context reachability is not semantic use or official success"
+            "memory_search, memory_get, and file reads are separate capability metrics; "
+            "context reachability is not semantic use or official success"
         ),
     }
 
@@ -473,8 +612,14 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
         manifest = json.loads((library.parent / "mining_stage_manifest.json").read_text())
     except (FileNotFoundError, OSError, ValueError, json.JSONDecodeError) as exc:
         return {
-            "schema_version": "1.2",
+            "schema_version": "2.0",
             "pilot_admitted": False,
+            "pipeline_execution": {"status": "not_executed"},
+            "input_integrity": {"status": "failed"},
+            "structural_admission": {"status": "not_run"},
+            "runtime_review": {"status": "not_run"},
+            "execution_authorization": {"status": "absent", "granted": False},
+            "official_outcome": {"status": "not_evaluated"},
             "reports": [],
             "failed_gates": ["input_integrity"],
             "pending_reviews": [],
@@ -490,8 +635,14 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
         }
     if manifest.get("collection_tree_hash") != stage.collection_tree_hash:
         return {
-            "schema_version": "1.2",
+            "schema_version": "2.0",
             "pilot_admitted": False,
+            "pipeline_execution": {"status": "not_executed"},
+            "input_integrity": {"status": "failed"},
+            "structural_admission": {"status": "not_run"},
+            "runtime_review": {"status": "not_run"},
+            "execution_authorization": {"status": "absent", "granted": False},
+            "official_outcome": {"status": "not_evaluated"},
             "reports": [],
             "failed_gates": ["input_integrity"],
             "pending_reviews": [],
@@ -505,8 +656,14 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
     raw_paths = sorted(collection.glob("trajectories/*/raw_trajectory.json"))
     if len(raw_paths) != 1:
         return {
-            "schema_version": "1.2",
+            "schema_version": "2.0",
             "pilot_admitted": False,
+            "pipeline_execution": {"status": "not_executed"},
+            "input_integrity": {"status": "failed"},
+            "structural_admission": {"status": "not_run"},
+            "runtime_review": {"status": "not_run"},
+            "execution_authorization": {"status": "absent", "granted": False},
+            "official_outcome": {"status": "not_evaluated"},
             "reports": [],
             "failed_gates": ["single_trajectory_required"],
             "pending_reviews": [],
@@ -521,6 +678,7 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
         }
     for raw_path in raw_paths:
         trajectory = RawInteractionTrajectory.model_validate_json(raw_path.read_text())
+        provider_records, provider_status = load_provider_evidence(trajectory, collection)
         graph_path = (
             library.parent
             / "interactions/normalized"
@@ -545,24 +703,35 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
                 graph,
                 accepted_count=manifest["accepted_count"],
                 library_audit_passed=True,
+                provider_evidence_records=provider_records,
+                provider_evidence_status=provider_status,
             )
         )
     structural_passed = (
         bool(results)
-        and all(report.get("structural_checks_passed") is True for report in results)
         and not diagnostics
+        and all(
+            report.get("structural_admission", {}).get("status") == "passed" for report in results
+        )
     )
+    runtime_review = {"status": "pending"}
+    authorization = {"status": "absent", "granted": False}
     return {
-        "schema_version": "1.3",
-        "pipeline_execution": {"status": "completed"},
+        "schema_version": "2.0",
+        "pilot_admitted": bool(
+            structural_passed and runtime_review["status"] == "passed" and authorization["granted"]
+        ),
+        "pipeline_execution": {"status": "not_executed"},
         "input_integrity": {"status": "passed" if not diagnostics else "failed"},
         "structural_admission": {"status": "passed" if structural_passed else "failed"},
-        "runtime_review": {"status": "pending"},
-        "execution_authorization": {"status": "absent"},
-        "official_outcome": "not_evaluated",
-        "pilot_admitted": False,
+        "runtime_review": runtime_review,
+        "execution_authorization": authorization,
+        "official_outcome": {"status": "not_evaluated"},
         "reports": results,
         "input_sha256": inputs,
-        "note": "Runtime budget, isolation and cleanup still require recorded review.",
+        "note": (
+            "pilot_admitted means structural pass AND runtime review pass AND explicit "
+            "execution authorization; structural success alone never grants launch"
+        ),
         "diagnostics": diagnostics,
     }

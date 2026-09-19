@@ -44,15 +44,14 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
                 new_session_request_action_id="restart-1",
             )
         if e["event_id"] == "e7":
-            e["public_payload"]["consumption_evidence"] = [
+            e["public_payload"]["artifact_use_evidence"] = [
                 {
-                    "artifact_id": "a4",
-                    "source_result_call_id": "synthetic-fixture-read",
-                    "kind": "deterministic_output_reference",
-                    "source_field": "retrieval.output",
-                    "target_field": "agent_context.input",
-                    "verification_rule": "synthetic_fixture_exact_artifact_binding",
-                    "evidence_ref": "lineage:a4:a5",
+                    "source_artifact_id": "a4",
+                    "evidence_kind": "deterministic_argument_derivation",
+                    "verification_rule": "sha256_exact_projection",
+                    "source_content_sha256": "hash-a4",
+                    "target_projection_sha256": "hash-a4",
+                    "evidence_ref_ids": ["lineage:a4:a5"],
                 }
             ]
     fixture = tmp_path / "fixture.jsonl"
@@ -79,12 +78,14 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
     assert (build / "extraction").is_dir()
     assert stable_hash("session-2") in next(build.rglob("source_events.jsonl")).read_text()
     report = construction_admission(raw, graph, accepted_count=1, library_audit_passed=True)
-    assert report["checks"]["cross_session_persistence_read_use"], report
-    assert report["structural_checks_passed"], report
+    # Caller-authored hash labels are not production evidence and cannot pass C.
+    assert report["checks"]["cross_session_persistence_read_use"] is False, report
+    assert report["structural_checks_passed"] is False, report
     assert report["pilot_admitted"] is False  # Runtime engineering review is still required.
-    assert report["structural_admission"]["status"] == "passed"
+    assert report["structural_admission"]["status"] == "failed"
     assert report["runtime_review"]["status"] == "pending"
     assert report["execution_authorization"]["status"] == "absent"
+    assert report["official_outcome"]["status"] == "not_evaluated"
     # A two-event accepted chain cannot bypass the complete engineering gate.
     short = graph.model_copy(update={"edges": []})
     assert (
@@ -118,69 +119,54 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
             is False
         )
 
-    write = next(event for event in graph.events if event.event_type == "state_write")
-    read = next(
-        event
-        for event in graph.events
-        if event.event_type == "state_read" and event.operation == "memory_retrieve_later_session"
+    duplicate = graph.model_copy(update={"events": [*graph.events, graph.events[0]]})
+    duplicate_report = construction_admission(
+        raw, duplicate, accepted_count=1, library_audit_passed=True
     )
-    use = next(event for event in graph.events if event.public_payload.get("consumption_evidence"))
-    mutations = [
-        (write.event_id, {"post_state_ref": None}),
-        (
-            read.event_id,
-            {
-                "public_payload": {
-                    **read.public_payload,
-                    "new_session_request_action_id": None,
-                }
-            },
-        ),
-        (
-            use.event_id,
-            {
-                "public_payload": {
-                    **use.public_payload,
-                    "actual_session_identity_sha256": stable_hash("unrelated-session"),
-                }
-            },
-        ),
-    ]
-    for event_id, update in mutations:
-        changed = graph.model_copy(
-            update={
-                "events": [
-                    event.model_copy(update=update) if event.event_id == event_id else event
-                    for event in graph.events
-                ]
-            }
-        )
-        changed_report = construction_admission(
-            raw, changed, accepted_count=1, library_audit_passed=True
-        )
-        assert changed_report["checks"]["cross_session_persistence_read_use"] is False
+    assert duplicate_report["input_integrity"]["status"] == "failed"
+    assert "duplicate_event_id" in {
+        item["reason_code"] for item in duplicate_report["input_integrity"]["findings"]
+    }
 
-    no_use = graph.model_copy(
+    broken_parent = graph.model_copy(
+        update={
+            "artifacts": [
+                graph.artifacts[0].model_copy(update={"parent_artifact_ids": ["missing-parent"]}),
+                *graph.artifacts[1:],
+            ]
+        }
+    )
+    broken_report = construction_admission(
+        raw, broken_parent, accepted_count=1, library_audit_passed=True
+    )
+    assert "parent_artifact_missing" in {
+        item["reason_code"] for item in broken_report["input_integrity"]["findings"]
+    }
+
+    missing_consumer_artifact = graph.model_copy(
         update={
             "events": [
                 event.model_copy(
                     update={
-                        "public_payload": {
-                            key: value
-                            for key, value in event.public_payload.items()
-                            if key != "consumption_evidence"
-                        }
+                        "input_artifact_ids": [
+                            *event.input_artifact_ids,
+                            "artifact-does-not-exist",
+                        ]
                     }
                 )
-                if event.event_id == use.event_id
+                if event.event_type == "tool_call"
                 else event
                 for event in graph.events
             ]
         }
     )
-    no_use_report = construction_admission(raw, no_use, accepted_count=1, library_audit_passed=True)
-    assert no_use_report["evidence_diagnostics"]["actual_session_changed"]["state"] == "observed"
-    assert (
-        no_use_report["evidence_diagnostics"]["workspace_scope_consistent"]["state"] == "observed"
+    missing_report = construction_admission(
+        raw,
+        missing_consumer_artifact,
+        accepted_count=1,
+        library_audit_passed=True,
     )
-    assert no_use_report["evidence_diagnostics"]["downstream_consumption"]["state"] == "failed"
+    assert missing_report["input_integrity"]["status"] == "failed"
+    assert "consumer_artifact_missing" in {
+        item["reason_code"] for item in missing_report["input_integrity"]["findings"]
+    }

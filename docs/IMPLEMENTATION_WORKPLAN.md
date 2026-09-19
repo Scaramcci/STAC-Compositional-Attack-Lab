@@ -1,16 +1,16 @@
-# Current workplan — 2026-09-19
+# Current workplan — 2026-09-19 (authoritative)
 
-Current readiness: offline mapping, replay, graph validation and state separation are implemented. Production can currently prove call/result observation and, when complete file evidence exists, persistence/read reachability. It cannot produce request-boundary context reachability or deterministic semantic-consumption evidence. A new live run therefore cannot be expected to pass the strong-consumption gate merely by spending real quota.
+The request-boundary producer, common bridge/replay mapping, and independent deterministic verifier are implemented and fake/offline tested. `inputToolResultCallIds`, transcript order, model self-report, caller-provided equality, and event-wide labels remain untrusted.
 
 Execution order:
 
-1. Keep historical raw, bridge responses, ledgers, mining and reports immutable; use `revalidation offline` to create a fresh analysis ID for either collection reanalysis or complete bridge action/response replay.
-2. Add audited request-boundary instrumentation that emits only request ID, session identity, result call ID, projection hash and evidence ref. Separately add a deterministic, artifact-specific consumption verifier if the protocol continues to require strong use.
-3. Re-run fake gateway/mock HTTP and full quality gates after that instrumentation. Do not weaken structural admission or substitute labels/model self-report.
-4. Only after steps 2–3 and explicit authorization, copy the disabled template into one unique run, enable that copy, run one live revalidation, then perform runtime review independently.
-5. Pilot, main/freeze and formal evaluation remain gated on structural pass, runtime review and explicit execution authorization.
+1. Keep `configs/sample_generation/cross_session_revalidation.disabled.json` disabled. Use `revalidation offline --collection` only for collection reanalysis and `--bridge-responses` only for complete initialize/action/response/finish replay inputs.
+2. Keep the exact UTF-8 derivation rule explicitly experimental and synthetic-only until the research protocol owner approves or replaces it. The formal default remains disabled.
+3. Review the new fake replay artifact and negative mutation results. In particular, confirm provider-specific message shape support before any real request; unsupported arrays/wrappers/partial/binary results stay unknown.
+4. If separately authorized, prepare one unique disabled run, review its final config/source hashes, then explicitly enable only that run. The purpose is production compatibility validation, not official outcome evaluation.
+5. Review structural admission and runtime budget/isolation/cleanup independently. Pilot, main/freeze, and formal remain out of scope until the policy is approved, structural and runtime gates pass, and explicit authorization is present.
 
-The present synthetic integration proves code paths only. It does not upgrade historical evidence, establish production strong consumption, grant pilot authorization or predict a live pass.
+The replay regression is synthetic engineering evidence, not a real construction or attack success. Current code is ready to request a narrowly scoped production-compatibility revalidation, but not to claim formal readiness from the fake result. The sections below are historical plans and do not override this order.
 
 # Implementation Workplan
 
