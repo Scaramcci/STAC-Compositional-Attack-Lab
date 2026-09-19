@@ -497,7 +497,7 @@ class SafeClawSubprocessVictimDriver:
         self._current_embedding_requests = 0
         # Only versions established by an observed successful write are eligible
         # for later file-read lineage. Edits without a post-image invalidate it.
-        self._workspace_versions: dict[str, tuple[str, str]] = {}
+        self._workspace_versions: dict[tuple[str, str], tuple[str, str, str]] = {}
 
     @staticmethod
     def _accepted_request_count(records: Any) -> int:
@@ -716,6 +716,18 @@ class SafeClawSubprocessVictimDriver:
                 ),
             }
         )
+        return self.map_bridge_action_response(action, response)
+
+    def map_bridge_action_response(
+        self,
+        action: ConstructionAttackerAction,
+        response: dict[str, Any],
+    ) -> ConstructionVictimStep:
+        """Purely map one recorded action/bridge response into source events.
+
+        Replay initializes the same bounded driver state and calls this method;
+        it performs no subprocess, provider, Docker, or model operation.
+        """
         self._observe_request_ledgers(response)
         # Model action IDs may repeat across retries; bind every attempt to a local nonce.
         action_nonce = self._event_sequence + 1
@@ -833,8 +845,11 @@ class SafeClawSubprocessVictimDriver:
                     retrieved_parents = []
                 evidence_refs = raw_retrieval.get("evidence_ref_ids", [])
                 evidence_refs = [str(item).strip() for item in evidence_refs if str(item).strip()]
+                retrieval_occurrence = stable_hash(
+                    [session_id, retrieval_id, action_nonce, retrieval_index]
+                )[:16]
                 retrieval_event: dict[str, Any] = {
-                    "event_id": f"state-read-memory-{retrieval_id}",
+                    "event_id": f"state-read-memory-{retrieval_id}-{retrieval_occurrence}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "_provider_order": int(raw_retrieval.get("result_line_number") or 900_001) * 10
@@ -990,29 +1005,48 @@ class SafeClawSubprocessVictimDriver:
             result_call_id = str(raw_call.get("id") or raw_call.get("call_id") or "")
             result_line = raw_call.get("result_line_number")
             if result_call_id and result_line is not None:
+                occurrence = stable_hash(
+                    [
+                        session.get("actual_session_identity_sha256") or session_id,
+                        result_call_id,
+                        action_nonce,
+                        result_index,
+                    ]
+                )[:16]
                 result_artifact_id = (
-                    f"artifact-file-read-{result_call_id}"
+                    f"artifact-file-read-{result_call_id}-{occurrence}"
                     if raw_call.get("tool_name") == "read"
-                    else f"artifact-recall-{result_call_id}"
+                    else f"artifact-recall-{result_call_id}-{occurrence}"
                     if raw_call.get("tool_name") in {"memory_search", "memory_get"}
-                    else f"artifact-tool-result-{result_call_id}-{action_nonce}-{result_index}"
+                    else f"artifact-tool-result-{result_call_id}-{occurrence}"
                 )
                 result_artifacts_by_call[result_call_id] = (
                     int(result_line),
                     result_artifact_id,
                 )
         tool_call_event_ids: list[str] = []
+        tool_call_event_by_provider_id: dict[str, str] = {}
         for index, tool_call in indexed_tool_calls:
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
             provider_call_id = (
                 str(call_payload.get("id") or call_payload.get("call_id") or "") or None
             )
+            call_occurrence = stable_hash(
+                [
+                    session.get("actual_session_identity_sha256") or session_id,
+                    provider_call_id or action.action_id,
+                    action_nonce,
+                    index,
+                ]
+            )[:16]
             tool_call_event_id = (
-                f"tool-call-{provider_call_id}"
+                f"tool-call-{provider_call_id}-{call_occurrence}"
                 if provider_call_id
-                else f"tool-call-{action.action_id}-{action_nonce}-{index}"
+                else f"tool-call-{action.action_id}-{call_occurrence}"
             )
             tool_call_event_ids.append(tool_call_event_id)
+            if provider_call_id:
+                tool_call_event_by_provider_id[provider_call_id] = tool_call_event_id
             request_line = call_payload.get("request_line_number")
             context_inputs: list[str] = []
             if request_line is not None:
@@ -1024,20 +1058,17 @@ class SafeClawSubprocessVictimDriver:
                     for result_line, artifact_id in result_artifacts_by_call.values()
                     if lower_bound < result_line < request_line_int
                 ]
-            explicit_result_call_ids = call_payload.get("input_result_call_ids", [])
-            explicit_inputs = (
-                [
-                    result_artifacts_by_call[call_id][1]
-                    for call_id in explicit_result_call_ids
-                    if isinstance(call_id, str) and call_id in result_artifacts_by_call
+            edge_evidence = call_payload.get("artifact_use_evidence", [])
+            verified_inputs: list[str] = []
+            if isinstance(edge_evidence, list):
+                verified_inputs = [
+                    str(item.get("source_artifact_id"))
+                    for item in edge_evidence
+                    if isinstance(item, dict)
+                    and isinstance(item.get("source_artifact_id"), str)
+                    and item.get("source_artifact_id")
+                    in {artifact_id for _, artifact_id in result_artifacts_by_call.values()}
                 ]
-                if isinstance(explicit_result_call_ids, list)
-                else []
-            )
-            # Context reachability and semantic consumption are deliberately
-            # separate.  Only an explicit provider correlation authorizes the
-            # stronger use classification; line order alone stays contextual.
-            all_inputs = list(dict.fromkeys([*context_inputs, *explicit_inputs]))
             source_events.append(
                 {
                     "event_id": tool_call_event_id,
@@ -1049,17 +1080,19 @@ class SafeClawSubprocessVictimDriver:
                     "component_role": "effect_tool",
                     "operation": "safeclaw.tool_request",
                     "status": "attempted",
-                    "input_artifact_ids": all_inputs,
+                    "input_artifact_ids": list(dict.fromkeys(verified_inputs)),
                     "public_payload": {
                         **call_payload,
                         "provider_tool_call_id": provider_call_id,
                         "execution_result_observed": call_payload.get("result_observation")
                         in {"observed", "rejected", "error"},
-                        "context_reachability_evidence": bool(context_inputs),
-                        "use_evidence_kind": (
-                            call_payload.get("use_evidence_kind") if explicit_inputs else None
+                        "context_reachability_status": "unknown",
+                        "transcript_order_candidate_artifact_ids": context_inputs,
+                        "artifact_use_evidence": edge_evidence if verified_inputs else [],
+                        "reported_input_result_call_ids": call_payload.get(
+                            "reported_input_result_call_ids", []
                         ),
-                        "explicit_input_result_call_ids": explicit_result_call_ids,
+                        "correlation_contract": call_payload.get("correlation_contract"),
                     },
                     "evidence_ref_ids": [
                         str(
@@ -1086,7 +1119,7 @@ class SafeClawSubprocessVictimDriver:
             )
             result_event: dict[str, Any] = {
                 "event_id": (
-                    f"tool-result-{provider_call_id or action.action_id}-{action_nonce}-{index}"
+                    f"tool-result-{provider_call_id or action.action_id}-{call_occurrence}"
                 ),
                 "session_id": session_id,
                 "sequence_no": self._next_sequence(),
@@ -1131,7 +1164,7 @@ class SafeClawSubprocessVictimDriver:
                     {
                         "artifact_id": (
                             f"artifact-tool-result-{provider_call_id or action.action_id}-"
-                            f"{action_nonce}-{index}"
+                            f"{call_occurrence}"
                         ),
                         "artifact_type": "tool_result",
                         "content_hash": result_hash,
@@ -1170,23 +1203,65 @@ class SafeClawSubprocessVictimDriver:
                 if value
             ]
             provider_order = int(raw_operation.get("result_line_number") or 900_001) * 10 + 1
-            state_ref = f"safeclaw_state:workspace_file:{path}" if path else None
+            workspace_identity = session.get("workspace_identity_sha256")
+            state_ref = (
+                f"safeclaw_state:workspace_file:{workspace_identity}:{path}"
+                if path and workspace_identity
+                else None
+            )
+            workspace_key = (
+                (str(workspace_identity), str(path))
+                if workspace_identity and isinstance(path, str)
+                else None
+            )
+            operation_occurrence = stable_hash(
+                [
+                    workspace_identity,
+                    path,
+                    content_hash,
+                    session_id,
+                    call_id,
+                    action_nonce,
+                    operation_index,
+                    kind,
+                ]
+            )[:16]
             if kind == "write":
                 classification = str(raw_operation.get("classification") or "")
                 is_exact_write = classification == "workspace_file_write"
+                write_occurrence = stable_hash(
+                    [
+                        workspace_identity,
+                        path,
+                        content_hash,
+                        session_id,
+                        call_id,
+                        action_nonce,
+                        operation_index,
+                    ]
+                )[:24]
                 version_id = (
-                    f"artifact-file-version-{stable_hash([path, content_hash])[:24]}"
-                    if status == "passed" and path and content_hash and is_exact_write
+                    f"artifact-file-version-{write_occurrence}"
+                    if status == "passed"
+                    and workspace_key
+                    and content_hash
+                    and is_exact_write
+                    and len(evidence_refs) >= 2
+                    and raw_operation.get("result_order_valid") is True
                     else None
                 )
-                if path and (not version_id or classification == "workspace_file_edit"):
-                    self._workspace_versions.pop(path, None)
+                if workspace_key and (not version_id or classification == "workspace_file_edit"):
+                    self._workspace_versions.pop(workspace_key, None)
                 if version_id and isinstance(content_hash, str):
-                    assert isinstance(path, str)
-                    self._workspace_versions[path] = (content_hash, version_id)
+                    assert workspace_key is not None
+                    self._workspace_versions[workspace_key] = (
+                        content_hash,
+                        version_id,
+                        str(raw_operation.get("content_hash_scope") or "unknown"),
+                    )
                 source_events.append(
                     {
-                        "event_id": f"state-write-file-{call_id}",
+                        "event_id": f"state-write-file-{call_id}-{operation_occurrence}",
                         "session_id": session_id,
                         "sequence_no": self._next_sequence(),
                         "_provider_order": provider_order,
@@ -1214,28 +1289,49 @@ class SafeClawSubprocessVictimDriver:
                             if version_id
                             else []
                         ),
-                        "request_event_id": f"tool-call-{call_id}",
+                        "request_event_id": tool_call_event_by_provider_id.get(call_id),
                         "public_payload": {
                             "workspace_relative_path": path,
                             "content_hash_scope": raw_operation.get("content_hash_scope"),
                             "version_observation": "observed" if version_id else "unknown",
+                            "path_scope": "lexically_normalized_controlled_workspace",
+                            "realpath_verified": False,
                         },
                         "evidence_ref_ids": evidence_refs,
                     }
                 )
                 continue
-            prior = self._workspace_versions.get(path) if isinstance(path, str) else None
+            prior = self._workspace_versions.get(workspace_key) if workspace_key else None
+            read_complete = raw_operation.get("read_completeness") in {
+                "complete_content",
+                "synthetic_exact_content",
+            }
             version_match = bool(
-                prior and isinstance(content_hash, str) and content_hash == prior[0]
+                prior
+                and read_complete
+                and isinstance(content_hash, str)
+                and content_hash == prior[0]
+                and raw_operation.get("content_hash_scope") == prior[2]
             )
+            read_occurrence = stable_hash(
+                [
+                    workspace_identity,
+                    path,
+                    content_hash,
+                    session_id,
+                    call_id,
+                    action_nonce,
+                    operation_index,
+                ]
+            )[:16]
             read_artifact_id = (
-                f"artifact-file-read-{call_id}"
+                f"artifact-file-read-{call_id}-{read_occurrence}"
                 if status == "passed" and content_hash and not raw_operation.get("result_empty")
                 else None
             )
             source_events.append(
                 {
-                    "event_id": f"state-read-file-{call_id}",
+                    "event_id": f"state-read-file-{call_id}-{read_occurrence}",
                     "session_id": session_id,
                     "sequence_no": self._next_sequence(),
                     "_provider_order": provider_order,
@@ -1272,8 +1368,11 @@ class SafeClawSubprocessVictimDriver:
                         "retrieval_class": "workspace_file_read",
                         "retrieval_hit": bool(read_artifact_id),
                         "version_match": version_match,
+                        "read_completeness": raw_operation.get("read_completeness", "unknown"),
+                        "path_scope": "lexically_normalized_controlled_workspace",
+                        "realpath_verified": False,
                     },
-                    "request_event_id": f"tool-call-{call_id}",
+                    "request_event_id": tool_call_event_by_provider_id.get(call_id),
                     "evidence_ref_ids": evidence_refs,
                 }
             )
@@ -1293,6 +1392,7 @@ class SafeClawSubprocessVictimDriver:
             if before == after:
                 continue
             state_ref = f"safeclaw_state:{name}"
+            state_occurrence = stable_hash([after, session_id, action.action_id, action_nonce])[:24]
             source_events.append(
                 {
                     "event_id": f"state-write-{name}-{action.action_id}-{action_nonce}",
@@ -1313,7 +1413,7 @@ class SafeClawSubprocessVictimDriver:
                     ),
                     "output_artifacts": [
                         {
-                            "artifact_id": f"artifact-state-{name}-{after[:16]}",
+                            "artifact_id": f"artifact-state-{name}-{state_occurrence}",
                             "artifact_type": "persistent_state_version",
                             "content_hash": after,
                             "parent_artifact_ids": [],

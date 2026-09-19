@@ -1,12 +1,27 @@
-# Current status — 2026-09-19 (offline evidence-chain engineering)
+# Current status — 2026-09-19 (authoritative)
 
-- Review-start HEAD is `3e7e40fc6ff837cd3871991b32566f6d7203acf4`; the working tree is intentionally dirty with uncommitted user/round changes. No commit, reset, clean, or push was performed.
-- The real run `construction-cross-session-20260915-214932-33f82859` is present and was re-verified read-only. It is complete with four distinct actual-session identities, one stable workspace/index namespace, three lifecycle requests, Attacker/Victim/Embedding attempts 8/16/0, candidate/accepted/negative 1/1/0, and a passing library audit. Structural admission still fails: the historical projection does not preserve a reliable file-version write→read link or explicit downstream consumption. Runtime review remains pending and official outcome remains `not_evaluated`.
-- Offline implementation now distinguishes semantic `memory_search`, direct `memory_get`, ordinary workspace-file reads, and unknown/not-observed/not-occurred/error/empty states. It preserves bounded paths, request/result order and refs, content-hash scope, file-version lineage, session/workspace identity, context reachability, and only explicitly correlated downstream consumption.
-- Admission schema `1.2` reports observed/failed/unknown per gate, reason codes, evidence and missing facts; file, semantic-search, and direct-get chains are separate. Accepted samples, structural admission, runtime review, live authorization, and official outcome remain independent.
-- A new read-only-input replay was written to `experiments/runs/offline-replay-cross-session-20260919-evidence-v2/`. Mine and audit pass, admission fails as expected; the old raw/bridge/mining/report files were not modified. Its input and processing hashes are in `offline_provenance.json`.
-- Current verification: 33 focused tests pass. The first sandboxed `make check` reached 229 passed with 6 loopback-socket permission failures; the permitted local-socket rerun then passed completely: ruff format/check, mypy (71 source files), and **235 tests**. `git diff --check` also passes.
-- The positive end-to-end regression is synthetic bridge-shaped evidence, not a real construction success. No real provider request, diagnostic, construction, pilot, main, freeze, or formal evaluation was run in this round.
+- Review baseline and current HEAD are `46bb122a0860841bf8a9ac3bcf9422e28a2bfdec`; Python is `.venv/bin/python` 3.12.3. Pinned SafeClaw upstream is clean at `a11f5cceaba0676be721021f8d232638fd111305`. The working tree contains only this uncommitted repair round; no commit, push, reset, or clean was performed.
+- `inputToolResultCallIds` has no producer in the pinned upstream, applied patch, relay, or production driver. The bridge now records it only as an unsupported reported field. It never creates semantic-use evidence. Transcript adjacency is diagnostic only and does not prove request context.
+- Admission schema `2.0` evaluates every write/read candidate through independent gates, validates graph integrity and locatable refs, requires explicit lifecycle binding and same-session read→consumer edges, and accepts strong use only from artifact-bound deterministic derivation evidence. Missing strong use does not erase independently observed session or scope facts.
+- File versions use full structured redacted arguments before excerpt truncation, bind occurrence identity separately from content identity, and index by workspace identity plus normalized path. Partial/display-wrapped reads do not claim a complete-version match; failed/unknown writes and edits invalidate version knowledge.
+- `collection-reanalysis` and `bridge-replay` are separate modes. Replay requires recorded initialize/pre-state, action, response/post-state, finish, and ordering input; it calls the same pure driver mapper used by live collection, never starts the bridge or a provider, writes a new analysis ID, and rejects malformed or incomplete JSONL.
+- Pipeline execution, input integrity, structural admission, runtime review, execution authorization, and official outcome are independent. Structural pass may coexist with runtime `pending` and authorization `absent`; `pilot_admitted` means all three required decisions passed/granted and therefore remains false until then.
+- New offline artifact: `experiments/runs/evidence-chain-offline-20260919-001/analyses/bridge-replay-20260919-051443-52c7c542/`. Its synthetic fixture replay and mining pass, audit/admission fail honestly with exit 10 because no accepted persistence chain or strong consumption evidence exists. It is not a real construction success.
+- Verification from this working tree: 92 focused tests passed; the final `make check PYTHON=.venv/bin/python` passed formatting, lint, mypy across 71 source files, and **251 tests in 14.00s**. Schema regeneration produced no diff; bridge compile/import/lint and `git diff --check` pass.
+- No real Attacker, Victim, Embedding, or Planner request was made. No live diagnostic, construction, pilot, main, freeze, or formal evaluation ran, and no historical raw/bridge/ledger/mining/report artifact was modified.
+
+## Evidence capability matrix
+
+| Evidence type | Producer | Available now | Validation | Missing behavior |
+|---|---|---:|---|---|
+| Tool call occurred | bridge transcript parser | yes | call/result order, IDs and source refs | `unknown`/failed gate |
+| Tool result observed | bridge transcript parser | yes | ordered result, result hash scope and refs | no retrieval/version claim |
+| Result reached a later provider request | request-boundary relay projection | no | would require request ID, actual session, result ID, projection hash and refs | `context_reachability=unknown` |
+| Output/argument derived from one result | artifact-bound verifier | synthetic verifier only | exact source artifact, target projection hash, rule and locatable refs | `downstream_consumption=unknown` |
+| Task behavior result | normalized/mined trajectory | yes when observed | graph, state and occurrence gates | failed/unknown, never official success |
+| Official outcome | official evaluator | not run this round | evaluator-owned output only | `not_evaluated` |
+
+Readiness: offline mapping, replay rejection, graph validation, state separation, and fake live failure handling are ready. Production request-boundary reachability and strong-consumption producers are not connected, so spending real quota cannot currently satisfy the strongest admission gate and is not recommended merely to “try one live run”. The sections below are historical records and do not override this status.
 
 # Implementation Progress
 

@@ -61,24 +61,32 @@ def _normalise_workspace_path(value: Any) -> str | None:
     return "/".join(parts)
 
 
-def _tool_path(arguments_projection: str) -> str | None:
-    with contextlib.suppress(json.JSONDecodeError):
-        value = json.loads(arguments_projection)
-        if isinstance(value, dict):
-            for key in ("path", "file", "filename", "file_path"):
-                path = _normalise_workspace_path(value.get(key))
-                if path:
-                    return path
+def _structured_arguments(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        with contextlib.suppress(json.JSONDecodeError):
+            decoded = json.loads(value)
+            return decoded if isinstance(decoded, dict) else None
     return None
 
 
-def _write_content_hash(tool_name: str, arguments_projection: str) -> str | None:
+def _tool_path(arguments: Any) -> str | None:
+    value = _structured_arguments(arguments)
+    if value is not None:
+        for key in ("path", "file", "filename", "file_path"):
+            path = _normalise_workspace_path(value.get(key))
+            if path:
+                return path
+    return None
+
+
+def _write_content_hash(tool_name: str, arguments: Any) -> str | None:
     if tool_name != "write":
         return None
-    with contextlib.suppress(json.JSONDecodeError):
-        value = json.loads(arguments_projection)
-        if isinstance(value, dict) and isinstance(value.get("content"), str):
-            return hashlib.sha256(value["content"].encode()).hexdigest()
+    value = _structured_arguments(arguments)
+    if value is not None and isinstance(value.get("content"), str):
+        return hashlib.sha256(value["content"].encode()).hexdigest()
     return None
 
 
@@ -196,33 +204,33 @@ def _structured_tool_observations(
                 if not call_id or not tool_name:
                     continue
                 arguments = block.get("arguments", block.get("input", {}))
-                projection = str(
-                    redact_value(
-                        json.dumps(arguments, sort_keys=True, default=str), exact_secrets or []
-                    ).sanitized
-                )[:2000]
+                sanitized_arguments = redact_value(arguments, exact_secrets or []).sanitized
+                serialized_arguments = json.dumps(sanitized_arguments, sort_keys=True, default=str)
+                projection = serialized_arguments[:2000]
+                reported_input_ids = [
+                    str(value)
+                    for value in (
+                        block.get("inputToolResultCallIds")
+                        or message.get("inputToolResultCallIds")
+                        or []
+                    )
+                    if str(value)
+                ]
                 calls[call_id] = {
                     "call_id": call_id,
                     "tool_name": tool_name,
-                    "arguments_hash": hashlib.sha256(projection.encode()).hexdigest(),
+                    "arguments_hash": hashlib.sha256(serialized_arguments.encode()).hexdigest(),
                     "arguments_projection": projection,
-                    "workspace_relative_path": _tool_path(projection),
-                    "write_content_hash": _write_content_hash(tool_name, projection),
+                    "workspace_relative_path": _tool_path(sanitized_arguments),
+                    "write_content_hash": _write_content_hash(tool_name, sanitized_arguments),
+                    "write_content_hash_scope": (
+                        "redacted_argument_content_utf8" if tool_name == "write" else None
+                    ),
                     "request_line_number": line_number,
                     "request_evidence_ref": f"openclaw-session-entry:{entry_id}",
-                    # Some pinned/fake gateways can expose an explicit provider
-                    # correlation instead of forcing us to infer use from
-                    # transcript adjacency.  Preserve only call ids here; the
-                    # driver resolves them to observed result artifacts.
-                    "input_result_call_ids": [
-                        str(value)
-                        for value in (
-                            block.get("inputToolResultCallIds")
-                            or message.get("inputToolResultCallIds")
-                            or []
-                        )
-                        if str(value)
-                    ],
+                    # No producer for this non-pinned field exists in the current
+                    # runtime. Retain it only as an unverified diagnostic.
+                    "reported_input_result_call_ids": reported_input_ids,
                 }
         if message.get("role") in {"toolResult", "tool"}:
             call_id = str(message.get("toolCallId") or message.get("toolUseId") or "")
@@ -303,10 +311,10 @@ def _structured_tool_observations(
             "observation_class": _observation_class(call["tool_name"]),
             "workspace_relative_path": call.get("workspace_relative_path"),
             "write_content_hash": call.get("write_content_hash"),
-            "input_result_call_ids": call.get("input_result_call_ids", []),
-            "use_evidence_kind": (
-                "explicit_provider_output_reference" if call.get("input_result_call_ids") else None
-            ),
+            "write_content_hash_scope": call.get("write_content_hash_scope"),
+            "reported_input_result_call_ids": call.get("reported_input_result_call_ids", []),
+            "correlation_contract": "unsupported_unverified_field",
+            "use_evidence_kind": None,
         }
         projected.append(item)
     return projected, observed_ids
@@ -375,14 +383,21 @@ def _aggregate_relay_usage(records: list[dict[str, Any]]) -> dict[str, Any]:
         usage = item.get("provider_usage")
         if item.get("status") != 200:
             failed += 1
+        input_tokens = usage.get("input_tokens") if isinstance(usage, dict) else None
+        output_tokens = usage.get("output_tokens") if isinstance(usage, dict) else None
+        total_tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
         if (
-            isinstance(usage, dict)
-            and all(isinstance(usage.get(key), int) and usage.get(key) >= 0 for key in known)
-            and usage.get("total_tokens") == usage.get("input_tokens") + usage.get("output_tokens")
+            isinstance(input_tokens, int)
+            and input_tokens >= 0
+            and isinstance(output_tokens, int)
+            and output_tokens >= 0
+            and isinstance(total_tokens, int)
+            and total_tokens == input_tokens + output_tokens
         ):
             complete += 1
-            for key in known:
-                known[key] += int(usage[key])
+            known["input_tokens"] += input_tokens
+            known["output_tokens"] += output_tokens
+            known["total_tokens"] += total_tokens
         else:
             missing += 1
     observation = (
@@ -616,7 +631,9 @@ def main() -> int:
                 and gateway_usage["total_tokens"]
                 == gateway_usage["input_tokens"] + gateway_usage["output_tokens"]
             )
-            gateway_complete = gateway_complete and gateway_usage["total_tokens"] > 0
+            gateway_complete = bool(
+                gateway_complete and gateway_usage is not None and gateway_usage["total_tokens"] > 0
+            )
             result["gateway_provider_usage"] = gateway_usage
             result["gateway_usage_observation"] = (
                 "complete" if gateway_complete else "missing_or_invalid"
@@ -682,6 +699,10 @@ def main() -> int:
                     "classification": item.get("observation_class"),
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "read_scope": "tool_result_text" if item.get("result_hash") else None,
+                    # OpenClaw's read tool result is display text and may include
+                    # wrappers, line numbers, offset/limit truncation, or encoding
+                    # transformations. It is not a complete file-byte identity.
+                    "read_completeness": "unknown_display_text",
                     "content_hash": item.get("result_hash"),
                     "content_hash_scope": item.get("result_hash_scope"),
                     "result_observation": item.get("result_observation"),
@@ -701,9 +722,7 @@ def main() -> int:
                     "classification": item.get("observation_class"),
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "content_hash": item.get("write_content_hash"),
-                    "content_hash_scope": "redacted_text_content"
-                    if item.get("write_content_hash")
-                    else None,
+                    "content_hash_scope": item.get("write_content_hash_scope"),
                     "result_observation": item.get("result_observation"),
                     "result_order_valid": bool(item.get("result_order_valid")),
                     "request_line_number": item.get("request_line_number"),

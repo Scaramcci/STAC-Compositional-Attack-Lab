@@ -70,6 +70,8 @@ STAC_PYTHON=python bash scripts/run_cross_session_revalidation.sh offline \
 
 真实 `live` 子命令要求另行授权、prepared config 显式启用以及 `--authorize-live`，并以同一 run 内的原子标记防重复启动；详见 [scripts/README.md](scripts/README.md)。
 
+`offline --collection` 是旧 collection 的重新分析；`offline --bridge-responses` 才是通过当前 driver mapping 重建 source events 的 bridge replay。后者要求完整 initialize/pre-state、action/response/post-state 和 finish 记录。当前 pinned runtime 未生产可信的 `inputToolResultCallIds`、request-boundary context projection 或强消费派生证据，因此 synthetic replay 成功不能解释为真实攻击或准入成功。
+
 统一诊断入口：
 
 ```bash

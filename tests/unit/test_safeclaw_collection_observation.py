@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.base import CollectionBudget
 from stac_attack_lab.interactions.construction import ConstructionAttackerAction
 from stac_attack_lab.interactions.safeclaw_collection import (
@@ -85,7 +86,9 @@ def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None
             "observation_class": "semantic_memory_search",
             "workspace_relative_path": None,
             "write_content_hash": None,
-            "input_result_call_ids": [],
+            "write_content_hash_scope": None,
+            "reported_input_result_call_ids": [],
+            "correlation_contract": "unsupported_unverified_field",
             "use_evidence_kind": None,
         }
     ]
@@ -132,6 +135,239 @@ def test_bridge_preserves_observed_empty_memory_search_without_claiming_retrieva
     observations, _ = project(raw, set(), [])
     assert observations[0]["result_observation"] == "observed"
     assert observations[0]["result_empty"] is True
+
+
+def test_bridge_hashes_full_structured_write_before_excerpt_truncation() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    content = "x" * 3000
+    observations, _ = bridge["_structured_tool_observations"](
+        {
+            "session_transcript_raw": "\n".join(
+                json.dumps(item)
+                for item in [
+                    {
+                        "id": "q",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "w",
+                                    "name": "write",
+                                    "arguments": {"path": "MEMORY.md", "content": content},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "r",
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": "w",
+                            "toolName": "write",
+                            "content": [{"type": "text", "text": "ok"}],
+                        },
+                    },
+                ]
+            )
+        },
+        set(),
+        [],
+    )
+    assert observations[0]["workspace_relative_path"] == "MEMORY.md"
+    assert (
+        observations[0]["write_content_hash"]
+        == __import__("hashlib").sha256(content.encode()).hexdigest()
+    )
+    assert len(observations[0]["arguments_projection"]) <= 2000
+
+
+def test_file_versions_separate_content_occurrence_workspace_and_completeness() -> None:
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget()
+    driver._started_at = monotonic()
+    driver._last_state = {
+        "memory_content": "",
+        "workspace_file_contents": {},
+        "sim_google_calls": [],
+    }
+    driver._new_session_pending = False
+    driver._event_sequence = 0
+    driver._events = []
+    driver._checkpoints = []
+    driver._workspace_versions = {}
+    driver._provider_requests_spent = 0
+    driver._embedding_requests_spent = 0
+    driver._current_provider_requests = 0
+    driver._current_embedding_requests = 0
+
+    def apply_file(
+        *,
+        action_id: str,
+        session_id: str,
+        workspace: str,
+        kind: str,
+        content_hash: str,
+        observation: str = "observed",
+        classification: str | None = None,
+        completeness: str = "complete_content",
+        scope: str = "redacted_argument_content_utf8",
+    ) -> dict[str, Any]:
+        call_id = "duplicate-call-id"
+        operation = {
+            "call_id": call_id,
+            "classification": classification or f"workspace_file_{kind}",
+            "workspace_relative_path": "MEMORY.md",
+            "content_hash": content_hash,
+            "content_hash_scope": scope,
+            "read_completeness": completeness,
+            "result_observation": observation,
+            "result_empty": False,
+            "result_order_valid": True,
+            "request_line_number": 1,
+            "result_line_number": 2,
+            "request_evidence_ref": f"request:{action_id}",
+            "result_evidence_ref": f"result:{action_id}",
+        }
+        response = {
+            "session": {
+                "session_id": session_id,
+                "agent_response": "done",
+                "response_observation": "observed_text",
+                "actual_session_identity_sha256": stable_hash(session_id),
+                "workspace_identity_sha256": stable_hash(workspace),
+                "memory_index_namespace_sha256": stable_hash(f"index:{workspace}"),
+                "memory_retrieval_observation": "not_occurred",
+                "tool_observations": [
+                    {
+                        "call_id": call_id,
+                        "tool_name": kind,
+                        "arguments_hash": stable_hash(action_id),
+                        "arguments_projection": "{}",
+                        "request_line_number": 1,
+                        "result_line_number": 2,
+                        "result_observation": observation,
+                        "result_empty": False,
+                        "result_hash": stable_hash(f"result:{action_id}"),
+                        "result_hash_scope": "redacted_text_content",
+                        "request_evidence_ref": f"request:{action_id}",
+                        "result_evidence_ref": f"result:{action_id}",
+                    }
+                ],
+                "persistence_writes": [operation] if kind in {"write", "edit"} else [],
+                "persistence_reads": [operation] if kind == "read" else [],
+                "provider_usage": {"total_tokens": 1},
+            },
+            "post_state": dict(driver._last_state),
+        }
+        step = driver.map_bridge_action_response(
+            ConstructionAttackerAction(
+                action_id=action_id,
+                action_type="deliver_message",
+                delivery_surface="safeclaw_user_message",
+                public_message=action_id,
+                rationale_summary="file version regression",
+            ),
+            response,
+        )
+        return next(
+            event
+            for event in step.source_events
+            if event["event_type"] in {"state_write", "state_read"}
+            and event["component_role"] == "workspace_file"
+        )
+
+    first = apply_file(
+        action_id="a1", session_id="s1", workspace="w1", kind="write", content_hash="A"
+    )
+    repeated = apply_file(
+        action_id="a2", session_id="s1", workspace="w1", kind="write", content_hash="A"
+    )
+    middle = apply_file(
+        action_id="b", session_id="s1", workspace="w1", kind="write", content_hash="B"
+    )
+    restored = apply_file(
+        action_id="a3", session_id="s1", workspace="w1", kind="write", content_hash="A"
+    )
+    version_ids = [
+        event["output_artifacts"][0]["artifact_id"] for event in (first, repeated, middle, restored)
+    ]
+    assert len(version_ids) == len(set(version_ids))
+    assert [
+        event["output_artifacts"][0]["content_hash"]
+        for event in (first, repeated, middle, restored)
+    ] == ["A", "A", "B", "A"]
+
+    partial = apply_file(
+        action_id="partial",
+        session_id="s2",
+        workspace="w1",
+        kind="read",
+        content_hash="A",
+        completeness="partial_offset_limit",
+    )
+    wrapped = apply_file(
+        action_id="wrapped",
+        session_id="s2",
+        workspace="w1",
+        kind="read",
+        content_hash="A",
+        scope="display_text_with_line_numbers",
+    )
+    other_workspace = apply_file(
+        action_id="other", session_id="s2", workspace="w2", kind="read", content_hash="A"
+    )
+    exact = apply_file(
+        action_id="exact", session_id="s2", workspace="w1", kind="read", content_hash="A"
+    )
+    assert partial["public_payload"]["version_match"] is False
+    assert wrapped["public_payload"]["version_match"] is False
+    assert other_workspace["public_payload"]["version_match"] is False
+    assert exact["public_payload"]["version_match"] is True
+
+    failed = apply_file(
+        action_id="failed",
+        session_id="s2",
+        workspace="w1",
+        kind="write",
+        content_hash="C",
+        observation="error",
+    )
+    assert failed["output_artifacts"] == []
+    after_failed = apply_file(
+        action_id="after-failed", session_id="s3", workspace="w1", kind="read", content_hash="A"
+    )
+    assert after_failed["public_payload"]["version_match"] is False
+
+    apply_file(
+        action_id="before-failed-edit",
+        session_id="s3",
+        workspace="w1",
+        kind="write",
+        content_hash="D",
+    )
+    failed_edit = apply_file(
+        action_id="failed-edit",
+        session_id="s3",
+        workspace="w1",
+        kind="edit",
+        content_hash="unknown-post-image",
+        observation="error",
+    )
+    assert failed_edit["output_artifacts"] == []
+    after_failed_edit = apply_file(
+        action_id="after-failed-edit",
+        session_id="s4",
+        workspace="w1",
+        kind="read",
+        content_hash="D",
+    )
+    assert after_failed_edit["public_payload"]["version_match"] is False
+
+    event_ids = [event["event_id"] for event in driver._events]
+    assert len(event_ids) == len(set(event_ids))
 
 
 def test_bridge_distinguishes_rejected_and_unobserved_tool_results() -> None:
@@ -366,9 +602,9 @@ def test_explicit_memory_retrievals_are_all_preserved_with_lineage(
         for event in step.source_events
         if event["operation"] == "memory_retrieve_later_session"
     ]
-    assert [event["event_id"] for event in retrievals] == [
-        "state-read-memory-r1",
-        "state-read-memory-r2",
+    assert [event["event_id"].split("-")[:4] for event in retrievals] == [
+        ["state", "read", "memory", "r1"],
+        ["state", "read", "memory", "r2"],
     ]
     assert retrievals[0]["output_artifacts"][0]["parent_artifact_ids"] == ["memory-version-1"]
     assert retrievals[1]["evidence_ref_ids"] == ["retrieval-log:r2"]

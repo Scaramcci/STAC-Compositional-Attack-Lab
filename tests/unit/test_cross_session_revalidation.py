@@ -10,6 +10,7 @@ import pytest
 from stac_attack_lab.execution.construction_admission import construction_admission
 from stac_attack_lab.execution.revalidation import (
     launch_live_revalidation,
+    offline_revalidation,
     prepare_revalidation,
 )
 from stac_attack_lab.hashing import stable_hash
@@ -109,6 +110,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
             "status": "passed",
             "post_state_ref": "m:v1",
             "write_state_refs": ["m"],
+            "evidence_ref_ids": ["w"],
             "output_artifacts": [
                 {
                     "artifact_id": "a-write",
@@ -169,6 +171,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
                 }
             ],
             "public_payload": later,
+            "evidence_ref_ids": ["r"],
         },
         {
             "event_id": "use",
@@ -182,8 +185,20 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
             "input_artifact_ids": ["a-read"],
             "public_payload": {
                 **later,
-                "use_evidence_kind": "explicit_provider_output_reference",
+                # Synthetic instrumentation used only to exercise the verifier.
+                # The pinned production runtime does not currently emit this.
+                "artifact_use_evidence": [
+                    {
+                        "source_artifact_id": "a-read",
+                        "evidence_kind": "deterministic_argument_derivation",
+                        "verification_rule": "sha256_exact_projection",
+                        "source_content_sha256": "v1",
+                        "target_projection_sha256": "v1",
+                        "evidence_ref_ids": ["synthetic-verifier:use"],
+                    }
+                ],
             },
+            "evidence_ref_ids": ["synthetic-verifier:use"],
         },
     ]
     graph, audit = normalize_source_events(_trajectory(), events, audit_ref="a")
@@ -202,7 +217,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
                         "public_payload": {
                             key: value
                             for key, value in event.public_payload.items()
-                            if key != "use_evidence_kind"
+                            if key != "artifact_use_evidence"
                         }
                     }
                 )
@@ -216,7 +231,273 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
         _trajectory(), context_only, accepted_count=1, library_audit_passed=True
     )
     assert context_report["checks"]["cross_session_persistence_read_use"] is False
-    assert context_report["evidence_diagnostics"]["context_reachability"]["state"] == "observed"
+    assert context_report["evidence_diagnostics"]["context_reachability"]["state"] == "unknown"
+
+
+def test_admission_requires_each_independent_gate_and_preserves_observed_facts() -> None:
+    """Mutations cannot pass by skipping gates or erase unrelated observations."""
+    scope = {
+        "actual_session_identity_sha256": stable_hash("s1"),
+        "workspace_identity_sha256": stable_hash("w"),
+        "memory_index_namespace_sha256": stable_hash("i"),
+    }
+    later = {
+        **scope,
+        "actual_session_identity_sha256": stable_hash("s3"),
+        "retrieval_hit": True,
+        "new_session_request_action_id": "restart-s2",
+    }
+    events = [
+        {
+            "event_id": "write",
+            "session_id": "s1",
+            "sequence_no": 1,
+            "actor_role": "system",
+            "event_type": "state_write",
+            "component_role": "persistent_memory",
+            "operation": "memory_write",
+            "status": "passed",
+            "post_state_ref": "m:v1",
+            "write_state_refs": ["m"],
+            "evidence_ref_ids": ["write:post"],
+            "public_payload": scope,
+            "output_artifacts": [
+                {
+                    "artifact_id": "a-write",
+                    "artifact_type": "memory",
+                    "content_hash": "v1",
+                    "parent_artifact_ids": [],
+                    "taint_labels": ["persistent"],
+                    "trust_label": "workspace_state",
+                    "source_ref_ids": ["write:post"],
+                }
+            ],
+        },
+        {
+            "event_id": "restart",
+            "session_id": "s2",
+            "sequence_no": 2,
+            "actor_role": "runner",
+            "event_type": "lifecycle",
+            "component_role": "session_lifecycle",
+            "operation": "request_new_session",
+            "status": "passed",
+            "lifecycle_id": "restart-s2",
+            "public_payload": {
+                "old_session_identity_sha256": stable_hash("s1"),
+                "new_session_identity_sha256": stable_hash("s3"),
+            },
+            "evidence_ref_ids": ["lifecycle:restart-s2"],
+        },
+        {
+            "event_id": "read",
+            "session_id": "s3",
+            "sequence_no": 3,
+            "actor_role": "system",
+            "event_type": "state_read",
+            "component_role": "persistent_memory",
+            "operation": "memory_retrieve_later_session",
+            "status": "passed",
+            "read_state_refs": ["m"],
+            "input_artifact_ids": ["a-write"],
+            "evidence_ref_ids": ["read:result"],
+            "public_payload": later,
+            "output_artifacts": [
+                {
+                    "artifact_id": "a-read",
+                    "artifact_type": "retrieved",
+                    "content_hash": "v1",
+                    "parent_artifact_ids": ["a-write"],
+                    "taint_labels": ["persistent"],
+                    "trust_label": "workspace_state",
+                    "source_ref_ids": ["read:result"],
+                }
+            ],
+        },
+        {
+            "event_id": "use",
+            "session_id": "s3",
+            "sequence_no": 4,
+            "actor_role": "agent",
+            "event_type": "tool_call",
+            "component_role": "effect_tool",
+            "operation": "effect",
+            "status": "passed",
+            "input_artifact_ids": ["a-read"],
+            "evidence_ref_ids": ["use:derived"],
+            "public_payload": {
+                **later,
+                "artifact_use_evidence": [
+                    {
+                        "source_artifact_id": "a-read",
+                        "evidence_kind": "deterministic_argument_derivation",
+                        "verification_rule": "sha256_exact_projection",
+                        "source_content_sha256": "v1",
+                        "target_projection_sha256": "v1",
+                        "evidence_ref_ids": ["use:derived"],
+                    }
+                ],
+            },
+        },
+    ]
+
+    def report(mutator: object | None = None) -> dict[str, object]:
+        changed = json.loads(json.dumps(events))
+        if callable(mutator):
+            mutator(changed)
+        graph, _ = normalize_source_events(_trajectory(), changed, audit_ref="mutation")
+        return construction_admission(
+            _trajectory(), graph, accepted_count=1, library_audit_passed=True
+        )
+
+    assert report()["structural_admission"]["status"] == "passed"
+    missing_post = report(lambda rows: rows[0].pop("post_state_ref"))
+    assert missing_post["checks"]["cross_session_persistence_read_use"] is False
+    assert "reliable_write" in missing_post["failed_gates"]
+    missing_lifecycle_binding = report(
+        lambda rows: rows[2]["public_payload"].pop("new_session_request_action_id")
+    )
+    assert "valid_lifecycle_transition" in missing_lifecycle_binding["failed_gates"]
+    unrelated_session = report(
+        lambda rows: rows[3]["public_payload"].update(
+            actual_session_identity_sha256=stable_hash("unrelated")
+        )
+    )
+    assert "consumer_session_consistent" in unrelated_session["failed_gates"]
+    no_use = report(lambda rows: rows[3]["public_payload"].pop("artifact_use_evidence"))
+    assert no_use["evidence_diagnostics"]["actual_session_changed"]["state"] == "observed"
+    assert no_use["evidence_diagnostics"]["workspace_scope_consistent"]["state"] == "observed"
+    assert no_use["evidence_diagnostics"]["downstream_consumption"]["state"] == "unknown"
+
+
+def test_bridge_correlation_field_is_diagnostic_only_and_does_not_pollute_context_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bridge = runpy.run_path("integrations/safeclaw/construction_bridge.py")
+    observations, _ = bridge["_structured_tool_observations"](
+        {
+            "session_transcript_raw": "\n".join(
+                json.dumps(item)
+                for item in [
+                    {
+                        "id": "rq",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "r",
+                                    "name": "read",
+                                    "arguments": {"path": "MEMORY.md"},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "rr",
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": "r",
+                            "toolName": "read",
+                            "content": [{"type": "text", "text": "A"}],
+                        },
+                    },
+                    {
+                        "id": "bq",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "b",
+                                    "name": "read",
+                                    "arguments": {"path": "B.md"},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": "br",
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": "b",
+                            "toolName": "read",
+                            "content": [{"type": "text", "text": "B"}],
+                        },
+                    },
+                    {
+                        "id": "uq",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "u",
+                                    "name": "exec",
+                                    "inputToolResultCallIds": ["r"],
+                                    "arguments": {"command": "noop"},
+                                }
+                            ],
+                        },
+                    },
+                ]
+            )
+        },
+        set(),
+        [],
+    )
+    use = next(item for item in observations if item["call_id"] == "u")
+    assert use["reported_input_result_call_ids"] == ["r"]
+    assert use["correlation_contract"] == "unsupported_unverified_field"
+    assert use.get("use_evidence_kind") is None
+
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget()
+    driver._started_at = monotonic()
+    driver._last_state = {
+        "memory_content": "",
+        "workspace_file_contents": {},
+        "sim_google_calls": [],
+    }
+    driver._new_session_pending = False
+    driver._event_sequence = 0
+    driver._events = []
+    driver._checkpoints = []
+    driver._workspace_versions = {}
+    monkeypatch.setattr(
+        driver,
+        "_send_bridge",
+        lambda _: {
+            "session": {
+                "session_id": "s",
+                "agent_response": "done",
+                "tool_observations": observations,
+                "provider_usage": {"total_tokens": 1},
+            },
+            "post_state": dict(driver._last_state),
+        },
+    )
+    step = driver.apply(
+        ConstructionAttackerAction(
+            action_id="a",
+            action_type="deliver_message",
+            delivery_surface="safeclaw_user_message",
+            public_message="x",
+            rationale_summary="test",
+        )
+    )
+    use_event = next(
+        item
+        for item in step.source_events
+        if item.get("public_payload", {}).get("provider_tool_call_id") == "u"
+    )
+    assert use_event["input_artifact_ids"] == []
+    assert use_event["public_payload"]["context_reachability_status"] == "unknown"
 
 
 def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -301,7 +582,6 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
                             "type": "toolCall",
                             "id": "u",
                             "name": "exec",
-                            "inputToolResultCallIds": ["r"],
                             "arguments": {"command": "record controlled benchmark effect"},
                         }
                     ],
@@ -329,6 +609,7 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
                 "classification": item["observation_class"],
                 "workspace_relative_path": item["workspace_relative_path"],
                 "read_scope": "tool_result_text",
+                "read_completeness": "synthetic_exact_content",
                 "content_hash": item["result_hash"],
                 "content_hash_scope": item["result_hash_scope"],
                 "result_observation": item["result_observation"],
@@ -423,6 +704,30 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
         ),
     ]
     events = [event for action in actions for event in driver.apply(action).source_events]
+    # Explicit synthetic instrumentation exercises the strong-use verifier.
+    use_event = next(
+        event
+        for event in events
+        if event.get("public_payload", {}).get("provider_tool_call_id") == "u"
+    )
+    read_event = next(
+        event
+        for event in events
+        if event["event_type"] == "state_read" and event["operation"] == "workspace_file_read"
+    )
+    read_artifact_id = read_event["output_artifacts"][0]["artifact_id"]
+    use_event["input_artifact_ids"] = [read_artifact_id]
+    use_event["evidence_ref_ids"].append("synthetic-verifier:file-use")
+    use_event["public_payload"]["artifact_use_evidence"] = [
+        {
+            "source_artifact_id": read_artifact_id,
+            "evidence_kind": "deterministic_argument_derivation",
+            "verification_rule": "sha256_exact_projection",
+            "source_content_sha256": read_observations[0]["result_hash"],
+            "target_projection_sha256": read_observations[0]["result_hash"],
+            "evidence_ref_ids": ["synthetic-verifier:file-use"],
+        }
+    ]
     graph, audit = normalize_source_events(_trajectory(), events, audit_ref="integration")
     assert audit.passed, audit
     report = construction_admission(
@@ -432,8 +737,14 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
     assert report["checks"]["semantic_memory_search_read_use"] is False
     assert report["checks"]["cross_session_persistence_read_use"] is True
     assert (
-        next(event for event in graph.events if event.event_id == "tool-call-u").sequence_no
-        > next(event for event in graph.events if event.event_id == "state-read-file-r").sequence_no
+        next(
+            event
+            for event in graph.events
+            if event.public_payload.get("provider_tool_call_id") == "u"
+        ).sequence_no
+        > next(
+            event for event in graph.events if event.operation == "workspace_file_read"
+        ).sequence_no
     )
 
 
@@ -474,8 +785,231 @@ def test_prepare_is_offline_and_live_launch_is_atomic(
         lambda *_: {"overall_status": "passed"},
     )
     result = launch_live_revalidation(tmp_path, run_root, authorized=True)
-    assert result["execution_status"] == "completed"
+    assert result["execution_status"] == "completed_awaiting_runtime_review"
+    assert result["exit_code"] == 2
     assert calls == ["collect"]
+    review_before = (run_root / "configuration_review.live.json").read_text()
     with pytest.raises(FileExistsError):
         launch_live_revalidation(tmp_path, run_root, authorized=True)
     assert calls == ["collect"]
+    assert (run_root / "configuration_review.live.json").read_text() == review_before
+
+
+def test_live_rejects_config_identity_mismatch_before_launch(tmp_path: Path) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        "construction-binding-test",
+    )
+    config_path = run_root / "runtime_config.json"
+    config = json.loads(config_path.read_text())
+    config.update(execution_enabled=True, pipeline_id="wrong-batch")
+    config_path.write_text(json.dumps(config))
+
+    with pytest.raises(ValueError, match="pipeline_id_mismatch"):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+
+    assert not (run_root / "launch.marker").exists()
+    summary = json.loads((run_root / "launch_validation_summary.json").read_text())
+    assert summary["pipeline_execution"]["status"] == "not_started"
+    assert summary["exit_code"] == 30
+
+
+@pytest.mark.parametrize("partial_valid", [True, False])
+def test_live_collection_exception_preserves_partial_artifact_outcome(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, partial_valid: bool
+) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        f"construction-partial-{partial_valid}",
+    )
+    config_path = run_root / "runtime_config.json"
+    config = json.loads(config_path.read_text())
+    config["execution_enabled"] = True
+    config_path.write_text(json.dumps(config))
+    import stac_attack_lab.execution.revalidation as revalidation_module
+    import stac_attack_lab.execution.sample_generation as generation
+    import stac_attack_lab.execution.sample_preflight as preflight_module
+
+    class Passed:
+        passed = True
+
+    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: Passed())
+
+    def fail_after_write(_root: Path, loaded: object) -> Path:
+        candidate = (
+            Path(config["output_root"])
+            / config["library_version"]
+            / "interactions"
+            / "raw"
+            / config["pipeline_id"]
+        )
+        candidate.mkdir(parents=True, exist_ok=True)
+        raise RuntimeError("collection exploded after possible writes")
+
+    monkeypatch.setattr(generation, "collect_sample_interactions", fail_after_write)
+    if partial_valid:
+        monkeypatch.setattr(generation, "_validate_collection_stage", lambda *_a, **_k: object())
+        monkeypatch.setattr(
+            revalidation_module,
+            "offline_revalidation",
+            lambda *_: {
+                "overall_status": "failed",
+                "structural_admission": "failed",
+                "analysis_root": str(tmp_path / "analysis"),
+            },
+        )
+
+    result = launch_live_revalidation(tmp_path, run_root, authorized=True)
+
+    assert result["stage_errors"][0]["stage"] == "collection"
+    if partial_valid:
+        assert result["collection"] is not None
+        assert result["offline_status"] == "failed"
+        assert result["execution_status"] == "completed_with_stage_failures"
+    else:
+        assert result["collection"] is None
+        assert result["offline_status"] == "not_run"
+        assert result["execution_status"] == "blocked_no_valid_collection"
+
+
+def test_bridge_replay_uses_real_driver_mapping_mining_audit_and_admission(
+    tmp_path: Path,
+) -> None:
+    run_root = tmp_path / "prepared"
+    run_root.mkdir()
+    config = json.loads(
+        (ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json").read_text()
+    )
+    config.update(
+        pipeline_id="bridge-replay-test",
+        library_version="bridge-replay-test",
+        output_root=str(tmp_path / "unused-output"),
+        execution_enabled=False,
+    )
+    (run_root / "runtime_config.json").write_text(json.dumps(config))
+    bridge_path = tmp_path / "bridge.jsonl"
+    action = {
+        "action_id": "delivery-1",
+        "action_type": "deliver_message",
+        "delivery_surface": "safeclaw_user_message",
+        "public_message": "synthetic replay message",
+        "rationale_summary": "offline replay fixture",
+    }
+    response = {
+        "session": {
+            "session_id": "recorded-s1",
+            "agent_response": "recorded response",
+            "response_observation": "observed_text",
+            "actual_session_identity_sha256": stable_hash("recorded-s1"),
+            "workspace_identity_sha256": stable_hash("workspace"),
+            "memory_index_namespace_sha256": stable_hash("namespace"),
+            "memory_retrieval_observation": "not_occurred",
+            "tool_observations": [],
+            "provider_usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        },
+        "post_state": {"memory_content": "", "workspace_file_contents": {}, "sim_google_calls": []},
+    }
+    bridge_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "request": {"kind": "initialize"},
+                        "response": {
+                            "kind": "ready",
+                            "pre_state": {
+                                "memory_content": "",
+                                "workspace_file_contents": {},
+                                "sim_google_calls": [],
+                            },
+                        },
+                    }
+                ),
+                json.dumps({"request": {"kind": "action", "action": action}, "response": response}),
+                json.dumps(
+                    {
+                        "request": {"kind": "finish"},
+                        "response": {"kind": "finished", "post_state": response["post_state"]},
+                    }
+                ),
+            ]
+        )
+        + "\n"
+    )
+
+    result = offline_revalidation(ROOT, run_root, bridge_responses=bridge_path)
+
+    assert result["mode"] == "bridge-replay"
+    assert result["bridge_replay"]["status"] == "passed"
+    assert [stage["stage"] for stage in result["stages"]] == [
+        "bridge_replay",
+        "mine",
+        "audit",
+        "admission",
+    ]
+    assert result["pipeline_execution"]["status"] == "not_executed"
+    assert result["structural_admission"]["status"] == "failed"
+    assert result["runtime_review"]["status"] == "pending"
+    assert result["execution_authorization"]["status"] == "absent"
+    assert result["official_outcome"]["status"] == "not_evaluated"
+    assert result["bridge_replay"]["diagnostics"]["valid_line_count"] == 3
+    analysis_root = Path(result["analysis_root"])
+    assert next(analysis_root.rglob("source_events.jsonl")).read_text().strip()
+    provenance = json.loads((analysis_root / "offline_provenance.json").read_text())
+    assert provenance["mode"] == "bridge-replay"
+    assert set(provenance["processing_source_sha256"]) == {
+        "admission",
+        "bridge",
+        "driver",
+        "revalidation",
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    ["{bad json\n", json.dumps({"response": {"session": {}, "post_state": {}}}) + "\n"],
+)
+def test_bridge_replay_blocks_malformed_or_missing_action(tmp_path: Path, payload: str) -> None:
+    run_root = tmp_path / "prepared"
+    run_root.mkdir()
+    config = json.loads(
+        (ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json").read_text()
+    )
+    config.update(pipeline_id="bridge-replay-invalid", execution_enabled=False)
+    (run_root / "runtime_config.json").write_text(json.dumps(config))
+    bridge_path = tmp_path / "bridge.jsonl"
+    bridge_path.write_text(payload)
+
+    first = offline_revalidation(ROOT, run_root, bridge_responses=bridge_path)
+    second = offline_revalidation(ROOT, run_root, bridge_responses=bridge_path)
+
+    assert first["overall_status"] == "blocked"
+    assert first["completion_class"] == "insufficient_inputs"
+    assert first["bridge_replay"]["reason_code"] == "insufficient_inputs"
+    assert first["analysis_id"] != second["analysis_id"]
+    assert Path(first["analysis_root"]).is_dir()
+    assert (Path(first["analysis_root"]) / "offline_provenance.json").is_file()
+
+
+def test_bridge_replay_missing_input_is_structured_and_provenanced(tmp_path: Path) -> None:
+    run_root = tmp_path / "prepared"
+    run_root.mkdir()
+    config = json.loads(
+        (ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json").read_text()
+    )
+    config.update(pipeline_id="bridge-replay-missing", execution_enabled=False)
+    (run_root / "runtime_config.json").write_text(json.dumps(config))
+
+    result = offline_revalidation(
+        ROOT,
+        run_root,
+        bridge_responses=tmp_path / "does-not-exist.jsonl",
+    )
+
+    assert result["overall_status"] == "blocked"
+    assert result["exit_code"] == 20
+    assert result["stages"][0]["reason_code"] == "bridge_response_input_missing"
+    provenance = Path(result["analysis_root"]) / "offline_provenance.json"
+    assert provenance.is_file()

@@ -172,7 +172,7 @@ def _main(argv: list[str] | None = None) -> int:
                 authorized=args.authorize_live,
             )
             print(json.dumps(report, indent=2, sort_keys=True, default=str))
-            return 0 if report.get("execution_status") == "completed" else 1
+            return int(report.get("exit_code", 30))
         report = offline_revalidation(
             root,
             _project_scoped_path(root, args.run_root),
@@ -181,7 +181,7 @@ def _main(argv: list[str] | None = None) -> int:
             _project_scoped_path(root, args.bridge_responses) if args.bridge_responses else None,
         )
         print(json.dumps(report, indent=2, sort_keys=True, default=str))
-        return 0 if report.get("overall_status") == "passed" else 1
+        return int(report.get("exit_code", 30))
 
     if args.command == "sample":
         if args.sample_command in {"collect-preflight", "collect", "collect-and-mine"}:
@@ -215,7 +215,7 @@ def _main(argv: list[str] | None = None) -> int:
                 _project_scoped_path(root, args.library),
             )
             print(json.dumps(report, indent=2))
-            return 0 if report["pilot_admitted"] else 1
+            return 0 if report.get("structural_admission", {}).get("status") == "passed" else 10
         library = _project_scoped_path(root, args.library)
         if args.sample_command == "audit":
             library_report = audit_sample_library_stage(library)

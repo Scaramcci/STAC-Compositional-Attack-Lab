@@ -1,15 +1,16 @@
-# Current workplan — 2026-09-19
+# Current workplan — 2026-09-19 (authoritative)
 
-Current blocker: the latest real run is present, but its historical bridge projection lacks file-version lineage and explicit read-result consumption, so it correctly remains structurally unadmitted. Runtime network/isolation/cleanup evidence is also pending, and no live request is authorized in this round.
+Offline evidence-chain repair is implemented and the complete quality gate passes. The current blocker is not another live run: pinned production has no request-boundary producer for result-context reachability and no deterministic, artifact-bound strong-consumption verifier. `inputToolResultCallIds`, transcript order, model self-report, or an event-wide label cannot fill that gap.
 
 Execution order:
 
-1. Complete offline evidence-chain validation (bridge → durable artifacts → session transition → read → downstream consumption → normalization/mining → admission). **Implemented; focused tests pass, full socket-dependent check still needs a permitted environment.**
-2. After explicit authorization, run one fresh real revalidation from `configs/sample_generation/cross_session_revalidation.disabled.json` with a unique run/batch/output; enable execution only in that copied run config.
-3. Perform independent structural and runtime review.
-4. Only after approval, run pilot, then main/freeze, then the formal matrix.
+1. Keep `configs/sample_generation/cross_session_revalidation.disabled.json` disabled. Use `revalidation offline --collection` only for collection reanalysis and `--bridge-responses` only for complete initialize/action/response/finish replay inputs.
+2. Implement and fake-test a minimal relay/request-boundary projection if context reachability is required: request ID, actual session identity, result call ID, redacted content projection hash and evidence ref. This fact must remain weaker than semantic consumption.
+3. Implement a protocol-approved deterministic derivation verifier only if the experiment requires strong consumption. Bind each claim to one source artifact and one consumer edge; do not propagate it to context inputs.
+4. Only after those producers exist, prepare a unique disabled single-run config for separate authorization. Review structural admission and runtime budget/isolation/cleanup independently; authorization absence is not a structural failure.
+5. Pilot, main/freeze, and formal remain out of scope until structural pass, runtime pass, and explicit authorization are all present.
 
-The synthetic regression is not a real construction success and cannot upgrade the historical run or grant pilot authorization. The single real revalidation in step 2 must remain disabled until separately authorized.
+The new replay regression and offline artifact are synthetic engineering evidence, not a real construction success. Current code is ready for offline/fake verification but not yet a justified use of real quota for the strongest evidence objective. The sections below are historical plans and do not override this order.
 
 # Implementation Workplan
 

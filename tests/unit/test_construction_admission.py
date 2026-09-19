@@ -44,7 +44,16 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
                 new_session_request_action_id="restart-1",
             )
         if e["event_id"] == "e7":
-            e["public_payload"]["use_evidence_kind"] = "explicit_provider_output_reference"
+            e["public_payload"]["artifact_use_evidence"] = [
+                {
+                    "source_artifact_id": "a4",
+                    "evidence_kind": "deterministic_argument_derivation",
+                    "verification_rule": "sha256_exact_projection",
+                    "source_content_sha256": "hash-a4",
+                    "target_projection_sha256": "hash-a4",
+                    "evidence_ref_ids": ["lineage:a4:a5"],
+                }
+            ]
     fixture = tmp_path / "fixture.jsonl"
     fixture.write_text(json.dumps(source) + "\n")
     config = load_sample_generation_config(
@@ -72,6 +81,10 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
     assert report["checks"]["cross_session_persistence_read_use"], report
     assert report["structural_checks_passed"], report
     assert report["pilot_admitted"] is False  # Runtime engineering review is still required.
+    assert report["structural_admission"]["status"] == "passed"
+    assert report["runtime_review"]["status"] == "pending"
+    assert report["execution_authorization"]["status"] == "absent"
+    assert report["official_outcome"]["status"] == "not_evaluated"
     # A two-event accepted chain cannot bypass the complete engineering gate.
     short = graph.model_copy(update={"edges": []})
     assert (
@@ -104,3 +117,55 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
             ]["cross_session_persistence_read_use"]
             is False
         )
+
+    duplicate = graph.model_copy(update={"events": [*graph.events, graph.events[0]]})
+    duplicate_report = construction_admission(
+        raw, duplicate, accepted_count=1, library_audit_passed=True
+    )
+    assert duplicate_report["input_integrity"]["status"] == "failed"
+    assert "duplicate_event_id" in {
+        item["reason_code"] for item in duplicate_report["input_integrity"]["findings"]
+    }
+
+    broken_parent = graph.model_copy(
+        update={
+            "artifacts": [
+                graph.artifacts[0].model_copy(update={"parent_artifact_ids": ["missing-parent"]}),
+                *graph.artifacts[1:],
+            ]
+        }
+    )
+    broken_report = construction_admission(
+        raw, broken_parent, accepted_count=1, library_audit_passed=True
+    )
+    assert "parent_artifact_missing" in {
+        item["reason_code"] for item in broken_report["input_integrity"]["findings"]
+    }
+
+    missing_consumer_artifact = graph.model_copy(
+        update={
+            "events": [
+                event.model_copy(
+                    update={
+                        "input_artifact_ids": [
+                            *event.input_artifact_ids,
+                            "artifact-does-not-exist",
+                        ]
+                    }
+                )
+                if event.event_type == "tool_call"
+                else event
+                for event in graph.events
+            ]
+        }
+    )
+    missing_report = construction_admission(
+        raw,
+        missing_consumer_artifact,
+        accepted_count=1,
+        library_audit_passed=True,
+    )
+    assert missing_report["input_integrity"]["status"] == "failed"
+    assert "consumer_artifact_missing" in {
+        item["reason_code"] for item in missing_report["input_integrity"]["findings"]
+    }
