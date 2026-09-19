@@ -10,6 +10,7 @@ import pytest
 from stac_attack_lab.execution.construction_admission import construction_admission
 from stac_attack_lab.execution.revalidation import (
     launch_live_revalidation,
+    offline_revalidation,
     prepare_revalidation,
 )
 from stac_attack_lab.hashing import stable_hash
@@ -117,10 +118,11 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
                     "parent_artifact_ids": [],
                     "taint_labels": ["persistent"],
                     "trust_label": "workspace_state",
-                    "source_ref_ids": ["w"],
+                    "source_ref_ids": ["source:write"],
                 }
             ],
             "public_payload": scope,
+            "evidence_ref_ids": ["evidence:write"],
         },
         {
             "event_id": "restart",
@@ -133,7 +135,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
             "status": "passed",
             "lifecycle_id": "restart-s2",
             "public_payload": {},
-            "evidence_ref_ids": ["l"],
+            "evidence_ref_ids": ["lifecycle:restart"],
         },
         {
             "event_id": "gap",
@@ -165,10 +167,11 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
                     "parent_artifact_ids": ["a-write"],
                     "taint_labels": ["persistent"],
                     "trust_label": "workspace_state",
-                    "source_ref_ids": ["r"],
+                    "source_ref_ids": ["source:read"],
                 }
             ],
             "public_payload": later,
+            "evidence_ref_ids": ["evidence:read"],
         },
         {
             "event_id": "use",
@@ -182,8 +185,21 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
             "input_artifact_ids": ["a-read"],
             "public_payload": {
                 **later,
-                "use_evidence_kind": "explicit_provider_output_reference",
+                # Synthetic verifier instrumentation: pinned OpenClaw does
+                # not currently produce this contract.
+                "consumption_evidence": [
+                    {
+                        "artifact_id": "a-read",
+                        "source_result_call_id": "synthetic-read",
+                        "kind": "deterministic_argument_derivation",
+                        "source_field": "tool_result",
+                        "target_field": "tool_arguments",
+                        "verification_rule": "test_exact_projection",
+                        "evidence_ref": "synthetic-verifier:use",
+                    }
+                ],
             },
+            "evidence_ref_ids": ["synthetic-verifier:use"],
         },
     ]
     graph, audit = normalize_source_events(_trajectory(), events, audit_ref="a")
@@ -202,7 +218,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
                         "public_payload": {
                             key: value
                             for key, value in event.public_payload.items()
-                            if key != "use_evidence_kind"
+                            if key != "consumption_evidence"
                         }
                     }
                 )
@@ -216,7 +232,7 @@ def test_s1_write_s2_gap_s3_read_and_use_is_admitted() -> None:
         _trajectory(), context_only, accepted_count=1, library_audit_passed=True
     )
     assert context_report["checks"]["cross_session_persistence_read_use"] is False
-    assert context_report["evidence_diagnostics"]["context_reachability"]["state"] == "observed"
+    assert context_report["evidence_diagnostics"]["context_reachability"]["state"] == "failed"
 
 
 def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -319,6 +335,19 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
             },
         ]
     )
+    # Explicitly synthetic instrumentation for the positive path. The pinned
+    # runtime does not produce this verifier record.
+    use_observation = next(item for item in read_observations if item["call_id"] == "u")
+    use_observation["consumption_evidence"] = [
+        {
+            "source_result_call_id": "r",
+            "kind": "deterministic_argument_derivation",
+            "source_field": "tool_result",
+            "target_field": "arguments.command",
+            "verification_rule": "synthetic_test_exact_derivation",
+            "evidence_ref": "synthetic-verifier:u:r",
+        }
+    ]
 
     def response(
         session_id: str, session_hash: str, observations: list[dict[str, object]], restart: bool
@@ -328,9 +357,10 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
                 "call_id": item["call_id"],
                 "classification": item["observation_class"],
                 "workspace_relative_path": item["workspace_relative_path"],
-                "read_scope": "tool_result_text",
+                "read_scope": "complete_redacted_utf8_file_content",
+                "content_complete": True,
                 "content_hash": item["result_hash"],
-                "content_hash_scope": item["result_hash_scope"],
+                "content_hash_scope": "redacted_utf8_content_projection",
                 "result_observation": item["result_observation"],
                 "result_empty": item["result_empty"],
                 "result_order_valid": item["result_order_valid"],
@@ -348,7 +378,7 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
                 "classification": item["observation_class"],
                 "workspace_relative_path": item["workspace_relative_path"],
                 "content_hash": item["write_content_hash"],
-                "content_hash_scope": "redacted_text_content",
+                "content_hash_scope": "redacted_utf8_content_projection",
                 "result_observation": item["result_observation"],
                 "result_order_valid": item["result_order_valid"],
                 "request_line_number": item["request_line_number"],
@@ -432,8 +462,12 @@ def test_bridge_driver_normalizer_admission_file_chain(monkeypatch: pytest.Monke
     assert report["checks"]["semantic_memory_search_read_use"] is False
     assert report["checks"]["cross_session_persistence_read_use"] is True
     assert (
-        next(event for event in graph.events if event.event_id == "tool-call-u").sequence_no
-        > next(event for event in graph.events if event.event_id == "state-read-file-r").sequence_no
+        next(
+            event for event in graph.events if event.event_id.startswith("tool-call-u-")
+        ).sequence_no
+        > next(
+            event for event in graph.events if event.event_id.startswith("state-read-file-r-")
+        ).sequence_no
     )
 
 
@@ -451,6 +485,16 @@ def test_prepare_is_offline_and_live_launch_is_atomic(
     config_path = run_root / "runtime_config.json"
     config = json.loads(config_path.read_text())
     config["execution_enabled"] = True
+    config["pipeline_id"] = "wrong-pipeline"
+    config_path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="pipeline_id_mismatch"):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+    assert not (run_root / "launch.marker").exists()
+    validation_failure = json.loads(
+        next(run_root.glob("launch_validation_failure-*.json")).read_text()
+    )
+    assert validation_failure["stages"][0]["stage"] == "configuration_binding"
+    config["pipeline_id"] = run_root.name
     config_path.write_text(json.dumps(config))
 
     import stac_attack_lab.execution.sample_generation as generation
@@ -479,3 +523,133 @@ def test_prepare_is_offline_and_live_launch_is_atomic(
     with pytest.raises(FileExistsError):
         launch_live_revalidation(tmp_path, run_root, authorized=True)
     assert calls == ["collect"]
+
+
+def test_live_config_load_failure_after_reservation_writes_summary(tmp_path: Path) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        "construction-cross-session-invalid-config",
+    )
+    config_path = run_root / "runtime_config.json"
+    config = json.loads(config_path.read_text())
+    config["execution_enabled"] = True
+    config["seed"] = None
+    config["seeds"] = []
+    config_path.write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="sample_generation_requires_seed_or_seeds"):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+    summary = json.loads((run_root / "live_summary.json").read_text())
+    assert summary["execution_status"] == "failed"
+    assert summary["stages"][-1]["stage"] == "configuration_load"
+    assert summary["offline_status"] == "blocked"
+    with pytest.raises(FileExistsError):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+
+
+def test_bridge_replay_uses_driver_mapping_and_rejects_malformed_input(tmp_path: Path) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        "construction-cross-session-replay",
+    )
+    bridge_records = tmp_path / "bridge-records.jsonl"
+    bridge_records.write_text(
+        json.dumps(
+            {
+                "action": {
+                    "action_id": "offline-message",
+                    "action_type": "deliver_message",
+                    "delivery_surface": "safeclaw_user_message",
+                    "public_message": "offline replay only",
+                    "rationale_summary": "test",
+                },
+                "response": {
+                    "kind": "step",
+                    "session": {
+                        "session_id": "offline-s1",
+                        "agent_response": "offline response",
+                        "response_observation": "observed_text",
+                        "actual_session_identity_sha256": stable_hash("offline-s1"),
+                        "workspace_identity_sha256": stable_hash("offline-workspace"),
+                        "memory_index_namespace_sha256": stable_hash("offline-index"),
+                        "tool_observations": [],
+                        "persistence_reads": [],
+                        "persistence_writes": [],
+                        "memory_retrieval_observation": "not_occurred",
+                    },
+                    "post_state": {},
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    result = offline_revalidation(ROOT, run_root, bridge_responses=bridge_records)
+    assert result["mode"] == "bridge_driver_replay"
+    assert result["stages"][0]["stage"] == "bridge_driver_replay"
+    collection = Path(result["stages"][0]["output"])
+    source_events = next(collection.rglob("source_events.jsonl")).read_text()
+    assert "delivery-offline-message" in source_events
+    assert (collection / "collection_stage_manifest.json").is_file()
+
+    malformed = tmp_path / "malformed.jsonl"
+    malformed.write_text('{"action":\n', encoding="utf-8")
+    failed = offline_revalidation(ROOT, run_root, bridge_responses=malformed)
+    assert failed["overall_status"] == "error"
+    assert failed["input_integrity"]["status"] == "failed"
+    assert "bridge_replay_malformed_jsonl" in failed["stages"][0]["reason"]
+
+    missing = tmp_path / "missing-action.jsonl"
+    missing.write_text(json.dumps({"response": {"kind": "step"}}) + "\n", encoding="utf-8")
+    missing_result = offline_revalidation(ROOT, run_root, bridge_responses=missing)
+    assert missing_result["overall_status"] == "error"
+    assert "bridge_replay_action_missing" in missing_result["stages"][0]["reason"]
+
+
+@pytest.mark.parametrize("partial", [False, True])
+def test_live_collection_error_records_stage_and_only_processes_existing_artifacts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, partial: bool
+) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        f"construction-cross-session-error-{partial}",
+    )
+    config_path = run_root / "runtime_config.json"
+    config = json.loads(config_path.read_text())
+    config["execution_enabled"] = True
+    config_path.write_text(json.dumps(config))
+
+    import stac_attack_lab.execution.revalidation as revalidation_module
+    import stac_attack_lab.execution.sample_generation as generation
+    import stac_attack_lab.execution.sample_preflight as preflight_module
+
+    class Passed:
+        passed = True
+
+    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: Passed())
+
+    def fail_collection(*_args: object) -> Path:
+        if partial:
+            collection = run_root / "partial-collection"
+            collection.mkdir()
+            (collection / "collection_stage_manifest.json").write_text("{}")
+        raise RuntimeError("synthetic_collection_failure")
+
+    monkeypatch.setattr(generation, "collect_sample_interactions", fail_collection)
+    offline_calls: list[Path] = []
+    monkeypatch.setattr(
+        revalidation_module,
+        "offline_revalidation",
+        lambda _root, _run, collection: (
+            offline_calls.append(collection) or {"overall_status": "failed"}
+        ),
+    )
+    with pytest.raises(RuntimeError, match="synthetic_collection_failure"):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+    summary = json.loads((run_root / "live_summary.json").read_text())
+    assert summary["execution_status"] == "failed"
+    assert summary["reason"] == "synthetic_collection_failure"
+    assert len(offline_calls) == (1 if partial else 0)
+    assert summary["offline_status"] == ("failed" if partial else "blocked")

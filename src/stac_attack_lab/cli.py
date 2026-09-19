@@ -215,7 +215,7 @@ def _main(argv: list[str] | None = None) -> int:
                 _project_scoped_path(root, args.library),
             )
             print(json.dumps(report, indent=2))
-            return 0 if report["pilot_admitted"] else 1
+            return 0 if report.get("structural_admission", {}).get("status") == "passed" else 1
         library = _project_scoped_path(root, args.library)
         if args.sample_command == "audit":
             library_report = audit_sample_library_stage(library)

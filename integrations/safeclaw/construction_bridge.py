@@ -61,24 +61,20 @@ def _normalise_workspace_path(value: Any) -> str | None:
     return "/".join(parts)
 
 
-def _tool_path(arguments_projection: str) -> str | None:
-    with contextlib.suppress(json.JSONDecodeError):
-        value = json.loads(arguments_projection)
-        if isinstance(value, dict):
-            for key in ("path", "file", "filename", "file_path"):
-                path = _normalise_workspace_path(value.get(key))
-                if path:
-                    return path
+def _tool_path(arguments: Any) -> str | None:
+    if isinstance(arguments, dict):
+        for key in ("path", "file", "filename", "file_path"):
+            path = _normalise_workspace_path(arguments.get(key))
+            if path:
+                return path
     return None
 
 
-def _write_content_hash(tool_name: str, arguments_projection: str) -> str | None:
+def _write_content_hash(tool_name: str, arguments: Any) -> str | None:
     if tool_name != "write":
         return None
-    with contextlib.suppress(json.JSONDecodeError):
-        value = json.loads(arguments_projection)
-        if isinstance(value, dict) and isinstance(value.get("content"), str):
-            return hashlib.sha256(value["content"].encode()).hexdigest()
+    if isinstance(arguments, dict) and isinstance(arguments.get("content"), str):
+        return hashlib.sha256(arguments["content"].encode()).hexdigest()
     return None
 
 
@@ -196,24 +192,31 @@ def _structured_tool_observations(
                 if not call_id or not tool_name:
                     continue
                 arguments = block.get("arguments", block.get("input", {}))
-                projection = str(
+                # Redact the complete structured argument value before deriving
+                # identities. The 2k projection is display-only and is never parsed.
+                sanitized_arguments_text = str(
                     redact_value(
                         json.dumps(arguments, sort_keys=True, default=str), exact_secrets or []
                     ).sanitized
-                )[:2000]
+                )
+                sanitized_arguments: Any = None
+                with contextlib.suppress(json.JSONDecodeError):
+                    sanitized_arguments = json.loads(sanitized_arguments_text)
                 calls[call_id] = {
                     "call_id": call_id,
                     "tool_name": tool_name,
-                    "arguments_hash": hashlib.sha256(projection.encode()).hexdigest(),
-                    "arguments_projection": projection,
-                    "workspace_relative_path": _tool_path(projection),
-                    "write_content_hash": _write_content_hash(tool_name, projection),
+                    "arguments_hash": hashlib.sha256(sanitized_arguments_text.encode()).hexdigest(),
+                    "arguments_hash_scope": "complete_redacted_structured_arguments",
+                    "arguments_projection": sanitized_arguments_text[:2000],
+                    "arguments_projection_truncated": len(sanitized_arguments_text) > 2000,
+                    "workspace_relative_path": _tool_path(sanitized_arguments),
+                    "write_content_hash": _write_content_hash(tool_name, sanitized_arguments),
+                    "write_content_hash_scope": "redacted_utf8_content_projection",
                     "request_line_number": line_number,
                     "request_evidence_ref": f"openclaw-session-entry:{entry_id}",
-                    # Some pinned/fake gateways can expose an explicit provider
-                    # correlation instead of forcing us to infer use from
-                    # transcript adjacency.  Preserve only call ids here; the
-                    # driver resolves them to observed result artifacts.
+                    # This field is not produced by pinned OpenClaw. Preserve it
+                    # as untrusted compatibility diagnostics only. It cannot prove
+                    # request reachability or semantic consumption.
                     "input_result_call_ids": [
                         str(value)
                         for value in (
@@ -283,7 +286,9 @@ def _structured_tool_observations(
             "call_id": call_id,
             "tool_name": call["tool_name"],
             "arguments_hash": call["arguments_hash"],
+            "arguments_hash_scope": call["arguments_hash_scope"],
             "arguments_projection": call["arguments_projection"],
+            "arguments_projection_truncated": call["arguments_projection_truncated"],
             "request_evidence_ref": call["request_evidence_ref"],
             "result_observation": result["result_observation"] if result else "not_observed",
             "result_empty": bool(result.get("result_empty")) if result else False,
@@ -303,10 +308,11 @@ def _structured_tool_observations(
             "observation_class": _observation_class(call["tool_name"]),
             "workspace_relative_path": call.get("workspace_relative_path"),
             "write_content_hash": call.get("write_content_hash"),
+            "write_content_hash_scope": call.get("write_content_hash_scope"),
             "input_result_call_ids": call.get("input_result_call_ids", []),
-            "use_evidence_kind": (
-                "explicit_provider_output_reference" if call.get("input_result_call_ids") else None
-            ),
+            "input_result_call_ids_contract": "unsupported_untrusted_compatibility_field",
+            "context_reachability_evidence": [],
+            "consumption_evidence": [],
         }
         projected.append(item)
     return projected, observed_ids
@@ -682,6 +688,7 @@ def main() -> int:
                     "classification": item.get("observation_class"),
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "read_scope": "tool_result_text" if item.get("result_hash") else None,
+                    "content_complete": False,
                     "content_hash": item.get("result_hash"),
                     "content_hash_scope": item.get("result_hash_scope"),
                     "result_observation": item.get("result_observation"),
@@ -701,7 +708,7 @@ def main() -> int:
                     "classification": item.get("observation_class"),
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "content_hash": item.get("write_content_hash"),
-                    "content_hash_scope": "redacted_text_content"
+                    "content_hash_scope": item.get("write_content_hash_scope")
                     if item.get("write_content_hash")
                     else None,
                     "result_observation": item.get("result_observation"),

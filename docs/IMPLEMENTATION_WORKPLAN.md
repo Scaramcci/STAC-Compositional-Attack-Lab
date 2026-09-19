@@ -1,15 +1,16 @@
 # Current workplan — 2026-09-19
 
-Current blocker: the latest real run is present, but its historical bridge projection lacks file-version lineage and explicit read-result consumption, so it correctly remains structurally unadmitted. Runtime network/isolation/cleanup evidence is also pending, and no live request is authorized in this round.
+Current readiness: offline mapping, replay, graph validation and state separation are implemented. Production can currently prove call/result observation and, when complete file evidence exists, persistence/read reachability. It cannot produce request-boundary context reachability or deterministic semantic-consumption evidence. A new live run therefore cannot be expected to pass the strong-consumption gate merely by spending real quota.
 
 Execution order:
 
-1. Complete offline evidence-chain validation (bridge → durable artifacts → session transition → read → downstream consumption → normalization/mining → admission). **Implemented; focused tests pass, full socket-dependent check still needs a permitted environment.**
-2. After explicit authorization, run one fresh real revalidation from `configs/sample_generation/cross_session_revalidation.disabled.json` with a unique run/batch/output; enable execution only in that copied run config.
-3. Perform independent structural and runtime review.
-4. Only after approval, run pilot, then main/freeze, then the formal matrix.
+1. Keep historical raw, bridge responses, ledgers, mining and reports immutable; use `revalidation offline` to create a fresh analysis ID for either collection reanalysis or complete bridge action/response replay.
+2. Add audited request-boundary instrumentation that emits only request ID, session identity, result call ID, projection hash and evidence ref. Separately add a deterministic, artifact-specific consumption verifier if the protocol continues to require strong use.
+3. Re-run fake gateway/mock HTTP and full quality gates after that instrumentation. Do not weaken structural admission or substitute labels/model self-report.
+4. Only after steps 2–3 and explicit authorization, copy the disabled template into one unique run, enable that copy, run one live revalidation, then perform runtime review independently.
+5. Pilot, main/freeze and formal evaluation remain gated on structural pass, runtime review and explicit execution authorization.
 
-The synthetic regression is not a real construction success and cannot upgrade the historical run or grant pilot authorization. The single real revalidation in step 2 must remain disabled until separately authorized.
+The present synthetic integration proves code paths only. It does not upgrade historical evidence, establish production strong consumption, grant pilot authorization or predict a live pass.
 
 # Implementation Workplan
 

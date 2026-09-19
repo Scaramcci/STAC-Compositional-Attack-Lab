@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.base import CollectionBudget
 from stac_attack_lab.interactions.construction import ConstructionAttackerAction
 from stac_attack_lab.interactions.safeclaw_collection import (
@@ -62,33 +63,17 @@ def test_bridge_projects_paired_structured_tool_results_and_retrievals() -> None
     observations, seen = project(raw, set(), [])
 
     assert seen == {"request-entry", "result-entry"}
-    assert observations == [
-        {
-            "call_id": "call-memory-1",
-            "tool_name": "memory_search",
-            "arguments_hash": observations[0]["arguments_hash"],
-            "arguments_projection": '{"query": "SYNTHETIC_CANARY"}',
-            "request_evidence_ref": "openclaw-session-entry:request-entry",
-            "result_observation": "observed",
-            "result_empty": False,
-            "result_disabled": None,
-            "result_unavailable": None,
-            "result_error": None,
-            "result_is_error": False,
-            "result_hash_scope": "redacted_text_content",
-            "result_hash": observations[0]["result_hash"],
-            "result_excerpt": "memory/MEMORY.md:1 SYNTHETIC_CANARY",
-            "result_evidence_ref": "openclaw-session-entry:result-entry",
-            "request_line_number": 1,
-            "result_line_number": 2,
-            "result_order_valid": True,
-            "observation_class": "semantic_memory_search",
-            "workspace_relative_path": None,
-            "write_content_hash": None,
-            "input_result_call_ids": [],
-            "use_evidence_kind": None,
-        }
-    ]
+    assert len(observations) == 1
+    observation = observations[0]
+    assert observation["call_id"] == "call-memory-1"
+    assert observation["arguments_projection"] == '{"query": "SYNTHETIC_CANARY"}'
+    assert observation["arguments_hash_scope"] == "complete_redacted_structured_arguments"
+    assert observation["arguments_projection_truncated"] is False
+    assert observation["result_observation"] == "observed"
+    assert observation["result_excerpt"] == "memory/MEMORY.md:1 SYNTHETIC_CANARY"
+    assert observation["input_result_call_ids"] == []
+    assert observation["input_result_call_ids_contract"].startswith("unsupported")
+    assert observation["consumption_evidence"] == []
     repeated, _ = project(raw, seen, [])
     assert repeated == []
 
@@ -132,6 +117,66 @@ def test_bridge_preserves_observed_empty_memory_search_without_claiming_retrieva
     observations, _ = project(raw, set(), [])
     assert observations[0]["result_observation"] == "observed"
     assert observations[0]["result_empty"] is True
+
+
+def test_bridge_hashes_complete_long_write_arguments_and_does_not_trust_magic_use_field() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    content = "x" * 3000
+    rows = [
+        {
+            "id": "write-request",
+            "type": "message",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    {
+                        "type": "toolCall",
+                        "id": "write-call",
+                        "name": "write",
+                        "arguments": {"path": "MEMORY.md", "content": content},
+                    }
+                ],
+            },
+        },
+        {
+            "id": "write-result",
+            "type": "message",
+            "message": {
+                "role": "toolResult",
+                "toolCallId": "write-call",
+                "toolName": "write",
+                "content": [{"type": "text", "text": "ok"}],
+            },
+        },
+        {
+            "id": "use-request",
+            "type": "message",
+            "message": {
+                "role": "assistant",
+                "inputToolResultCallIds": ["write-call"],
+                "content": [
+                    {
+                        "type": "toolCall",
+                        "id": "use-call",
+                        "name": "exec",
+                        "arguments": {"command": "true"},
+                    }
+                ],
+            },
+        },
+    ]
+    observations, _ = project(
+        {"session_transcript_raw": "\n".join(json.dumps(row) for row in rows)}, set(), []
+    )
+    write = observations[0]
+    use = observations[1]
+    assert write["arguments_projection_truncated"] is True
+    assert write["workspace_relative_path"] == "MEMORY.md"
+    assert write["write_content_hash"] == __import__("hashlib").sha256(content.encode()).hexdigest()
+    assert use["input_result_call_ids"] == ["write-call"]
+    assert use["input_result_call_ids_contract"].startswith("unsupported")
+    assert use["consumption_evidence"] == []
 
 
 def test_bridge_distinguishes_rejected_and_unobserved_tool_results() -> None:
@@ -535,6 +580,191 @@ def test_session_identity_survives_redaction_without_hashing_unknown() -> None:
     assert redact_value({"actual_session_identity_sha256": first}).sanitized == {
         "actual_session_identity_sha256": first
     }
+
+
+def test_file_version_occurrences_are_unique_and_workspace_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget()
+    driver._started_at = monotonic()
+    driver._last_state = {}
+    driver._new_session_pending = False
+    driver._event_sequence = 0
+    driver._events = []
+    driver._checkpoints = []
+    driver._workspace_versions = {}
+    driver._provider_call_occurrences = {}
+
+    def response(session: str, workspace: str, call: str, content_hash: str) -> dict[str, Any]:
+        observation = {
+            "call_id": call,
+            "tool_name": "write",
+            "result_hash": f"result-{call}",
+            "result_observation": "observed",
+            "result_empty": False,
+            "request_line_number": 1,
+            "result_line_number": 2,
+            "request_evidence_ref": f"request:{session}:{call}",
+            "result_evidence_ref": f"result:{session}:{call}",
+            "classification": "workspace_file_write",
+        }
+        return {
+            "session": {
+                "session_id": session,
+                "agent_response": "ok",
+                "response_observation": "observed_text",
+                "actual_session_identity_sha256": stable_hash(session),
+                "workspace_identity_sha256": workspace,
+                "memory_index_namespace_sha256": workspace,
+                "tool_observations": [observation],
+                "persistence_writes": [
+                    {
+                        **observation,
+                        "workspace_relative_path": "MEMORY.md",
+                        "content_hash": content_hash,
+                        "content_hash_scope": "redacted_utf8_content_projection",
+                        "result_order_valid": True,
+                    }
+                ],
+                "persistence_reads": [],
+                "memory_retrieval_observation": "not_occurred",
+            },
+            "post_state": {},
+        }
+
+    responses = iter(
+        [
+            response("s1", "a" * 64, "same-call", "A" * 64),
+            response("s1", "a" * 64, "same-call", "A" * 64),
+            response("s1", "a" * 64, "same-call", "B" * 64),
+            response("s1", "a" * 64, "same-call", "A" * 64),
+            response("s2", "b" * 64, "same-call", "A" * 64),
+        ]
+    )
+    monkeypatch.setattr(driver, "_send_bridge", lambda _request: next(responses))
+    emitted: list[dict[str, Any]] = []
+    for index in range(5):
+        emitted.extend(
+            driver.apply(
+                ConstructionAttackerAction(
+                    action_id=f"write-{index}",
+                    action_type="deliver_message",
+                    delivery_surface="safeclaw_user_message",
+                    public_message="write",
+                    rationale_summary="test",
+                )
+            ).source_events
+        )
+    writes = [event for event in emitted if event["event_type"] == "state_write"]
+    artifact_ids = [event["output_artifacts"][0]["artifact_id"] for event in writes]
+    assert len(artifact_ids) == len(set(artifact_ids)) == 5
+    tool_ids = [event["event_id"] for event in emitted if event["event_type"] == "tool_call"]
+    assert len(tool_ids) == len(set(tool_ids)) == 5
+    state_ids = [event["event_id"] for event in writes]
+    assert len(state_ids) == len(set(state_ids)) == 5
+    assert ("a" * 64, "MEMORY.md") in driver._workspace_versions
+    assert ("b" * 64, "MEMORY.md") in driver._workspace_versions
+
+
+def test_consumption_evidence_binds_only_named_artifact_not_context_neighbor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    driver = object.__new__(SafeClawSubprocessVictimDriver)
+    driver._budget = CollectionBudget()
+    driver._started_at = monotonic()
+    driver._last_state = {}
+    driver._new_session_pending = False
+    driver._event_sequence = 0
+    driver._events = []
+    driver._checkpoints = []
+    driver._workspace_versions = {}
+    driver._provider_call_occurrences = {}
+    observations = [
+        {
+            "call_id": "a",
+            "tool_name": "exec",
+            "result_hash": "a" * 64,
+            "result_observation": "observed",
+            "result_empty": False,
+            "request_line_number": 1,
+            "result_line_number": 2,
+            "request_evidence_ref": "request:a",
+            "result_evidence_ref": "result:a",
+        },
+        {
+            "call_id": "b",
+            "tool_name": "exec",
+            "result_hash": "b" * 64,
+            "result_observation": "observed",
+            "result_empty": False,
+            "request_line_number": 3,
+            "result_line_number": 4,
+            "request_evidence_ref": "request:b",
+            "result_evidence_ref": "result:b",
+        },
+        {
+            "call_id": "consumer",
+            "tool_name": "exec",
+            "result_hash": "c" * 64,
+            "result_observation": "observed",
+            "result_empty": False,
+            "request_line_number": 5,
+            "result_line_number": 6,
+            "request_evidence_ref": "request:consumer",
+            "result_evidence_ref": "result:consumer",
+            "input_result_call_ids": ["b"],
+            "consumption_evidence": [
+                {
+                    "source_result_call_id": "a",
+                    "kind": "deterministic_argument_derivation",
+                    "source_field": "tool_result",
+                    "target_field": "arguments.command",
+                    "verification_rule": "synthetic_exact_derivation",
+                    "evidence_ref": "synthetic-verifier:consumer:a",
+                }
+            ],
+        },
+    ]
+    monkeypatch.setattr(
+        driver,
+        "_send_bridge",
+        lambda _request: {
+            "session": {
+                "session_id": "s1",
+                "agent_response": "ok",
+                "response_observation": "observed_text",
+                "actual_session_identity_sha256": stable_hash("s1"),
+                "workspace_identity_sha256": stable_hash("workspace"),
+                "memory_index_namespace_sha256": stable_hash("index"),
+                "tool_observations": observations,
+                "persistence_reads": [],
+                "persistence_writes": [],
+                "memory_retrieval_observation": "not_occurred",
+            },
+            "post_state": {},
+        },
+    )
+    step = driver.apply(
+        ConstructionAttackerAction(
+            action_id="mixed",
+            action_type="deliver_message",
+            delivery_surface="safeclaw_user_message",
+            public_message="mixed",
+            rationale_summary="test",
+        )
+    )
+    consumer = next(
+        event
+        for event in step.source_events
+        if event["event_type"] == "tool_call"
+        and event["public_payload"]["provider_tool_call_id"] == "consumer"
+    )
+    assert len(consumer["input_artifact_ids"]) == 1
+    assert "artifact-tool-result-a-" in consumer["input_artifact_ids"][0]
+    predecessors = consumer["public_payload"]["transcript_predecessor_artifact_ids"]
+    assert len(predecessors) == 1
+    assert "artifact-tool-result-b-" in predecessors[0]
 
 
 def test_new_session_action_records_pending_request_only(monkeypatch: pytest.MonkeyPatch) -> None:

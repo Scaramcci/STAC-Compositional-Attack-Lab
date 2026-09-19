@@ -44,7 +44,17 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
                 new_session_request_action_id="restart-1",
             )
         if e["event_id"] == "e7":
-            e["public_payload"]["use_evidence_kind"] = "explicit_provider_output_reference"
+            e["public_payload"]["consumption_evidence"] = [
+                {
+                    "artifact_id": "a4",
+                    "source_result_call_id": "synthetic-fixture-read",
+                    "kind": "deterministic_output_reference",
+                    "source_field": "retrieval.output",
+                    "target_field": "agent_context.input",
+                    "verification_rule": "synthetic_fixture_exact_artifact_binding",
+                    "evidence_ref": "lineage:a4:a5",
+                }
+            ]
     fixture = tmp_path / "fixture.jsonl"
     fixture.write_text(json.dumps(source) + "\n")
     config = load_sample_generation_config(
@@ -72,6 +82,9 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
     assert report["checks"]["cross_session_persistence_read_use"], report
     assert report["structural_checks_passed"], report
     assert report["pilot_admitted"] is False  # Runtime engineering review is still required.
+    assert report["structural_admission"]["status"] == "passed"
+    assert report["runtime_review"]["status"] == "pending"
+    assert report["execution_authorization"]["status"] == "absent"
     # A two-event accepted chain cannot bypass the complete engineering gate.
     short = graph.model_copy(update={"edges": []})
     assert (
@@ -104,3 +117,70 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
             ]["cross_session_persistence_read_use"]
             is False
         )
+
+    write = next(event for event in graph.events if event.event_type == "state_write")
+    read = next(
+        event
+        for event in graph.events
+        if event.event_type == "state_read" and event.operation == "memory_retrieve_later_session"
+    )
+    use = next(event for event in graph.events if event.public_payload.get("consumption_evidence"))
+    mutations = [
+        (write.event_id, {"post_state_ref": None}),
+        (
+            read.event_id,
+            {
+                "public_payload": {
+                    **read.public_payload,
+                    "new_session_request_action_id": None,
+                }
+            },
+        ),
+        (
+            use.event_id,
+            {
+                "public_payload": {
+                    **use.public_payload,
+                    "actual_session_identity_sha256": stable_hash("unrelated-session"),
+                }
+            },
+        ),
+    ]
+    for event_id, update in mutations:
+        changed = graph.model_copy(
+            update={
+                "events": [
+                    event.model_copy(update=update) if event.event_id == event_id else event
+                    for event in graph.events
+                ]
+            }
+        )
+        changed_report = construction_admission(
+            raw, changed, accepted_count=1, library_audit_passed=True
+        )
+        assert changed_report["checks"]["cross_session_persistence_read_use"] is False
+
+    no_use = graph.model_copy(
+        update={
+            "events": [
+                event.model_copy(
+                    update={
+                        "public_payload": {
+                            key: value
+                            for key, value in event.public_payload.items()
+                            if key != "consumption_evidence"
+                        }
+                    }
+                )
+                if event.event_id == use.event_id
+                else event
+                for event in graph.events
+            ]
+        }
+    )
+    no_use_report = construction_admission(raw, no_use, accepted_count=1, library_audit_passed=True)
+    assert no_use_report["evidence_diagnostics"]["actual_session_changed"]["state"] == "observed"
+    assert (
+        no_use_report["evidence_diagnostics"]["workspace_scope_consistent"]["state"] == "observed"
+    )
+    assert no_use_report["evidence_diagnostics"]["downstream_consumption"]["state"] == "failed"

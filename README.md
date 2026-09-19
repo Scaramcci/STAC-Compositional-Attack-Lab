@@ -68,6 +68,8 @@ STAC_PYTHON=python bash scripts/run_cross_session_revalidation.sh offline \
   --run-root experiments/runs/<prepared-run>
 ```
 
+已有 collection 的重新分析使用 `--collection`。只有包含每一步 action、bridge response 和 state 的 JSONL 才能使用 `--bridge-responses`；该模式会调用当前 driver mapping 重建 source events。字段统计或历史 collection 重挖不称为 bridge replay。当前 pinned runtime 尚不生产可验证的强消费证据，因此离线 readiness 不代表“只差一次 live 即可通过”。
+
 真实 `live` 子命令要求另行授权、prepared config 显式启用以及 `--authorize-live`，并以同一 run 内的原子标记防重复启动；详见 [scripts/README.md](scripts/README.md)。
 
 统一诊断入口：
