@@ -1174,6 +1174,15 @@ def test_bridge_replay_uses_real_driver_mapping_mining_audit_and_admission(
     assert result["bridge_replay"]["diagnostics"]["valid_line_count"] == 3
     analysis_root = Path(result["analysis_root"])
     assert next(analysis_root.rglob("source_events.jsonl")).read_text().strip()
+    compatibility = json.loads((analysis_root / "provider_compatibility_report.json").read_text())
+    assert compatibility["status"] == "supported_subset"
+    assert compatibility["real_provider_payload_compatibility"] == "pending_not_exercised"
+    reconciliation = json.loads(
+        (analysis_root / "provider_attempt_reconciliation.json").read_text()
+    )
+    assert reconciliation["status"] == "pending"
+    assert reconciliation["budget_ledger_status"] == "unavailable"
+    assert reconciliation["evidence_attempt_count"] == 0
     provenance = json.loads((analysis_root / "offline_provenance.json").read_text())
     assert provenance["mode"] == "bridge-replay"
     assert set(provenance["processing_source_sha256"]) == {

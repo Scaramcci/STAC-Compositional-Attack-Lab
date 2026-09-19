@@ -407,8 +407,7 @@ def replay_bridge_responses(
     attempts = [
         item
         for item in evidence_records
-        if item.get("record_type") == "provider_request"
-        and item.get("send_state") == "attempted"
+        if item.get("record_type") == "provider_request" and item.get("send_state") == "attempted"
     ]
     outcomes = [
         item
@@ -832,7 +831,8 @@ def offline_revalidation(
         "processing_source_sha256": _processing_source_hashes(root),
         "compatibility_notes": (
             [
-                "real provider payload compatibility not exercised; exact derivation remains policy-controlled"
+                "real provider payload compatibility not exercised; "
+                "exact derivation remains policy-controlled"
             ]
             if bridge_responses is not None
             else []
