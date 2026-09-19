@@ -92,6 +92,7 @@ class ConstructionVictimResult(StrictModel):
     episode_id: str
     source_events: list[dict[str, Any]] = Field(default_factory=list)
     checkpoints: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_records: list[dict[str, Any]] = Field(default_factory=list)
     model_hashes: dict[str, str]
     config_hash: str
     status: Literal["complete", "partial", "blocked", "error"]
@@ -116,6 +117,8 @@ class ConstructionVictimDriver(Protocol):
     def finish(self) -> ConstructionVictimResult: ...
 
     def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]: ...
+
+    def boundary_evidence_snapshot(self) -> list[dict[str, Any]]: ...
 
     def diagnostic_snapshot(self) -> str | None: ...
 
@@ -365,6 +368,7 @@ class SafeClawConstructionInteractionAdapter:
                 session_ids=list(dict.fromkeys(session_ids)),
                 source_events=partial_events,
                 checkpoints=partial_checkpoints,
+                evidence_records=self.driver.boundary_evidence_snapshot(),
                 model_hashes={"victim": self.driver.model_hash},
                 config_hash=stable_hash({"task": task.source_task_id, "seed": seed}),
                 status="partial" if partial_events else "error",
@@ -395,6 +399,7 @@ class SafeClawConstructionInteractionAdapter:
             session_ids=list(dict.fromkeys(session_ids)),
             source_events=all_events,
             checkpoints=all_checkpoints,
+            evidence_records=result.evidence_records,
             model_hashes=result.model_hashes,
             config_hash=result.config_hash,
             status=final_status,
@@ -461,6 +466,7 @@ class SafeClawSubprocessVictimDriver:
         provider_timeout_seconds: int = 90,
         provider_allowed_tools: list[str] | None = None,
         embedding_request_budget: int = 128,
+        provider_evidence_policy: dict[str, Any] | None = None,
         environment: Mapping[str, str] | None = None,
         batch_id: str | None = None,
     ) -> None:
@@ -477,6 +483,10 @@ class SafeClawSubprocessVictimDriver:
         self.provider_timeout_seconds = provider_timeout_seconds
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
+        self.provider_evidence_policy = provider_evidence_policy or {
+            "enabled": False,
+            "policy_id": "formal-disabled",
+        }
         self.environment = environment if environment is not None else os.environ
         self.batch_id = batch_id
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -495,6 +505,8 @@ class SafeClawSubprocessVictimDriver:
         self._embedding_requests_spent = 0
         self._current_provider_requests = 0
         self._current_embedding_requests = 0
+        self._boundary_evidence_records: list[dict[str, Any]] = []
+        self._boundary_evidence_record_ids: set[str] = set()
         # Only versions established by an observed successful write are eligible
         # for later file-read lineage. Edits without a post-image invalidate it.
         self._workspace_versions: dict[tuple[str, str], tuple[str, str, str]] = {}
@@ -529,6 +541,27 @@ class SafeClawSubprocessVictimDriver:
     def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return append-only observations collected before an abort."""
         return list(self._events), list(self._checkpoints)
+
+    def boundary_evidence_snapshot(self) -> list[dict[str, Any]]:
+        return list(getattr(self, "_boundary_evidence_records", []))
+
+    def _ingest_boundary_evidence(self, response: dict[str, Any]) -> list[dict[str, Any]]:
+        if not hasattr(self, "_boundary_evidence_records"):
+            self._boundary_evidence_records = []
+            self._boundary_evidence_record_ids = set()
+        raw_records = response.get("provider_boundary_evidence", [])
+        if not isinstance(raw_records, list):
+            return []
+        current: list[dict[str, Any]] = []
+        for raw in raw_records:
+            if not isinstance(raw, dict) or not isinstance(raw.get("record_id"), str):
+                continue
+            record = dict(raw)
+            current.append(record)
+            if record["record_id"] not in self._boundary_evidence_record_ids:
+                self._boundary_evidence_record_ids.add(record["record_id"])
+                self._boundary_evidence_records.append(record)
+        return current
 
     def diagnostic_snapshot(self) -> str | None:
         """Return a bounded, redacted bridge stderr tail before cleanup."""
@@ -593,6 +626,7 @@ class SafeClawSubprocessVictimDriver:
             provider_timeout_seconds=self.provider_timeout_seconds,
             provider_allowed_tools=self.provider_allowed_tools,
             embedding_request_budget=embedding_remaining,
+            provider_evidence_policy=self.provider_evidence_policy,
             batch_id=self.batch_id,
         )
         self._started_at = monotonic()
@@ -653,6 +687,8 @@ class SafeClawSubprocessVictimDriver:
         self._last_state = dict(self._pre_state)
         pre_hash = stable_hash(self._pre_state)
         self._checkpoints = [{"checkpoint_id": "victim-pre", "state_hash": pre_hash}]
+        self._boundary_evidence_records = []
+        self._boundary_evidence_record_ids = set()
         return ConstructionObservation(
             task_id=task.source_task_id,
             session_index=0,
@@ -754,6 +790,7 @@ class SafeClawSubprocessVictimDriver:
                 public_stage_status={"lifecycle": "new_session_pending"},
             )
         session = cast(dict[str, Any], response.get("session", {}))
+        boundary_records = self._ingest_boundary_evidence(response)
         session["provider_request_ledger"] = response.get("provider_request_ledger", [])
         session["embedding_request_ledger"] = response.get("embedding_request_ledger", [])
         post_state = cast(dict[str, Any], response.get("post_state", {}))
@@ -991,7 +1028,7 @@ class SafeClawSubprocessVictimDriver:
         if isinstance(tool_observations, list) and tool_observations:
             tool_calls = tool_observations
         indexed_tool_calls = list(enumerate(tool_calls if isinstance(tool_calls, list) else []))
-        result_artifacts_by_call: dict[str, tuple[int, str]] = {}
+        result_artifacts_by_call: dict[str, list[tuple[int, str, str]]] = {}
         request_lines = sorted(
             {
                 int(cast(int | str, item.get("request_line_number")))
@@ -1020,10 +1057,83 @@ class SafeClawSubprocessVictimDriver:
                     if raw_call.get("tool_name") in {"memory_search", "memory_get"}
                     else f"artifact-tool-result-{result_call_id}-{occurrence}"
                 )
-                result_artifacts_by_call[result_call_id] = (
-                    int(result_line),
-                    result_artifact_id,
+                result_artifacts_by_call.setdefault(result_call_id, []).append(
+                    (
+                        int(result_line),
+                        result_artifact_id,
+                        str(raw_call.get("raw_result_projection_sha256") or ""),
+                    )
                 )
+        closed_contexts = {
+            str(record.get("control_context_id")): record
+            for record in boundary_records
+            if record.get("record_type") == "control_context"
+            and record.get("context_state") == "closed"
+            and record.get("close_state") == "completed"
+            and record.get("action_id") == action.action_id
+            and record.get("actual_session_identity_sha256")
+            == session.get("actual_session_identity_sha256")
+            and record.get("workspace_identity_sha256") == session.get("workspace_identity_sha256")
+        }
+        boundary_links_by_consumer: dict[str, list[dict[str, Any]]] = {}
+        for record in boundary_records:
+            context_record = closed_contexts.get(str(record.get("control_context_id")))
+            if (
+                record.get("record_type") != "provider_response"
+                or record.get("send_state") != "response_received"
+                or context_record is None
+                or record.get("action_id") != action.action_id
+                or record.get("workspace_identity_sha256")
+                != session.get("workspace_identity_sha256")
+            ):
+                continue
+            sources = record.get("source_tool_results", [])
+            targets = record.get("target_tool_arguments", [])
+            if not isinstance(sources, list) or not isinstance(targets, list):
+                continue
+            for target in targets:
+                if not isinstance(target, dict) or not isinstance(
+                    target.get("target_tool_call_id"), str
+                ):
+                    continue
+                for source in sources:
+                    if not isinstance(source, dict):
+                        continue
+                    source_call_id = source.get("tool_result_call_id")
+                    candidates = result_artifacts_by_call.get(str(source_call_id), [])
+                    matching = [
+                        (line, artifact_id)
+                        for line, artifact_id, raw_hash in candidates
+                        if raw_hash
+                        and raw_hash == source.get("projection_sha256")
+                        and source.get("projection_complete") is True
+                    ]
+                    if len(matching) != 1:
+                        continue
+                    _, artifact_id = matching[0]
+                    response_ref = (
+                        f"provider-evidence:{record['record_id']}:{record.get('record_sha256')}"
+                    )
+                    context_ref = (
+                        f"provider-evidence:{context_record['record_id']}:"
+                        f"{context_record.get('record_sha256')}"
+                    )
+                    boundary_links_by_consumer.setdefault(
+                        str(target["target_tool_call_id"]), []
+                    ).append(
+                        {
+                            "source_artifact_id": artifact_id,
+                            "source_tool_result_call_id": source_call_id,
+                            "request_id": record.get("request_id"),
+                            "batch_id": record.get("batch_id"),
+                            "control_context_id": record.get("control_context_id"),
+                            "rule_id": record.get("rule_id"),
+                            "target_tool_call_id": target.get("target_tool_call_id"),
+                            "target_tool_name": target.get("target_tool_name"),
+                            "target_json_pointer": target.get("target_json_pointer"),
+                            "evidence_ref_ids": [response_ref, context_ref],
+                        }
+                    )
         tool_call_event_ids: list[str] = []
         tool_call_event_by_provider_id: dict[str, str] = {}
         for index, tool_call in indexed_tool_calls:
@@ -1055,20 +1165,22 @@ class SafeClawSubprocessVictimDriver:
                 lower_bound = max(prior_request_lines, default=-1)
                 context_inputs = [
                     artifact_id
-                    for result_line, artifact_id in result_artifacts_by_call.values()
+                    for values in result_artifacts_by_call.values()
+                    for result_line, artifact_id, _ in values
                     if lower_bound < result_line < request_line_int
                 ]
-            edge_evidence = call_payload.get("artifact_use_evidence", [])
-            verified_inputs: list[str] = []
-            if isinstance(edge_evidence, list):
-                verified_inputs = [
-                    str(item.get("source_artifact_id"))
-                    for item in edge_evidence
-                    if isinstance(item, dict)
-                    and isinstance(item.get("source_artifact_id"), str)
-                    and item.get("source_artifact_id")
-                    in {artifact_id for _, artifact_id in result_artifacts_by_call.values()}
-                ]
+            boundary_links = boundary_links_by_consumer.get(str(provider_call_id), [])
+            verified_inputs = [
+                str(item["source_artifact_id"])
+                for item in boundary_links
+                if isinstance(item.get("source_artifact_id"), str)
+            ]
+            boundary_refs = [
+                str(ref)
+                for item in boundary_links
+                for ref in item.get("evidence_ref_ids", [])
+                if isinstance(ref, str)
+            ]
             source_events.append(
                 {
                     "event_id": tool_call_event_id,
@@ -1088,18 +1200,25 @@ class SafeClawSubprocessVictimDriver:
                         in {"observed", "rejected", "error"},
                         "context_reachability_status": "unknown",
                         "transcript_order_candidate_artifact_ids": context_inputs,
-                        "artifact_use_evidence": edge_evidence if verified_inputs else [],
+                        "artifact_context_evidence": boundary_links,
+                        "artifact_derivation_candidates": boundary_links,
+                        "artifact_use_evidence": [],
                         "reported_input_result_call_ids": call_payload.get(
                             "reported_input_result_call_ids", []
                         ),
                         "correlation_contract": call_payload.get("correlation_contract"),
                     },
-                    "evidence_ref_ids": [
-                        str(
-                            call_payload.get("request_evidence_ref")
-                            or f"bridge:{session_id}:tool:{index}"
+                    "evidence_ref_ids": list(
+                        dict.fromkeys(
+                            [
+                                str(
+                                    call_payload.get("request_evidence_ref")
+                                    or f"bridge:{session_id}:tool:{index}"
+                                ),
+                                *boundary_refs,
+                            ]
                         )
-                    ],
+                    ),
                 }
             )
             result_observation = str(call_payload.get("result_observation", "not_observed"))
@@ -1147,6 +1266,8 @@ class SafeClawSubprocessVictimDriver:
                             "result_error",
                             "result_is_error",
                             "result_hash_scope",
+                            "raw_result_projection_sha256",
+                            "result_redaction_changed",
                         )
                     },
                     "result_hash": call_payload.get("result_hash"),
@@ -1329,6 +1450,34 @@ class SafeClawSubprocessVictimDriver:
                 if status == "passed" and content_hash and not raw_operation.get("result_empty")
                 else None
             )
+            if read_artifact_id:
+                for candidate_event in source_events:
+                    candidate_payload = candidate_event.get("public_payload", {})
+                    if not isinstance(candidate_payload, dict):
+                        continue
+                    candidates = candidate_payload.get("artifact_derivation_candidates", [])
+                    if not isinstance(candidates, list):
+                        continue
+                    matched = False
+                    for candidate in candidates:
+                        if (
+                            isinstance(candidate, dict)
+                            and candidate.get("source_tool_result_call_id") == call_id
+                        ):
+                            candidate["source_artifact_id"] = read_artifact_id
+                            matched = True
+                    if matched:
+                        old_inputs = candidate_event.get("input_artifact_ids", [])
+                        candidate_event["input_artifact_ids"] = list(
+                            dict.fromkeys(
+                                [
+                                    read_artifact_id
+                                    if item.startswith("artifact-file-read-")
+                                    else item
+                                    for item in old_inputs
+                                ]
+                            )
+                        )
             source_events.append(
                 {
                     "event_id": f"state-read-file-{call_id}-{read_occurrence}",
@@ -1371,6 +1520,11 @@ class SafeClawSubprocessVictimDriver:
                         "read_completeness": raw_operation.get("read_completeness", "unknown"),
                         "path_scope": "lexically_normalized_controlled_workspace",
                         "realpath_verified": False,
+                        "provider_tool_call_id": call_id,
+                        "raw_result_projection_sha256": raw_operation.get(
+                            "raw_result_projection_sha256"
+                        ),
+                        "result_redaction_changed": raw_operation.get("result_redaction_changed"),
                     },
                     "request_event_id": tool_call_event_by_provider_id.get(call_id),
                     "evidence_ref_ids": evidence_refs,
@@ -1518,6 +1672,7 @@ class SafeClawSubprocessVictimDriver:
                 episode_id=f"construction-episode-{self._task.source_task_id}",
                 source_events=final_events,
                 checkpoints=self._checkpoints,
+                evidence_records=self.boundary_evidence_snapshot(),
                 model_hashes={"victim": self.model_hash},
                 config_hash=stable_hash(
                     {
@@ -1536,6 +1691,13 @@ class SafeClawSubprocessVictimDriver:
                     "victim_provider_http_request_count": str(self._provider_requests_spent),
                     "embedding_http_request_count": str(self._embedding_requests_spent),
                     "provider_request_budget_scope": "collection_run",
+                    "provider_evidence_policy_mode": str(
+                        self.provider_evidence_policy.get("mode", "disabled")
+                    ),
+                    "provider_evidence_rule_id": str(
+                        self.provider_evidence_policy.get("rule_id", "")
+                    ),
+                    "provider_evidence_batch_id": str(self.batch_id or ""),
                     "provider_error_categories": json.dumps(
                         sorted(
                             {

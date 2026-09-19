@@ -176,6 +176,13 @@
       "title": "Event Refs",
       "type": "array"
     },
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/SourceReference"
+      },
+      "title": "Evidence Refs",
+      "type": "array"
+    },
     "failure_category": {
       "anyOf": [
         {

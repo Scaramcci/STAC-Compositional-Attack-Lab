@@ -1,16 +1,16 @@
 # Current workplan — 2026-09-19 (authoritative)
 
-Offline evidence-chain repair is implemented and the complete quality gate passes. The current blocker is not another live run: pinned production has no request-boundary producer for result-context reachability and no deterministic, artifact-bound strong-consumption verifier. `inputToolResultCallIds`, transcript order, model self-report, or an event-wide label cannot fill that gap.
+The request-boundary producer, common bridge/replay mapping, and independent deterministic verifier are implemented and fake/offline tested. `inputToolResultCallIds`, transcript order, model self-report, caller-provided equality, and event-wide labels remain untrusted.
 
 Execution order:
 
 1. Keep `configs/sample_generation/cross_session_revalidation.disabled.json` disabled. Use `revalidation offline --collection` only for collection reanalysis and `--bridge-responses` only for complete initialize/action/response/finish replay inputs.
-2. Implement and fake-test a minimal relay/request-boundary projection if context reachability is required: request ID, actual session identity, result call ID, redacted content projection hash and evidence ref. This fact must remain weaker than semantic consumption.
-3. Implement a protocol-approved deterministic derivation verifier only if the experiment requires strong consumption. Bind each claim to one source artifact and one consumer edge; do not propagate it to context inputs.
-4. Only after those producers exist, prepare a unique disabled single-run config for separate authorization. Review structural admission and runtime budget/isolation/cleanup independently; authorization absence is not a structural failure.
-5. Pilot, main/freeze, and formal remain out of scope until structural pass, runtime pass, and explicit authorization are all present.
+2. Keep the exact UTF-8 derivation rule explicitly experimental and synthetic-only until the research protocol owner approves or replaces it. The formal default remains disabled.
+3. Review the new fake replay artifact and negative mutation results. In particular, confirm provider-specific message shape support before any real request; unsupported arrays/wrappers/partial/binary results stay unknown.
+4. If separately authorized, prepare one unique disabled run, review its final config/source hashes, then explicitly enable only that run. The purpose is production compatibility validation, not official outcome evaluation.
+5. Review structural admission and runtime budget/isolation/cleanup independently. Pilot, main/freeze, and formal remain out of scope until the policy is approved, structural and runtime gates pass, and explicit authorization is present.
 
-The new replay regression and offline artifact are synthetic engineering evidence, not a real construction success. Current code is ready for offline/fake verification but not yet a justified use of real quota for the strongest evidence objective. The sections below are historical plans and do not override this order.
+The replay regression is synthetic engineering evidence, not a real construction or attack success. Current code is ready to request a narrowly scoped production-compatibility revalidation, but not to claim formal readiness from the fake result. The sections below are historical plans and do not override this order.
 
 # Implementation Workplan
 

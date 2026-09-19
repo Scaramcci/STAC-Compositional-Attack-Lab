@@ -118,8 +118,10 @@ def _write_collected(
     trajectory_root = root / "trajectories" / trajectory_id
     events_path = trajectory_root / "source_events.jsonl"
     checkpoints_path = trajectory_root / "checkpoints.jsonl"
+    evidence_path = trajectory_root / "provider_boundary_evidence.jsonl"
     _atomic_jsonl(events_path, collected.source_events)
     _atomic_jsonl(checkpoints_path, collected.checkpoints)
+    _atomic_jsonl(evidence_path, collected.evidence_records)
 
     event_ref = SourceReference(
         ref_id=f"{trajectory_id}:events",
@@ -135,6 +137,16 @@ def _write_collected(
                 kind="state_checkpoints",
                 relative_path=str(checkpoints_path.relative_to(root)),
                 content_hash=file_hash(checkpoints_path),
+            )
+        )
+    evidence_refs = []
+    if collected.evidence_records:
+        evidence_refs.append(
+            SourceReference(
+                ref_id=f"{trajectory_id}:provider-boundary-evidence",
+                kind="provider_boundary_evidence",
+                relative_path=str(evidence_path.relative_to(root)),
+                content_hash=file_hash(evidence_path),
             )
         )
     outcome_by_status = {
@@ -162,6 +174,7 @@ def _write_collected(
         session_ids=collected.session_ids,
         event_refs=[event_ref],
         checkpoint_refs=checkpoint_refs,
+        evidence_refs=evidence_refs,
         model_hashes=collected.model_hashes,
         config_hash=collected.config_hash,
         collection_seed=seed,

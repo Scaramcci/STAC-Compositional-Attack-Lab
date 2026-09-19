@@ -49,6 +49,7 @@ class CollectedInteraction(StrictModel):
     session_ids: list[str]
     source_events: list[dict[str, Any]]
     checkpoints: list[dict[str, Any]]
+    evidence_records: list[dict[str, Any]] = Field(default_factory=list)
     model_hashes: dict[str, str]
     config_hash: str
     status: Literal["complete", "partial", "blocked", "error"]

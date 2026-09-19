@@ -204,8 +204,17 @@ def _structured_tool_observations(
                 if not call_id or not tool_name:
                     continue
                 arguments = block.get("arguments", block.get("input", {}))
+                raw_arguments_value = json.dumps(
+                    arguments,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                    default=str,
+                )
                 sanitized_arguments = redact_value(arguments, exact_secrets or []).sanitized
-                serialized_arguments = json.dumps(sanitized_arguments, sort_keys=True, default=str)
+                serialized_arguments = json.dumps(
+                    sanitized_arguments, sort_keys=True, ensure_ascii=False, default=str
+                )
                 projection = serialized_arguments[:2000]
                 reported_input_ids = [
                     str(value)
@@ -220,6 +229,10 @@ def _structured_tool_observations(
                     "call_id": call_id,
                     "tool_name": tool_name,
                     "arguments_hash": hashlib.sha256(serialized_arguments.encode()).hexdigest(),
+                    "raw_arguments_value_sha256": hashlib.sha256(
+                        raw_arguments_value.encode("utf-8")
+                    ).hexdigest(),
+                    "arguments_redaction_changed": arguments != sanitized_arguments,
                     "arguments_projection": projection,
                     "workspace_relative_path": _tool_path(sanitized_arguments),
                     "write_content_hash": _write_content_hash(tool_name, sanitized_arguments),
@@ -236,7 +249,8 @@ def _structured_tool_observations(
             call_id = str(message.get("toolCallId") or message.get("toolUseId") or "")
             if not call_id:
                 continue
-            result_text = str(redact_value(_text_content(content), exact_secrets or []).sanitized)
+            raw_result_text = _text_content(content)
+            result_text = str(redact_value(raw_result_text, exact_secrets or []).sanitized)
             is_error = bool(message.get("isError"))
             lowered = result_text.lower()
             parsed_result: Any = None
@@ -275,6 +289,10 @@ def _structured_tool_observations(
                 "result_is_error": is_error,
                 "result_hash_scope": "redacted_text_content",
                 "result_hash": hashlib.sha256(result_text.encode()).hexdigest(),
+                "raw_result_projection_sha256": hashlib.sha256(
+                    raw_result_text.encode("utf-8")
+                ).hexdigest(),
+                "result_redaction_changed": raw_result_text != result_text,
                 "result_excerpt": result_text[:2000],
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
             }
@@ -291,6 +309,8 @@ def _structured_tool_observations(
             "call_id": call_id,
             "tool_name": call["tool_name"],
             "arguments_hash": call["arguments_hash"],
+            "raw_arguments_value_sha256": call["raw_arguments_value_sha256"],
+            "arguments_redaction_changed": call["arguments_redaction_changed"],
             "arguments_projection": call["arguments_projection"],
             "request_evidence_ref": call["request_evidence_ref"],
             "result_observation": result["result_observation"] if result else "not_observed",
@@ -301,6 +321,12 @@ def _structured_tool_observations(
             "result_is_error": result.get("result_is_error") if result else None,
             "result_hash_scope": result.get("result_hash_scope") if result else None,
             "result_hash": result.get("result_hash") if result else None,
+            "raw_result_projection_sha256": (
+                result.get("raw_result_projection_sha256") if result else None
+            ),
+            "result_redaction_changed": (
+                result.get("result_redaction_changed") if result else None
+            ),
             "result_excerpt": result.get("result_excerpt")
             if result and call["tool_name"] in MEMORY_RETRIEVAL_TOOLS
             else None,
@@ -477,6 +503,7 @@ def main() -> int:
     session_index = 0
     seen_transcript_entry_ids: set[str] = set()
     provider_record_cursor = 0
+    provider_evidence_cursor = 0
     try:
         with contextlib.redirect_stdout(sys.stderr):
             phase = "container_start"
@@ -583,31 +610,55 @@ def main() -> int:
                 "timeout_seconds": int(command["timeout_seconds"]),
                 "pre_session_setup": {"restart_gateway": pending_restart},
             }
-            with contextlib.redirect_stdout(sys.stderr):
-                result = runner.run_session(
-                    session,
-                    session_index - 1,
-                    shared_session_key=current_key,
+            workspace_identity = _session_identity(f"{judge.CONTAINER}:{judge.WORKSPACE}")
+            evidence_context: dict[str, Any] | None = None
+            if relay is not None:
+                evidence_context = relay.open_evidence_context(
+                    action_id=str(action["action_id"]),
+                    workspace_identity_sha256=str(workspace_identity),
+                    logical_session_id=str(session["session_id"]),
                 )
-                raw_post_state = runner.capture_post_state()
-                public_post_state = _observable_state(raw_post_state, exact_secrets)
+            with contextlib.redirect_stdout(sys.stderr):
+                try:
+                    result = runner.run_session(
+                        session,
+                        session_index - 1,
+                        shared_session_key=current_key,
+                    )
+                    raw_post_state = runner.capture_post_state()
+                    public_post_state = _observable_state(raw_post_state, exact_secrets)
+                except Exception:
+                    if relay is not None and evidence_context is not None:
+                        relay.close_evidence_context(
+                            control_context_id=str(evidence_context["control_context_id"]),
+                            actual_session_identity_sha256=None,
+                            close_state="aborted",
+                        )
+                    raise
             current_key = result.pop("_session_key")
             result["actual_session_identity_sha256"] = _session_identity(current_key)
             result["previous_delivery_session_identity_sha256"] = last_delivery_identity
             last_delivery_identity = result["actual_session_identity_sha256"]
             result["restart_requested"] = pending_restart
             result["new_session_request_action_id"] = pending_lifecycle_action_id
-            result["workspace_identity_sha256"] = _session_identity(
-                f"{judge.CONTAINER}:{judge.WORKSPACE}"
-            )
+            result["workspace_identity_sha256"] = workspace_identity
             # Namespace identity, not proof that an index exists or contains an item.
             result["memory_index_namespace_sha256"] = _session_identity(
                 f"{judge.CONTAINER}:openclaw:default-agent-memory-index"
             )
+            if relay is not None and evidence_context is not None:
+                relay.close_evidence_context(
+                    control_context_id=str(evidence_context["control_context_id"]),
+                    actual_session_identity_sha256=result["actual_session_identity_sha256"],
+                    close_state="completed",
+                )
             raw_api_response = result.pop("raw_api_response", None)
             relay_records = relay.records() if relay is not None else []
             action_relay_records = relay_records[provider_record_cursor:]
             provider_record_cursor = len(relay_records)
+            relay_evidence = relay.evidence_records() if relay is not None else []
+            action_relay_evidence = relay_evidence[provider_evidence_cursor:]
+            provider_evidence_cursor = len(relay_evidence)
             relay_usage = _aggregate_relay_usage(action_relay_records)
             tool_observations, newly_seen = _structured_tool_observations(
                 raw_post_state, seen_transcript_entry_ids, exact_secrets
@@ -644,6 +695,8 @@ def main() -> int:
             result["provider_relay_missing_request_count"] = relay_usage["missing_request_count"]
             result["provider_relay_known_subtotal"] = relay_usage["known_subtotal"]
             result["provider_relay_failed_request_count"] = relay_usage["failed_request_count"]
+            result["provider_boundary_evidence"] = action_relay_evidence
+            result["provider_evidence_batch_id"] = relay.batch_id if relay is not None else None
             if relay_usage["observation"] == "complete":
                 result["provider_usage"] = relay_usage["usage"]
                 result["provider_usage_source"] = "provider_relay_upstream"
@@ -676,6 +729,8 @@ def main() -> int:
                     "retrieval_class": item.get("observation_class"),
                     "content_hash": item["result_hash"],
                     "content_hash_scope": item.get("result_hash_scope"),
+                    "raw_result_projection_sha256": item.get("raw_result_projection_sha256"),
+                    "result_redaction_changed": item.get("result_redaction_changed"),
                     "content_excerpt": item["result_excerpt"],
                     # Upstream may provide a source/version reference. An empty
                     # list is intentional: a result hash alone is not lineage.
@@ -758,6 +813,7 @@ def main() -> int:
                     "session": result,
                     "post_state": public_post_state,
                     "provider_request_ledger": relay.records() if relay else [],
+                    "provider_boundary_evidence": action_relay_evidence,
                     "embedding_request_ledger": _embedding_ledger(judge, relay),
                 }
             )

@@ -78,10 +78,11 @@ def test_identity_through_collection_normalization_mining_and_independent_admiss
     assert (build / "extraction").is_dir()
     assert stable_hash("session-2") in next(build.rglob("source_events.jsonl")).read_text()
     report = construction_admission(raw, graph, accepted_count=1, library_audit_passed=True)
-    assert report["checks"]["cross_session_persistence_read_use"], report
-    assert report["structural_checks_passed"], report
+    # Caller-authored hash labels are not production evidence and cannot pass C.
+    assert report["checks"]["cross_session_persistence_read_use"] is False, report
+    assert report["structural_checks_passed"] is False, report
     assert report["pilot_admitted"] is False  # Runtime engineering review is still required.
-    assert report["structural_admission"]["status"] == "passed"
+    assert report["structural_admission"]["status"] == "failed"
     assert report["runtime_review"]["status"] == "pending"
     assert report["execution_authorization"]["status"] == "absent"
     assert report["official_outcome"]["status"] == "not_evaluated"

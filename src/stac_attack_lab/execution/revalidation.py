@@ -266,6 +266,12 @@ def replay_bridge_responses(
         "".join(json.dumps(item, sort_keys=True) + "\n" for item in driver._checkpoints),
         encoding="utf-8",
     )
+    evidence_path = trajectory_root / "provider_boundary_evidence.jsonl"
+    evidence_records = driver.boundary_evidence_snapshot()
+    evidence_path.write_text(
+        "".join(json.dumps(item, sort_keys=True) + "\n" for item in evidence_records),
+        encoding="utf-8",
+    )
     manifest = ConstructionManifest(
         acquisition_mode="adversarial_trace",
         construction_objective_id=config.construction_objective_id,
@@ -306,6 +312,16 @@ def replay_bridge_responses(
         ]
         if driver._checkpoints
         else [],
+        evidence_refs=[
+            SourceReference(
+                ref_id=f"{trajectory_id}:provider-boundary-evidence",
+                kind="provider_boundary_evidence",
+                relative_path=str(evidence_path.relative_to(collection)),
+                content_hash=file_hash(evidence_path),
+            )
+        ]
+        if evidence_records
+        else [],
         model_hashes={"victim": str(config.victim_model_hash or "recorded-unknown")},
         config_hash=stable_hash(config.model_dump(mode="json")),
         collection_seed=config.effective_seeds[0],
@@ -317,6 +333,22 @@ def replay_bridge_responses(
             "replay_version": REPLAY_VERSION,
             "live_requests_performed": "false",
             "synthetic_instrumentation": "false",
+            "provider_evidence_policy_mode": (
+                "experimental"
+                if evidence_records
+                and all(
+                    item.get("rule_id") == "stac.experimental.exact_tool_result_to_argument.v1"
+                    for item in evidence_records
+                    if item.get("record_type") in {"provider_request", "provider_response"}
+                )
+                else "disabled"
+            ),
+            "provider_evidence_batch_id": str(
+                next(
+                    (item.get("batch_id") for item in evidence_records if item.get("batch_id")),
+                    "",
+                )
+            ),
         },
     )
     raw_path = trajectory_root / "raw_trajectory.json"

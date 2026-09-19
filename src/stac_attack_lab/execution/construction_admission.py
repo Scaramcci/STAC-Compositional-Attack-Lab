@@ -6,6 +6,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from stac_attack_lab.execution.provider_evidence import (
+    load_provider_evidence,
+    verify_context_candidate,
+    verify_derivation_candidate,
+)
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.models import InteractionGraph, RawInteractionTrajectory
 
@@ -23,6 +28,8 @@ def construction_admission(
     *,
     accepted_count: int,
     library_audit_passed: bool,
+    provider_evidence_records: dict[str, dict[str, Any]] | None = None,
+    provider_evidence_status: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate graph facts without conflating review or launch authorization."""
     identity_field = "actual_session_identity_sha256"
@@ -56,6 +63,9 @@ def construction_admission(
 
     event_ids = [event.event_id for event in graph.events]
     artifact_ids = [artifact.artifact_id for artifact in graph.artifacts]
+    graph_payload = graph.model_dump(mode="json", exclude={"graph_hash"})
+    if stable_hash(graph_payload) != graph.graph_hash:
+        integrity("graph_hash_mismatch")
     if len(event_ids) != len(set(event_ids)):
         integrity("duplicate_event_id")
     if len(artifact_ids) != len(set(artifact_ids)):
@@ -142,25 +152,43 @@ def construction_admission(
         }
         return bool(refs & artifact_refs or internal_event_refs)
 
-    def strong_use(use: Any, artifact_id: str) -> tuple[bool, list[str]]:
-        claims = use.public_payload.get("artifact_use_evidence", [])
-        if not isinstance(claims, list) or artifact_id not in artifacts:
-            return False, []
-        source_hash = artifacts[artifact_id].content_hash
-        for claim in claims:
-            if not isinstance(claim, dict) or claim.get("source_artifact_id") != artifact_id:
+    def strong_use(use: Any, artifact_id: str) -> tuple[str, list[str], str]:
+        candidates = use.public_payload.get("artifact_derivation_candidates", [])
+        if not isinstance(candidates, list) or artifact_id not in artifacts:
+            return "unknown", [], "derivation_candidate_missing"
+        source_artifact = artifacts[artifact_id]
+        source_event = events.get(str(source_artifact.producer_event_id))
+        if source_event is None:
+            return "failed", [], "derivation_source_event_missing"
+        evaluations = []
+        for candidate in candidates:
+            if (
+                not isinstance(candidate, dict)
+                or candidate.get("source_artifact_id") != artifact_id
+            ):
                 continue
-            refs = [str(ref) for ref in claim.get("evidence_ref_ids", []) if str(ref).strip()]
-            valid_refs = bool(refs and set(refs) <= set(use.evidence_ref_ids))
-            valid_derivation = (
-                claim.get("evidence_kind") == "deterministic_argument_derivation"
-                and claim.get("verification_rule") == "sha256_exact_projection"
-                and claim.get("source_content_sha256") == source_hash
-                and claim.get("target_projection_sha256") == source_hash
+            evaluations.append(
+                verify_derivation_candidate(
+                    trajectory=trajectory,
+                    source_artifact=source_artifact,
+                    source_event=source_event,
+                    consumer_event=use,
+                    candidate=candidate,
+                    records=provider_evidence_records or {},
+                    bundle_status=provider_evidence_status
+                    or {"state": "unknown", "reason_code": "provider_evidence_not_supplied"},
+                )
             )
-            if valid_refs and valid_derivation:
-                return True, refs
-        return False, []
+        observed = next((value for value in evaluations if value["state"] == "observed"), None)
+        if observed:
+            return "observed", list(observed["evidence_ref_ids"]), str(observed["reason_code"])
+        failed = next((value for value in evaluations if value["state"] == "failed"), None)
+        value = failed or (evaluations[0] if evaluations else None)
+        return (
+            str(value["state"]) if value else "unknown",
+            list(value.get("evidence_ref_ids", [])) if value else [],
+            str(value["reason_code"]) if value else "derivation_candidate_missing",
+        )
 
     candidates: list[dict[str, Any]] = []
     successful_paths: list[tuple[Any, Any, Any, Any]] = []
@@ -377,20 +405,35 @@ def construction_admission(
                 "observed" if bound else ("failed" if consumers else "unknown"),
                 edge_ids=[edge.edge_id for edge, _ in bound],
             )
-            verified = [
-                (edge, use, refs)
+            evaluated = [
+                (edge, use, state, refs, reason)
                 for edge, use in bound
                 if edge.artifact_id is not None
-                for ok, refs in [strong_use(use, edge.artifact_id)]
-                if ok
+                for state, refs, reason in [strong_use(use, edge.artifact_id)]
             ]
+            verified = [value for value in evaluated if value[2] == "observed"]
+            derivation_state = (
+                "observed"
+                if verified
+                else "failed"
+                if any(value[2] == "failed" for value in evaluated)
+                else "unknown"
+            )
             gates["downstream_consumption"] = gate(
                 "downstream_consumption",
-                "observed" if verified else "unknown",
-                event_ids=[read.event_id] + [use.event_id for _, use, _ in verified],
-                edge_ids=[edge.edge_id for edge, _, _ in verified],
-                evidence_refs=[ref for _, _, refs in verified for ref in refs],
+                derivation_state,
+                event_ids=[read.event_id] + [use.event_id for _, use, _, _, _ in verified],
+                edge_ids=[edge.edge_id for edge, _, _, _, _ in verified],
+                evidence_refs=[ref for _, _, _, refs, _ in verified for ref in refs],
                 missing=[] if verified else ["edge-bound deterministic derivation evidence"],
+                reason_code=(
+                    "downstream_consumption_observed"
+                    if verified
+                    else next(
+                        (value[4] for value in evaluated if value[2] == derivation_state),
+                        "derivation_candidate_missing",
+                    )
+                ),
             )
             # Request-boundary context evidence is a separate, currently optional fact.
             context_verified = []
@@ -398,18 +441,34 @@ def construction_admission(
                 edge_artifact = artifacts.get(str(edge.artifact_id))
                 if edge_artifact is None:
                     continue
+                source_event = events.get(str(edge_artifact.producer_event_id))
+                if source_event is None:
+                    continue
                 claims = use.public_payload.get("artifact_context_evidence", [])
-                if isinstance(claims, list) and any(
-                    isinstance(claim, dict)
-                    and claim.get("source_artifact_id") == edge.artifact_id
-                    and claim.get("evidence_kind") == "provider_request_context_projection"
-                    and claim.get("request_id")
-                    and claim.get("content_projection_sha256") == edge_artifact.content_hash
-                    and set(claim.get("evidence_ref_ids", [])) <= set(use.evidence_ref_ids)
-                    and bool(claim.get("evidence_ref_ids"))
-                    for claim in claims
-                ):
-                    context_verified.append(use)
+                if not isinstance(claims, list):
+                    continue
+                for claim in claims:
+                    if (
+                        not isinstance(claim, dict)
+                        or claim.get("source_artifact_id") != edge.artifact_id
+                    ):
+                        continue
+                    verification = verify_context_candidate(
+                        trajectory=trajectory,
+                        source_artifact=edge_artifact,
+                        source_event=source_event,
+                        consumer_event=use,
+                        candidate=claim,
+                        records=provider_evidence_records or {},
+                        bundle_status=provider_evidence_status
+                        or {
+                            "state": "unknown",
+                            "reason_code": "provider_evidence_not_supplied",
+                        },
+                    )
+                    if verification["state"] == "observed":
+                        context_verified.append(use)
+                        break
             gates["context_reachability"] = gate(
                 "context_reachability",
                 "observed" if context_verified else "unknown",
@@ -431,7 +490,7 @@ def construction_admission(
                 ],
             }
             candidates.append(candidate)
-            for edge, use, _ in verified:
+            for edge, use, _, _, _ in verified:
                 if passed:
                     successful_paths.append((write, read, use, edge))
             for use in context_verified:
@@ -619,6 +678,7 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
         }
     for raw_path in raw_paths:
         trajectory = RawInteractionTrajectory.model_validate_json(raw_path.read_text())
+        provider_records, provider_status = load_provider_evidence(trajectory, collection)
         graph_path = (
             library.parent
             / "interactions/normalized"
@@ -643,6 +703,8 @@ def audit_construction_collection(collection: Path, library: Path) -> dict[str, 
                 graph,
                 accepted_count=manifest["accepted_count"],
                 library_audit_passed=True,
+                provider_evidence_records=provider_records,
+                provider_evidence_status=provider_status,
             )
         )
     structural_passed = (

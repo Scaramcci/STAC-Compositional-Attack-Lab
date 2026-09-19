@@ -13,7 +13,7 @@
 
 每次 offline 都写 `<RUN>/analyses/<mode-timestamp-id>/`，不覆盖旧分析。退出码：0 表示所需离线检查通过但 runtime review 仍可 pending；10 表示检查完成但门槛未满足；20 表示输入不足/blocked；30 表示配置或程序错误。live 的 2 表示执行和离线检查完成、等待 runtime review。查看 `<analysis>/offline_summary.json`、`offline_provenance.json` 和 `bridge_replay_diagnostics.json`；历史输入只读引用，不得把派生报告写回历史 run。
 
-当前生产链没有 `inputToolResultCallIds` 的可信生产者，也没有 request-boundary context projection 或强消费 verifier。synthetic verifier 测试只证明门逻辑，不证明真实运行已支持该证据。默认禁用准备命令为：
+`inputToolResultCallIds` 仍没有可信生产者并始终只作诊断。当前 relay/bridge 路径可生成 request-boundary context projection；版本化的 exact UTF-8 verifier 仅在显式 synthetic/experimental policy 下复算强派生，正式默认禁用。fake HTTP/replay 成功只证明工程链路，不证明真实模型、攻击或 official outcome。默认禁用准备命令为：
 
 ```bash
 STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prepare \
@@ -21,4 +21,4 @@ STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prep
   --run-id <new-unique-run-id>
 ```
 
-该命令仅生成 `execution_enabled=false` 配置，不是 live 授权；在真实 evidence producer 接通前不建议花费额度。
+该命令仅生成 `execution_enabled=false` 配置，不是 live 授权。任何单条真实兼容性复验仍需单独审核 policy、provider payload 形状、预算和最终配置后再授权。

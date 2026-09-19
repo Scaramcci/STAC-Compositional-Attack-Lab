@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import hmac
 import json
@@ -16,6 +17,232 @@ from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
+
+REQUEST_EVIDENCE_VERSION = "provider-request-boundary-v1"
+EXACT_DERIVATION_RULE = "stac.experimental.exact_tool_result_to_argument.v1"
+UTF8_STRING_PROJECTION = "utf8-string-v1"
+MAX_EVIDENCE_PROJECTION_BYTES = 16_384
+
+
+def _canonical_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
+
+
+def _record_hash(value: dict[str, Any]) -> str:
+    return hashlib.sha256(
+        _canonical_bytes({key: item for key, item in value.items() if key != "record_sha256"})
+    ).hexdigest()
+
+
+def _utf8_projection(value: str, *, retain: bool) -> dict[str, Any]:
+    encoded = value.encode("utf-8")
+    result: dict[str, Any] = {
+        "projection_kind": UTF8_STRING_PROJECTION,
+        "projection_sha256": hashlib.sha256(encoded).hexdigest(),
+        "projection_byte_length": len(encoded),
+        "projection_complete": len(encoded) <= MAX_EVIDENCE_PROJECTION_BYTES,
+    }
+    if retain and result["projection_complete"]:
+        result["projection_base64"] = base64.b64encode(encoded).decode("ascii")
+    return result
+
+
+def _request_tool_result_projections(
+    payload: dict[str, Any], *, retain: bool
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    projections: list[dict[str, Any]] = []
+    unsupported: list[dict[str, Any]] = []
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return projections, [{"reason_code": "request_messages_not_list"}]
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict) or message.get("role") != "tool":
+            continue
+        call_id = message.get("tool_call_id")
+        content = message.get("content")
+        if not isinstance(call_id, str) or not call_id:
+            unsupported.append(
+                {"message_index": index, "reason_code": "tool_result_call_id_missing"}
+            )
+            continue
+        if not isinstance(content, str):
+            unsupported.append(
+                {
+                    "message_index": index,
+                    "tool_result_call_id": call_id,
+                    "reason_code": "tool_result_content_not_complete_string",
+                }
+            )
+            continue
+        if not content:
+            unsupported.append(
+                {
+                    "message_index": index,
+                    "tool_result_call_id": call_id,
+                    "reason_code": "tool_result_content_empty",
+                }
+            )
+            continue
+        projection = _utf8_projection(content, retain=retain)
+        projections.append(
+            {
+                "tool_result_call_id": call_id,
+                "message_index": index,
+                "content_json_pointer": f"/messages/{index}/content",
+                **projection,
+            }
+        )
+    return projections, unsupported
+
+
+def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str, Any]], str]:
+    text = body.decode("utf-8", errors="strict")
+    if "text/event-stream" not in content_type.lower() and not text.lstrip().startswith("data:"):
+        value = json.loads(text)
+        if not isinstance(value, dict):
+            return [], "response_json_not_object"
+        calls: list[dict[str, Any]] = []
+        for choice in value.get("choices", []):
+            if not isinstance(choice, dict):
+                continue
+            message = choice.get("message")
+            if isinstance(message, dict) and isinstance(message.get("tool_calls"), list):
+                calls.extend(call for call in message["tool_calls"] if isinstance(call, dict))
+        return calls, "complete"
+    calls_by_index: dict[int, dict[str, Any]] = {}
+    done = False
+    for line in text.splitlines():
+        if not line.startswith("data:"):
+            continue
+        raw_event = line[5:].strip()
+        if raw_event == "[DONE]":
+            done = True
+            continue
+        event = json.loads(raw_event)
+        if not isinstance(event, dict):
+            continue
+        for choice in event.get("choices", []):
+            if not isinstance(choice, dict):
+                continue
+            delta = choice.get("delta")
+            if not isinstance(delta, dict) or not isinstance(delta.get("tool_calls"), list):
+                continue
+            for call in delta["tool_calls"]:
+                if not isinstance(call, dict) or not isinstance(call.get("index"), int):
+                    continue
+                index = call["index"]
+                merged = calls_by_index.setdefault(
+                    index,
+                    {
+                        "id": None,
+                        "type": "function",
+                        "function": {"name": "", "arguments": ""},
+                    },
+                )
+                if isinstance(call.get("id"), str):
+                    merged["id"] = call["id"]
+                function = call.get("function")
+                if isinstance(function, dict):
+                    if isinstance(function.get("name"), str):
+                        merged["function"]["name"] += function["name"]
+                    if isinstance(function.get("arguments"), str):
+                        merged["function"]["arguments"] += function["arguments"]
+    return list(calls_by_index.values()), "complete" if done else "response_sse_truncated"
+
+
+def _json_pointer(value: object, pointer: str) -> object:
+    if pointer == "":
+        return value
+    if not pointer.startswith("/"):
+        raise ValueError("json_pointer_invalid")
+    current = value
+    for raw_token in pointer[1:].split("/"):
+        token = raw_token.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            raise KeyError("json_pointer_target_missing")
+    return current
+
+
+def _target_argument_projections(
+    body: bytes,
+    content_type: str,
+    policy: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    targets: list[dict[str, Any]] = []
+    unsupported: list[dict[str, Any]] = []
+    try:
+        calls, response_status = _response_tool_calls(body, content_type)
+    except (UnicodeError, json.JSONDecodeError):
+        return [], [{"reason_code": "provider_response_not_parseable"}]
+    if response_status != "complete":
+        return [], [{"reason_code": response_status}]
+    selectors = policy.get("target_selectors", []) if policy.get("enabled") else []
+    for call_index, call in enumerate(calls):
+        function = call.get("function") if isinstance(call, dict) else None
+        if not isinstance(function, dict):
+            continue
+        call_id, tool_name = call.get("id"), function.get("name")
+        arguments_text = function.get("arguments")
+        for selector in selectors:
+            if not isinstance(selector, dict) or selector.get("tool_name") != tool_name:
+                continue
+            pointer = selector.get("json_pointer")
+            if not isinstance(call_id, str) or not call_id:
+                unsupported.append(
+                    {"call_index": call_index, "reason_code": "target_tool_call_id_missing"}
+                )
+                continue
+            if not isinstance(arguments_text, str):
+                unsupported.append(
+                    {
+                        "target_tool_call_id": call_id,
+                        "reason_code": "target_arguments_not_complete_string",
+                    }
+                )
+                continue
+            try:
+                arguments = json.loads(arguments_text)
+                selected = _json_pointer(arguments, str(pointer))
+            except (json.JSONDecodeError, KeyError, ValueError):
+                unsupported.append(
+                    {
+                        "target_tool_call_id": call_id,
+                        "reason_code": "target_argument_projection_invalid",
+                    }
+                )
+                continue
+            if not isinstance(selected, str) or not selected:
+                unsupported.append(
+                    {
+                        "target_tool_call_id": call_id,
+                        "reason_code": "target_argument_not_nonempty_string",
+                    }
+                )
+                continue
+            arguments_bytes = arguments_text.encode("utf-8")
+            arguments_value_bytes = _canonical_bytes(arguments)
+            target = {
+                "target_tool_call_id": call_id,
+                "target_tool_name": tool_name,
+                "target_call_index": call_index,
+                "target_json_pointer": pointer,
+                "arguments_json_sha256": hashlib.sha256(arguments_bytes).hexdigest(),
+                "arguments_json_byte_length": len(arguments_bytes),
+                "arguments_value_sha256": hashlib.sha256(arguments_value_bytes).hexdigest(),
+                **_utf8_projection(selected, retain=True),
+            }
+            if len(arguments_bytes) <= MAX_EVIDENCE_PROJECTION_BYTES:
+                target["arguments_json_base64"] = base64.b64encode(arguments_bytes).decode("ascii")
+            else:
+                target["projection_complete"] = False
+            targets.append(target)
+    return targets, unsupported
 
 
 def chat_completions_url(base_url: str) -> str:
@@ -120,11 +347,15 @@ class ProviderRelayConfig:
     allowed_tools: tuple[str, ...] | None = None
     provider_compat: str = "openai"
     ledger_path: str = "/tmp/stac-provider-ledger.jsonl"
+    evidence_path: str = "/tmp/stac-provider-evidence.jsonl"
     batch_id: str | None = None
+    control_token: str | None = None
+    derivation_policy: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> ProviderRelayConfig:
         allowed = value.get("allowed_tools")
+        derivation_policy = value.get("derivation_policy")
         if allowed is not None and not isinstance(allowed, list):
             raise ValueError("provider_relay_allowed_tools_must_be_list_or_null")
         config = cls(
@@ -136,7 +367,12 @@ class ProviderRelayConfig:
             allowed_tools=(tuple(str(item) for item in allowed) if allowed is not None else None),
             provider_compat=str(value.get("provider_compat") or "openai"),
             ledger_path=str(value.get("ledger_path") or "/tmp/stac-provider-ledger.jsonl"),
+            evidence_path=str(value.get("evidence_path") or "/tmp/stac-provider-evidence.jsonl"),
             batch_id=(str(value.get("batch_id")) if value.get("batch_id") else None),
+            control_token=(str(value.get("control_token")) if value.get("control_token") else None),
+            derivation_policy=(
+                dict(derivation_policy) if isinstance(derivation_policy, dict) else {}
+            ),
         )
         if not config.upstream_base_url or not config.upstream_api_key or not config.ingress_token:
             raise ValueError("provider_relay_missing_required_config")
@@ -146,6 +382,14 @@ class ProviderRelayConfig:
             set(config.allowed_tools)
         ):
             raise ValueError("provider_relay_duplicate_allowed_tool")
+        if config.derivation_policy.get("enabled") is True:
+            if config.derivation_policy.get("rule_id") != EXACT_DERIVATION_RULE:
+                raise ValueError("provider_relay_unknown_derivation_rule")
+            if not config.control_token:
+                raise ValueError("provider_relay_evidence_control_token_required")
+            selectors = config.derivation_policy.get("target_selectors")
+            if not isinstance(selectors, list) or not selectors:
+                raise ValueError("provider_relay_derivation_selectors_required")
         return config
 
 
@@ -243,11 +487,50 @@ class _PersistentRelayBudget:
             self._fd = None
 
 
+class _PersistentEvidence:
+    """Append-only evidence records with per-record hashes and fsync."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self._mutex = threading.Lock()
+        self.sequence = 0
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            for item in _parse_jsonl_records(
+                path.read_bytes(), corruption="provider_evidence_corrupt"
+            ):
+                if item.get("record_sha256") != _record_hash(item):
+                    raise RuntimeError("provider_evidence_record_hash_mismatch")
+                self.sequence = max(self.sequence, int(item.get("evidence_sequence", 0)))
+
+    def append(self, value: dict[str, Any]) -> dict[str, Any]:
+        with self._mutex:
+            self.sequence += 1
+            item = {
+                "schema_version": REQUEST_EVIDENCE_VERSION,
+                "evidence_sequence": self.sequence,
+                "record_id": f"evidence-{self.sequence}-{uuid.uuid4().hex}",
+                "recorded_at_unix": time.time(),
+                **value,
+            }
+            item["record_sha256"] = _record_hash(item)
+            try:
+                with self.path.open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(item, sort_keys=True, ensure_ascii=False) + "\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            except OSError as exc:
+                raise RuntimeError("provider_evidence_write_failed") from exc
+            return item
+
+
 @dataclass
 class ProviderRelayState:
     accepted_requests: int = 0
     total_attempts: int = 0
     records: list[dict[str, Any]] = field(default_factory=list)
+    evidence_records: list[dict[str, Any]] = field(default_factory=list)
+    active_evidence_context: dict[str, Any] | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
@@ -307,6 +590,32 @@ class _RelayHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         config = self.server.config
         started = time.monotonic()
+        if self.path in {"/stac/evidence/context/open", "/stac/evidence/context/close"}:
+            supplied_control = self.headers.get("X-STAC-Control-Token", "")
+            if not config.control_token or not hmac.compare_digest(
+                supplied_control, config.control_token
+            ):
+                self._write(401, b'{"error":{"message":"control_auth_failed"}}', "application/json")
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                value = json.loads(self.rfile.read(size))
+                if not isinstance(value, dict):
+                    raise ValueError("control_body_not_object")
+                result = (
+                    self.server.open_evidence_context(value)
+                    if self.path.endswith("/open")
+                    else self.server.close_evidence_context(value)
+                )
+            except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
+                self._write(
+                    409,
+                    json.dumps({"error": {"message": str(exc)}}).encode(),
+                    "application/json",
+                )
+                return
+            self._write(200, json.dumps(result).encode(), "application/json")
+            return
         if self.path not in {"/chat/completions", "/v1/chat/completions"}:
             self._write(404, b'{"error":{"message":"unsupported_path"}}', "application/json")
             return
@@ -363,6 +672,57 @@ class _RelayHandler(BaseHTTPRequestHandler):
                 payload["stream_options"] = stream_options
             stream_options.setdefault("include_usage", True)
         encoded = json.dumps(payload, separators=(",", ":")).encode()
+        request_id = f"provider-request-{self.server.budget.batch_id}-{sequence}-{uuid.uuid4().hex}"
+        with self.server.state.lock:
+            context = (
+                dict(self.server.state.active_evidence_context)
+                if self.server.state.active_evidence_context is not None
+                else None
+            )
+        source_projections, source_unsupported = _request_tool_result_projections(
+            payload,
+            retain=config.derivation_policy.get("enabled") is True,
+        )
+        evidence_base = {
+            "batch_id": self.server.budget.batch_id,
+            "request_id": request_id,
+            "attempt_sequence": sequence,
+            "control_context_id": context.get("control_context_id") if context else None,
+            "action_id": context.get("action_id") if context else None,
+            "workspace_identity_sha256": (
+                context.get("workspace_identity_sha256") if context else None
+            ),
+            "logical_session_id": context.get("logical_session_id") if context else None,
+            "request_sha256": hashlib.sha256(encoded).hexdigest(),
+            "source_tool_results": source_projections,
+            "unsupported_source_projections": source_unsupported,
+            "rule_id": config.derivation_policy.get("rule_id"),
+            "policy_enabled": config.derivation_policy.get("enabled") is True,
+        }
+        try:
+            prepared_record = self.server.record_evidence(
+                {**evidence_base, "record_type": "provider_request", "send_state": "prepared"}
+            )
+            attempted_record = self.server.record_evidence(
+                {**evidence_base, "record_type": "provider_request", "send_state": "attempted"}
+            )
+        except RuntimeError:
+            self.server.record(
+                {
+                    "sequence": sequence,
+                    "accepted": True,
+                    "status": 500,
+                    "error_category": "provider_evidence_write_failed",
+                    "final_tools": final_tools,
+                    "duration_ms": round((time.monotonic() - started) * 1000, 3),
+                }
+            )
+            self._write(
+                500,
+                b'{"error":{"message":"provider_evidence_write_failed"}}',
+                "application/json",
+            )
+            return
         target = chat_completions_url(config.upstream_base_url)
         request = urllib.request.Request(
             target,
@@ -379,18 +739,49 @@ class _RelayHandler(BaseHTTPRequestHandler):
         content_type = "application/json"
         body = b'{"error":{"message":"provider_transport_error"}}'
         error_category: str | None = None
+        response_received = False
         try:
             with urllib.request.urlopen(request, timeout=config.timeout_seconds) as response:
                 status = response.status
                 content_type = response.headers.get("Content-Type", "application/json")
                 body = response.read()
+                response_received = True
         except urllib.error.HTTPError as exc:
             status = exc.code
             content_type = exc.headers.get("Content-Type", "application/json")
             body = exc.read()
             error_category = f"provider_http_{exc.code}"
+            response_received = True
         except Exception as exc:  # relay must return a bounded, observable failure
             error_category = type(exc).__name__
+        target_projections: list[dict[str, Any]] = []
+        target_unsupported: list[dict[str, Any]] = []
+        response_evidence_record: dict[str, Any] | None = None
+        if response_received:
+            target_projections, target_unsupported = _target_argument_projections(
+                body, content_type, config.derivation_policy
+            )
+            response_evidence_record = self.server.record_evidence(
+                {
+                    **evidence_base,
+                    "record_type": "provider_response",
+                    "send_state": "response_received",
+                    "http_status": status,
+                    "response_sha256": hashlib.sha256(body).hexdigest(),
+                    "response_content_type": content_type,
+                    "target_tool_arguments": target_projections,
+                    "unsupported_target_projections": target_unsupported,
+                }
+            )
+        else:
+            self.server.record_evidence(
+                {
+                    **evidence_base,
+                    "record_type": "provider_request",
+                    "send_state": "transport_error",
+                    "error_category": error_category,
+                }
+            )
         provider_usage, usage_observation, usage_reasons = _extract_provider_usage(
             body, content_type
         )
@@ -402,6 +793,21 @@ class _RelayHandler(BaseHTTPRequestHandler):
                 "error_category": error_category,
                 "upstream_path": urllib.parse.urlparse(target).path,
                 "request_sha256": hashlib.sha256(encoded).hexdigest(),
+                "request_id": request_id,
+                "request_evidence_ref": (
+                    f"provider-evidence:{attempted_record['record_id']}:"
+                    f"{attempted_record['record_sha256']}"
+                ),
+                "response_evidence_ref": (
+                    f"provider-evidence:{response_evidence_record['record_id']}:"
+                    f"{response_evidence_record['record_sha256']}"
+                    if response_evidence_record is not None
+                    else None
+                ),
+                "prepared_evidence_ref": (
+                    f"provider-evidence:{prepared_record['record_id']}:"
+                    f"{prepared_record['record_sha256']}"
+                ),
                 "final_tools": final_tools,
                 "stream": bool(payload.get("stream")),
                 "provider_usage": provider_usage,
@@ -426,6 +832,12 @@ class ProviderRelayServer(ThreadingHTTPServer):
         self.budget = _PersistentRelayBudget(
             Path(config.ledger_path), config.max_requests, config.batch_id
         )
+        evidence_path = (
+            Path(str(config.ledger_path) + ".evidence.jsonl")
+            if config.evidence_path == "/tmp/stac-provider-evidence.jsonl"
+            else Path(config.evidence_path)
+        )
+        self.evidence = _PersistentEvidence(evidence_path)
         self.state = ProviderRelayState(
             accepted_requests=self.budget.reserved,
             total_attempts=self.budget.sequence,
@@ -448,6 +860,62 @@ class ProviderRelayServer(ThreadingHTTPServer):
             item = {"batch_id": self.budget.batch_id, **value}
             self.state.records.append(dict(item))
             self.budget.append(item)
+
+    def record_evidence(self, value: dict[str, Any]) -> dict[str, Any]:
+        item = self.evidence.append(value)
+        with self.state.lock:
+            self.state.evidence_records.append(dict(item))
+        return item
+
+    def open_evidence_context(self, value: dict[str, Any]) -> dict[str, Any]:
+        action_id = value.get("action_id")
+        workspace = value.get("workspace_identity_sha256")
+        logical_session_id = value.get("logical_session_id")
+        required = (action_id, workspace, logical_session_id)
+        if not all(isinstance(item, str) and item for item in required):
+            raise ValueError("evidence_context_fields_missing")
+        with self.state.lock:
+            if self.state.active_evidence_context is not None:
+                raise RuntimeError("evidence_context_already_active")
+            context = {
+                "control_context_id": f"context-{uuid.uuid4().hex}",
+                "action_id": action_id,
+                "workspace_identity_sha256": workspace,
+                "logical_session_id": logical_session_id,
+            }
+            self.state.active_evidence_context = dict(context)
+        record = self.record_evidence(
+            {
+                "batch_id": self.budget.batch_id,
+                "record_type": "control_context",
+                "context_state": "open",
+                **context,
+            }
+        )
+        return {**context, "evidence_record_id": record["record_id"]}
+
+    def close_evidence_context(self, value: dict[str, Any]) -> dict[str, Any]:
+        context_id = value.get("control_context_id")
+        actual_session = value.get("actual_session_identity_sha256")
+        close_state = value.get("close_state", "completed")
+        with self.state.lock:
+            context = self.state.active_evidence_context
+            if context is None or context.get("control_context_id") != context_id:
+                raise RuntimeError("evidence_context_not_active")
+            self.state.active_evidence_context = None
+        record = self.record_evidence(
+            {
+                "batch_id": self.budget.batch_id,
+                "record_type": "control_context",
+                "context_state": "closed",
+                **context,
+                "actual_session_identity_sha256": (
+                    actual_session if isinstance(actual_session, str) and actual_session else None
+                ),
+                "close_state": close_state,
+            }
+        )
+        return {"control_context_id": context_id, "evidence_record_id": record["record_id"]}
 
 
 class RunningProviderRelay:
@@ -503,6 +971,7 @@ class ContainerProviderRelay:
         self.container = f"stac-provider-{suffix}"
         self.volume = f"stac-ledger-{suffix}"
         self.ingress_token = token
+        self.control_token = uuid.uuid4().hex
         self.embedding_ingress_token = uuid.uuid4().hex
         self.runtime = dict(runtime)
         self.batch_id = str(self.runtime.get("batch_id") or uuid.uuid4().hex)
@@ -555,8 +1024,10 @@ class ContainerProviderRelay:
             **self.runtime,
             "batch_id": self.batch_id,
             "ledger_path": "/var/lib/stac-ledger/provider.jsonl",
+            "evidence_path": "/var/lib/stac-ledger/provider-evidence.jsonl",
             "upstream_api_key": upstream_key,
             "ingress_token": self.ingress_token,
+            "control_token": self.control_token,
         }
         try:
             self._docker("volume", "create", self.volume)
@@ -781,6 +1252,85 @@ class ContainerProviderRelay:
         )
         return _parse_jsonl_records(result.stdout, corruption="provider_ledger_corrupt")
 
+    def evidence_records(self) -> list[dict[str, Any]]:
+        if not self.started:
+            return []
+        result = self._docker(
+            "exec",
+            self.container,
+            "sh",
+            "-c",
+            "cat /var/lib/stac-ledger/provider-evidence.jsonl 2>/dev/null || true",
+            check=False,
+        )
+        return _parse_jsonl_records(result.stdout, corruption="provider_evidence_corrupt")
+
+    def _evidence_control(self, operation: str, value: dict[str, Any]) -> dict[str, Any]:
+        if not self.started or operation not in {"open", "close"}:
+            raise RuntimeError("provider_evidence_control_unavailable")
+        script = "\n".join(
+            [
+                "import json,sys,urllib.request",
+                "v=json.load(sys.stdin)",
+                "r=urllib.request.Request(v['url'],data=json.dumps(v['body']).encode(),",
+                " headers={'Content-Type':'application/json',",
+                " 'X-STAC-Control-Token':v['token']},method='POST')",
+                "with urllib.request.urlopen(r,timeout=5) as x: print(x.read().decode())",
+            ]
+        )
+        payload = json.dumps(
+            {
+                "url": (f"http://127.0.0.1:18791/stac/evidence/context/{operation}"),
+                "body": value,
+                "token": self.control_token,
+            }
+        ).encode()
+        result = self._docker(
+            "exec",
+            "-i",
+            self.container,
+            "python3",
+            "-c",
+            script,
+            input_data=payload,
+            timeout=10,
+        )
+        try:
+            response = json.loads(result.stdout.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError("provider_evidence_control_invalid_response") from exc
+        if not isinstance(response, dict):
+            raise RuntimeError("provider_evidence_control_invalid_response")
+        return response
+
+    def open_evidence_context(
+        self, *, action_id: str, workspace_identity_sha256: str, logical_session_id: str
+    ) -> dict[str, Any]:
+        return self._evidence_control(
+            "open",
+            {
+                "action_id": action_id,
+                "workspace_identity_sha256": workspace_identity_sha256,
+                "logical_session_id": logical_session_id,
+            },
+        )
+
+    def close_evidence_context(
+        self,
+        *,
+        control_context_id: str,
+        actual_session_identity_sha256: str | None,
+        close_state: str,
+    ) -> dict[str, Any]:
+        return self._evidence_control(
+            "close",
+            {
+                "control_context_id": control_context_id,
+                "actual_session_identity_sha256": actual_session_identity_sha256,
+                "close_state": close_state,
+            },
+        )
+
     def stop(self) -> None:
         # The named ledger volume is intentionally retained across container
         # rebuilds; callers may remove it only after archiving its evidence.
@@ -806,6 +1356,9 @@ def relay_runtime_from_model_config(value: dict[str, Any]) -> dict[str, Any] | N
         "timeout_seconds": value.pop("provider_timeout_seconds", 90),
         "allowed_tools": allowed_tools,
         "provider_compat": value.pop("provider_compat", "openai"),
+        "derivation_policy": value.pop(
+            "provider_evidence_policy", {"enabled": False, "policy_id": "formal-disabled"}
+        ),
         "batch_id": value.pop("batch_id", None),
     }
     embedding_provider = value.get("embedding_provider")
