@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from pydantic import Field, model_validator
 
@@ -28,6 +28,7 @@ from stac_attack_lab.interactions.models import (
 
 class InteractionCollectionPlan(StrictModel):
     collection_id: str
+    collection_mode: Literal["ordinary_trace", "benign_interaction"] = "ordinary_trace"
     source_task_ids: list[str]
     allowed_source_splits: list[str] = Field(default_factory=lambda: ["train", "dev", "synthetic"])
     formal_excluded_task_ids: list[str] = Field(default_factory=list)
@@ -309,7 +310,7 @@ def collect_interactions(
         "adapter_id": adapter.adapter_id,
         "adapter_version": adapter.adapter_version,
         "acquisition_mode": (
-            "adversarial_trace" if construction_attacker is not None else "ordinary_trace"
+            "adversarial_trace" if construction_attacker is not None else plan.collection_mode
         ),
         "construction_attacker_id": (
             construction_attacker.attacker_id if construction_attacker is not None else None

@@ -1,0 +1,52 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "execution_enabled": {
+      "const": false,
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "network_requests_performed": {
+      "const": false,
+      "default": false,
+      "title": "Network Requests Performed",
+      "type": "boolean"
+    },
+    "preparation_id": {
+      "title": "Preparation Id",
+      "type": "string"
+    },
+    "prompt_hash": {
+      "title": "Prompt Hash",
+      "type": "string"
+    },
+    "scenario_set_hash": {
+      "title": "Scenario Set Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "preparation_id",
+    "config_hash",
+    "scenario_set_hash",
+    "prompt_hash",
+    "execution_enabled",
+    "manifest_hash"
+  ],
+  "title": "BenignPreparationManifest",
+  "type": "object"
+}

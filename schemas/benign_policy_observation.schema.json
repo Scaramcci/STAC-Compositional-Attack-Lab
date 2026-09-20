@@ -1,0 +1,51 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "authorized_operations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Authorized Operations",
+      "type": "array"
+    },
+    "completed_steps": {
+      "minimum": 0,
+      "title": "Completed Steps",
+      "type": "integer"
+    },
+    "legitimate_goal": {
+      "title": "Legitimate Goal",
+      "type": "string"
+    },
+    "public_response_summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Public Response Summary"
+    },
+    "remaining_followups": {
+      "minimum": 0,
+      "title": "Remaining Followups",
+      "type": "integer"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "legitimate_goal",
+    "completed_steps",
+    "remaining_followups",
+    "authorized_operations"
+  ],
+  "title": "BenignPolicyObservation",
+  "type": "object"
+}

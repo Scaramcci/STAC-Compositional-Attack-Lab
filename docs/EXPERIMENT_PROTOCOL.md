@@ -1,5 +1,19 @@
 # Experiment Protocol
 
+## Benign pre-evaluation collection
+
+The primary collection origin for the graph-prior study is `benign_interaction`. Its policy receives
+only a legitimate task, authorized operations, public progress and a bounded stop rule. It does not
+receive an attack objective, contamination predicate or private evaluator. Synthetic fixtures are
+engineering validation; SafeClaw-derived scenarios require a source hash and explicit sanitization
+manifest and are not official benchmark tasks.
+
+`observation_valid` and `planning_reference_eligible` do not require cross-session behavior. A
+claimed cross-session capability separately requires actual identities, common scope and verified
+resource `read_from`. Collection completion and planning eligibility do not establish a security
+outcome. Real pre-evaluation collection is an online activity and always needs separate request
+authorization despite occurring before formal evaluation.
+
 ## Primitive v3 research boundary and offline profiles
 
 Primitive v3 is a parallel representation for a fixed observation boundary, not a migration of

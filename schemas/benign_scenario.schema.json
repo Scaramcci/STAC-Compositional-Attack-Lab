@@ -1,0 +1,264 @@
+{
+  "$defs": {
+    "BenignInteractionStep": {
+      "additionalProperties": false,
+      "properties": {
+        "followup_index": {
+          "minimum": 0,
+          "title": "Followup Index",
+          "type": "integer"
+        },
+        "source_events": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Source Events",
+          "type": "array"
+        },
+        "step_id": {
+          "title": "Step Id",
+          "type": "string"
+        },
+        "stop_after": {
+          "default": false,
+          "title": "Stop After",
+          "type": "boolean"
+        },
+        "user_message": {
+          "title": "User Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step_id",
+        "user_message",
+        "followup_index",
+        "source_events"
+      ],
+      "title": "BenignInteractionStep",
+      "type": "object"
+    },
+    "SanitizationChange": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "removed",
+            "replaced",
+            "retained"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "field_path": {
+          "title": "Field Path",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "replacement_kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replacement Kind"
+        }
+      },
+      "required": [
+        "field_path",
+        "action",
+        "reason"
+      ],
+      "title": "SanitizationChange",
+      "type": "object"
+    },
+    "SourceTaskMapping": {
+      "additionalProperties": false,
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/SanitizationChange"
+          },
+          "title": "Changes",
+          "type": "array"
+        },
+        "retained_conditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retained Conditions",
+          "type": "array"
+        },
+        "source_kind": {
+          "enum": [
+            "independent_synthetic",
+            "safeclaw_derived"
+          ],
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_task_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Task Hash"
+        },
+        "source_task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Task Id"
+        }
+      },
+      "required": [
+        "source_kind",
+        "changes",
+        "retained_conditions"
+      ],
+      "title": "SourceTaskMapping",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "allowed_followups": {
+      "minimum": 0,
+      "title": "Allowed Followups",
+      "type": "integer"
+    },
+    "authorized_operations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Authorized Operations",
+      "type": "array"
+    },
+    "domain_inventory": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Domain Inventory",
+      "type": "array"
+    },
+    "environment_family": {
+      "title": "Environment Family",
+      "type": "string"
+    },
+    "environment_version": {
+      "title": "Environment Version",
+      "type": "string"
+    },
+    "instrumentation": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Instrumentation",
+      "type": "array"
+    },
+    "legitimate_goal": {
+      "title": "Legitimate Goal",
+      "type": "string"
+    },
+    "lifecycle_policy": {
+      "enum": [
+        "single_session",
+        "explicit_new_session_allowed"
+      ],
+      "title": "Lifecycle Policy",
+      "type": "string"
+    },
+    "normal_success_criteria": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Normal Success Criteria",
+      "type": "array"
+    },
+    "scenario_family": {
+      "enum": [
+        "read_only_answer",
+        "multi_source_synthesis",
+        "legitimate_memory",
+        "resource_versioning",
+        "delegation",
+        "refusal_recovery"
+      ],
+      "title": "Scenario Family",
+      "type": "string"
+    },
+    "scenario_id": {
+      "title": "Scenario Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scripted_steps": {
+      "items": {
+        "$ref": "#/$defs/BenignInteractionStep"
+      },
+      "title": "Scripted Steps",
+      "type": "array"
+    },
+    "source_task_mapping": {
+      "$ref": "#/$defs/SourceTaskMapping"
+    },
+    "split_group": {
+      "enum": [
+        "development",
+        "validation",
+        "synthetic"
+      ],
+      "title": "Split Group",
+      "type": "string"
+    },
+    "surface_inventory": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Surface Inventory",
+      "type": "array"
+    }
+  },
+  "required": [
+    "scenario_id",
+    "scenario_family",
+    "split_group",
+    "environment_family",
+    "environment_version",
+    "legitimate_goal",
+    "authorized_operations",
+    "normal_success_criteria",
+    "allowed_followups",
+    "domain_inventory",
+    "surface_inventory",
+    "lifecycle_policy",
+    "source_task_mapping",
+    "scripted_steps"
+  ],
+  "title": "BenignScenario",
+  "type": "object"
+}

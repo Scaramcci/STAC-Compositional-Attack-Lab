@@ -335,6 +335,8 @@ Prompt 是版本化实验输入，但权限与数据契约还必须由代码验�
 | `sample_generation/cross_session_revalidation.disabled.json` | 默认禁用真实执行的跨会话复验模板 |
 | `sample_generation/provider_compatibility_revalidation.disabled.json` | 默认禁用、单请求/零重试的 provider 兼容性复验模板 |
 | `flow/observation_profile_v3.json`、`flow/registry_v3.json` | Primitive v3 固定观测边界与版本化 registry |
+| `benign_scenarios/scenarios_v1.json` | 合成正常场景、来源映射与 sanitization manifest |
+| `benign_collection/synthetic_stage_a.disabled.json` | 阶段 A 默认禁用、零真实请求配置 |
 | `experiments/formal_evaluation.yaml` | 正式条件、seeds、预算、冻结库与角色 prompt 路径 |
 
 部分 `.yaml` 文件使用 JSON 对象写法；JSON 是 YAML 的子集，应按内容及对应模型理解，而不是凭扩展名判断配置语义。
@@ -373,6 +375,7 @@ Prompt 是版本化实验输入，但权限与数据契约还必须由代码验�
 | `make check` | ruff 格式/静态检查、mypy 类型检查、pytest |
 | `make schemas` | 重新生成 schema |
 | `python -m stac_attack_lab.cli flow ...` | v3 profile 校验、重分析、analysis 校验、切片与 inspect/report |
+| `python -m stac_attack_lab.cli benign ...` | 正常场景校验、禁用准备和 synthetic fixture 采集 |
 
 诊断证明的是特定协议或生命周期检查，不自动证明攻击成功，也不能计入正式评测指标。本次只阅读相关实现，没有执行这些运行入口。
 

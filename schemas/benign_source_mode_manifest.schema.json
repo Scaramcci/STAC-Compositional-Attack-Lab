@@ -1,0 +1,130 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attack_objective_exposed_to_policy": {
+      "const": false,
+      "default": false,
+      "title": "Attack Objective Exposed To Policy",
+      "type": "boolean"
+    },
+    "collection_id": {
+      "title": "Collection Id",
+      "type": "string"
+    },
+    "collection_manifest_hash": {
+      "title": "Collection Manifest Hash",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "fixture_or_runtime_mode": {
+      "enum": [
+        "synthetic_fixture",
+        "safeclaw_derived"
+      ],
+      "title": "Fixture Or Runtime Mode",
+      "type": "string"
+    },
+    "interaction_policy_id": {
+      "title": "Interaction Policy Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "processing_source_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Processing Source Hashes",
+      "type": "object"
+    },
+    "profile_hash": {
+      "title": "Profile Hash",
+      "type": "string"
+    },
+    "prompt_hash": {
+      "title": "Prompt Hash",
+      "type": "string"
+    },
+    "real_model_requests": {
+      "const": false,
+      "default": false,
+      "title": "Real Model Requests",
+      "type": "boolean"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "scenario_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Scenario Ids",
+      "type": "array"
+    },
+    "scenario_mapping_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Scenario Mapping Hashes",
+      "type": "object"
+    },
+    "scenario_set_hash": {
+      "title": "Scenario Set Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "security_evaluator_used": {
+      "const": false,
+      "default": false,
+      "title": "Security Evaluator Used",
+      "type": "boolean"
+    },
+    "source_mode": {
+      "const": "benign_interaction",
+      "default": "benign_interaction",
+      "title": "Source Mode",
+      "type": "string"
+    },
+    "study_id": {
+      "title": "Study Id",
+      "type": "string"
+    },
+    "trajectory_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Trajectory Hashes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "study_id",
+    "collection_id",
+    "fixture_or_runtime_mode",
+    "config_hash",
+    "scenario_set_hash",
+    "scenario_ids",
+    "scenario_mapping_hashes",
+    "interaction_policy_id",
+    "prompt_hash",
+    "profile_hash",
+    "registry_hash",
+    "collection_manifest_hash",
+    "trajectory_hashes",
+    "processing_source_hashes",
+    "manifest_hash"
+  ],
+  "title": "BenignSourceModeManifest",
+  "type": "object"
+}

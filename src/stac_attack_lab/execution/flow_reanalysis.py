@@ -103,20 +103,37 @@ def _load_inputs(
             ],
             {},
         )
-    stage = _validate_collection_stage(input_path)
-    legacy_registry = load_formal_registry(project_root / stage.config.registry_path)
-    if legacy_registry.registry_hash != stage.registry_hash:
-        raise ValueError("v3_reanalysis_legacy_registry_hash_mismatch")
+    benign_manifest_path = input_path / "benign_source_mode_manifest.json"
+    benign_manifest: dict[str, Any] | None = None
+    stage = None
+    if benign_manifest_path.is_file():
+        benign_manifest = json.loads(benign_manifest_path.read_text(encoding="utf-8"))
+        manifest_hash = benign_manifest.pop("manifest_hash", None)
+        if manifest_hash != stable_hash(benign_manifest):
+            raise ValueError("v3_reanalysis_benign_manifest_hash_mismatch")
+        benign_manifest["manifest_hash"] = manifest_hash
+        if benign_manifest.get("source_mode") != "benign_interaction":
+            raise ValueError("v3_reanalysis_benign_source_mode_invalid")
+        collection_manifest_path = input_path / "collection_manifest.json"
+        if file_hash(collection_manifest_path) != benign_manifest.get("collection_manifest_hash"):
+            raise ValueError("v3_reanalysis_benign_collection_manifest_hash_mismatch")
+    else:
+        stage = _validate_collection_stage(input_path)
+        legacy_registry = load_formal_registry(project_root / stage.config.registry_path)
+        if legacy_registry.registry_hash != stage.registry_hash:
+            raise ValueError("v3_reanalysis_legacy_registry_hash_mismatch")
     graphs: list[InteractionGraph] = []
     evidence_bundle_refs: list[AnalysisInputRef] = []
     policy_hashes: set[str] = set()
-    refs = [
-        AnalysisInputRef(
-            relative_or_declared_path=str(input_path / COLLECTION_STAGE_MANIFEST),
-            content_hash=file_hash(input_path / COLLECTION_STAGE_MANIFEST),
-            kind="collection_stage_manifest",
+    refs = []
+    if stage is not None:
+        refs.append(
+            AnalysisInputRef(
+                relative_or_declared_path=str(input_path / COLLECTION_STAGE_MANIFEST),
+                content_hash=file_hash(input_path / COLLECTION_STAGE_MANIFEST),
+                kind="collection_stage_manifest",
+            )
         )
-    ]
     for raw_path in sorted(input_path.glob("trajectories/*/raw_trajectory.json")):
         trajectory = RawInteractionTrajectory.model_validate_json(
             raw_path.read_text(encoding="utf-8")
@@ -146,6 +163,41 @@ def _load_inputs(
                 kind="raw_trajectory",
             )
         )
+    if benign_manifest is not None:
+        expected = benign_manifest.get("trajectory_hashes")
+        observed = {
+            path.parent.name: file_hash(path)
+            for path in sorted(input_path.glob("trajectories/*/raw_trajectory.json"))
+        }
+        if expected != observed:
+            raise ValueError("v3_reanalysis_benign_trajectory_hash_mismatch")
+        refs.append(
+            AnalysisInputRef(
+                relative_or_declared_path=str(benign_manifest_path),
+                content_hash=file_hash(benign_manifest_path),
+                kind="benign_source_mode_manifest",
+            )
+        )
+        return (
+            "collection",
+            graphs,
+            refs,
+            {
+                "run_id": benign_manifest.get("collection_id"),
+                "collection_manifest_hash": benign_manifest.get("collection_manifest_hash"),
+                "collection_tree_hash": None,
+                "collection_config_hash": benign_manifest.get("config_hash"),
+                "collection_registry_hash": benign_manifest.get("registry_hash"),
+                "sampling_strategy": {
+                    "kind": "reviewed_benign_scenarios",
+                    "selection": "configured_scenario_ids",
+                },
+                "evidence_bundle_refs": evidence_bundle_refs,
+                "policy_hashes": sorted(policy_hashes),
+                "origin_modes": ["benign_interaction"],
+            },
+        )
+    assert stage is not None
     return (
         "collection",
         graphs,
@@ -164,6 +216,7 @@ def _load_inputs(
             },
             "evidence_bundle_refs": evidence_bundle_refs,
             "policy_hashes": sorted(policy_hashes),
+            "origin_modes": ["legacy_adversarial"],
         },
     )
 
@@ -187,11 +240,12 @@ def reanalyze_flow_v3(
         "budget": (budget or SliceBudget()).model_dump(mode="json"),
         "join_policy": "all_observed_incoming_to_selected_sink",
     }
-    input_identity = (
-        file_hash(input_path)
-        if input_path.is_file()
-        else file_hash(input_path / COLLECTION_STAGE_MANIFEST)
-    )
+    if input_path.is_file():
+        input_identity = file_hash(input_path)
+    elif (input_path / "benign_source_mode_manifest.json").is_file():
+        input_identity = file_hash(input_path / "benign_source_mode_manifest.json")
+    else:
+        input_identity = file_hash(input_path / COLLECTION_STAGE_MANIFEST)
     analysis_key = stable_hash(
         {
             "input": input_identity,
@@ -301,7 +355,10 @@ def reanalyze_flow_v3(
         "processing_source_hashes": {
             _source_label(project_root, path): file_hash(path) for path in source_files
         },
-        "parameters": parameters,
+        "parameters": {
+            **parameters,
+            "origin_modes": collection.get("origin_modes", ["unknown"]),
+        },
         "evidence_bundle_refs": [
             item.model_dump(mode="json") for item in collection.get("evidence_bundle_refs", [])
         ],

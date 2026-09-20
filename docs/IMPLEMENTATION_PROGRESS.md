@@ -1,4 +1,16 @@
-# Current status — 2026-09-20 Primitive v3 phase 2 offline workflow (authoritative)
+# Current status — 2026-09-20 benign collection stage A (authoritative)
+
+- Inspected HEAD is `2bdb203`; conda `stac` is Python 3.11.16 and pinned SafeClawArena remains clean at `a11f5cceaba0676be721021f8d232638fd111305`. User-provided `docs/Sok*`, the new research-design document and `tmp/` were not overwritten.
+- A separate strict benign contract now represents reviewed legitimate goals, authorized operations, normal completion, follow-up/lifecycle limits, domain/surface inventories and hash-bound source neutralization. It rejects adversarial-only configuration fields rather than accepting empty placeholders.
+- The cooperative policy sees only the legitimate goal, authorized operations and public progress. The synthetic adapter uses the common collector/normalizer, records `source_mode=benign_interaction`, and does not invoke a security evaluator or model service.
+- Three synthetic scenarios cover read-only use, two-source synthesis and legitimate memory across an explicit session transition. Collection flows through v3 reanalysis; all three are observation-valid and planning-reference eligible. Single-session cases mark cross-session capability not applicable. The memory case retains its weaker graph but leaves cross-session capability unknown because strict read-from is not verified.
+- New source-mode and preparation manifests bind config, scenario set, sanitization mapping, prompt, profile, registry, collection and trajectory hashes. `AnalysisManifest.parameters.origin_modes` records benign origin without changing the v3 manifest schema; legacy adversarial collection behavior and origin remain unchanged.
+- Fresh artifact: `experiments/runs/benign-stage-a/benign-offline-20260920T123601-332075Z/`. No real request, SafeClaw live collection, pilot, main, freeze or formal run occurred.
+- Targeted benign/v3/provider/normalization/schema tests passed 68 tests; the broader affected suite passed 94 tests. Final `make check` passed ruff, mypy over 88 source files, and all 313 tests in 16.36 seconds. Schema generation was byte-identical across two runs; bridge compile/lint and `git diff --check` passed.
+
+Implementation details: [BENIGN_COLLECTION_STAGE_A.md](BENIGN_COLLECTION_STAGE_A.md).
+
+# Previous current status — 2026-09-20 Primitive v3 phase 2 offline workflow
 
 - Actual inspected HEAD remains `4425d962a627c210cbc48d061a67df616e2b0c17`; Phase 1 and Phase 2 are uncommitted. Conda `stac` is Python 3.11.16. Pinned SafeClawArena is clean at `a11f5cceaba0676be721021f8d232638fd111305`. Root `AGENTS.md`/`Agent.md` were preserved.
 - The explicit `flow` CLI validates the profile, reanalyzes a legacy normalized graph or sealed collection, validates an analysis manifest, slices from explicit sinks and inspects a public report. Collection seal and legacy registry checks remain mandatory; legacy verdicts are not inherited. Every invocation writes a new directory and stable input/version-dependent `analysis_key`.

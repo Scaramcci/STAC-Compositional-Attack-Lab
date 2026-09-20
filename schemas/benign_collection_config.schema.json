@@ -1,0 +1,169 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "allowed_source_splits": {
+      "default": [
+        "synthetic"
+      ],
+      "items": {
+        "enum": [
+          "synthetic",
+          "development",
+          "validation"
+        ],
+        "type": "string"
+      },
+      "title": "Allowed Source Splits",
+      "type": "array"
+    },
+    "collection_id": {
+      "title": "Collection Id",
+      "type": "string"
+    },
+    "collection_mode": {
+      "const": "benign_interaction",
+      "default": "benign_interaction",
+      "title": "Collection Mode",
+      "type": "string"
+    },
+    "environment_version": {
+      "title": "Environment Version",
+      "type": "string"
+    },
+    "execution_enabled": {
+      "default": false,
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "interaction_policy_id": {
+      "title": "Interaction Policy Id",
+      "type": "string"
+    },
+    "max_actions": {
+      "default": 12,
+      "exclusiveMinimum": 0,
+      "title": "Max Actions",
+      "type": "integer"
+    },
+    "max_events": {
+      "default": 200,
+      "exclusiveMinimum": 0,
+      "title": "Max Events",
+      "type": "integer"
+    },
+    "max_sessions": {
+      "default": 4,
+      "exclusiveMinimum": 0,
+      "title": "Max Sessions",
+      "type": "integer"
+    },
+    "max_tool_calls": {
+      "default": 16,
+      "exclusiveMinimum": 0,
+      "title": "Max Tool Calls",
+      "type": "integer"
+    },
+    "max_turns": {
+      "default": 8,
+      "exclusiveMinimum": 0,
+      "title": "Max Turns",
+      "type": "integer"
+    },
+    "output_root": {
+      "title": "Output Root",
+      "type": "string"
+    },
+    "profile_path": {
+      "title": "Profile Path",
+      "type": "string"
+    },
+    "prompt_path": {
+      "title": "Prompt Path",
+      "type": "string"
+    },
+    "prompt_version": {
+      "title": "Prompt Version",
+      "type": "string"
+    },
+    "registry_path": {
+      "title": "Registry Path",
+      "type": "string"
+    },
+    "request_caps_by_role": {
+      "additionalProperties": {
+        "exclusiveMinimum": 0,
+        "type": "integer"
+      },
+      "title": "Request Caps By Role",
+      "type": "object"
+    },
+    "scenario_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Scenario Ids",
+      "type": "array"
+    },
+    "scenario_set_path": {
+      "title": "Scenario Set Path",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "source_mode": {
+      "enum": [
+        "synthetic_fixture",
+        "safeclaw_derived"
+      ],
+      "title": "Source Mode",
+      "type": "string"
+    },
+    "study_id": {
+      "title": "Study Id",
+      "type": "string"
+    },
+    "target_agent_config_hash": {
+      "title": "Target Agent Config Hash",
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "default": 300,
+      "exclusiveMinimum": 0,
+      "title": "Timeout Seconds",
+      "type": "integer"
+    },
+    "wall_clock_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Wall Clock Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "study_id",
+    "collection_id",
+    "source_mode",
+    "scenario_set_path",
+    "scenario_ids",
+    "environment_version",
+    "target_agent_config_hash",
+    "interaction_policy_id",
+    "prompt_path",
+    "prompt_version",
+    "request_caps_by_role",
+    "wall_clock_seconds",
+    "seed",
+    "profile_path",
+    "registry_path",
+    "output_root"
+  ],
+  "title": "BenignCollectionConfig",
+  "type": "object"
+}

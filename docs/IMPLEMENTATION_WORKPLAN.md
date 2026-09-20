@@ -1,4 +1,11 @@
-# Current workplan — 2026-09-20 Primitive v3 remaining work (authoritative)
+# Current workplan — after benign collection stage A (authoritative)
+
+1. Stage B: define FlowPattern abstraction, origin/split audit, public/private views, immutable benign library build/audit/freeze and no-outcome-driven selection. Do not use historical adversarial runs to fill the benign library.
+2. Before any real benign collection, implement the reviewed SafeClaw-derived runtime mapping and separately authorize exact tasks, models, per-role request caps, wall clock and output. Current Stage A supports deterministic synthetic fixtures only.
+3. Stage C then adds graph-prior conditions, task surface contracts and dry-run assignment compilation. Legacy planner/formal remains unchanged until explicit v3 capability support exists.
+4. Preserve the remaining v3 limitations: cross-session claims require verified read-from; exact provider derivation stays disabled and synthetic-only; runtime review and official outcomes require separate evidence.
+
+# Previous workplan — Primitive v3 remaining work
 
 1. Review and preserve the new v3 schemas, explicit sink policy, manifests, layered profiles and public/private report boundary. Revalidate analyses whenever inputs or processing source hashes change.
 2. Implement the remaining seven macro matchers only for concrete downstream requirements; never infer bindings from names, counts or a single trace's missing alternatives.

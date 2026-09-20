@@ -9,6 +9,8 @@
 | `bash scripts/run_safeclaw_sample_collection.sh` | canonical pilot/main collection（需单独授权）。 |
 | `bash scripts/run_formal_evaluation.sh` | formal evaluation（需 frozen library 和单独授权）。 |
 | `python -m stac_attack_lab.cli flow reanalyze ...` | 显式 Primitive v3 离线重分析；校验 collection seal/registry，写新 manifest、效果图、切片、分层准入和报告。 |
+| `python -m stac_attack_lab.cli benign validate/prepare` | 校验正常场景并生成默认禁用快照；零网络请求。 |
+| `python -m stac_attack_lab.cli benign collect-fixture` | 仅运行受版本控制的 synthetic 正常场景，经共用 collector/normalizer 进入 v3；拒绝 live-enabled 配置。 |
 
 复验入口不复制历史 `experiments/runs`，不自动启用 live，不探测 provider，也不负责清理其他 run。prepare 会验证模板并写禁用配置、不可变 prepared snapshot、配置审核和 provenance；live 必须同时有仅改变 `execution_enabled` 的运行配置和 `--authorize-live`。launch reservation 在 collection 前原子创建，失败进程不能覆盖获胜进程的 live review/summary；可能已产生请求后的失败不会删除 marker。`max_tokens` 是 collection action 后累计的 Victim usage 检查，不是请求前硬 token 上限。
 

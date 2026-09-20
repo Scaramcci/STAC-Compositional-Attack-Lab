@@ -12,6 +12,11 @@ from stac_attack_lab.environments.safeclaw.preflight import (
     run_safeclaw_preflight,
 )
 from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
+from stac_attack_lab.execution.benign_collection import (
+    collect_benign_fixture,
+    prepare_benign_collection,
+    validate_benign_collection_config,
+)
 from stac_attack_lab.execution.construction_admission import audit_construction_collection
 from stac_attack_lab.execution.flow_reanalysis import (
     reanalyze_flow_v3,
@@ -103,6 +108,15 @@ def _build_parser() -> argparse.ArgumentParser:
     schemas = sub.add_parser("schemas")
     schemas.add_subparsers(dest="schemas_command", required=True).add_parser("build")
 
+    benign = sub.add_parser("benign", help="benign pre-evaluation collection")
+    benign_sub = benign.add_subparsers(dest="benign_command", required=True)
+    for command in ("validate", "prepare", "collect-fixture"):
+        action = benign_sub.add_parser(command)
+        action.add_argument(
+            "--config",
+            default="configs/benign_collection/synthetic_stage_a.disabled.json",
+        )
+
     flow = sub.add_parser("flow", help="explicit Primitive v3 offline analysis")
     flow_sub = flow.add_subparsers(dest="flow_command", required=True)
     profile_validate = flow_sub.add_parser("profile-validate")
@@ -189,6 +203,32 @@ def _main(argv: list[str] | None = None) -> int:
     if args.command == "schemas":
         build_schemas(root)
         print("schemas built")
+        return 0
+
+    if args.command == "benign":
+        config_path = _project_scoped_path(root, args.config)
+        if args.benign_command == "validate":
+            config, scenarios = validate_benign_collection_config(root, config_path)
+            print(
+                json.dumps(
+                    {
+                        "status": "passed",
+                        "study_id": config.study_id,
+                        "source_mode": config.source_mode,
+                        "execution_enabled": config.execution_enabled,
+                        "scenario_count": len(scenarios.scenarios),
+                        "network_requests_performed": False,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.benign_command == "prepare":
+            print(prepare_benign_collection(root, config_path))
+            return 0
+        collection, analysis = collect_benign_fixture(root, config_path)
+        print(json.dumps({"collection": str(collection), "analysis": str(analysis)}, indent=2))
         return 0
 
     if args.command == "flow":

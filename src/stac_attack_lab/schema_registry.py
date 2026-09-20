@@ -16,6 +16,12 @@ from stac_attack_lab.environments.safeclaw.contracts import (
     SafeClawPublicTaskView,
     SafeClawTaskDescriptor,
 )
+from stac_attack_lab.execution.benign_collection import (
+    BenignCollectionConfig,
+    BenignPreparationManifest,
+    BenignSourceModeManifest,
+    BenignTraceAssessment,
+)
 from stac_attack_lab.execution.formal_attacker import (
     FormalAttackerInput,
     FormalAttackRealization,
@@ -35,6 +41,13 @@ from stac_attack_lab.flow.analysis import (
     MacroBinding,
 )
 from stac_attack_lab.flow.models import EffectGraph, ObservationProfile
+from stac_attack_lab.interactions.benign import (
+    BenignPolicyAction,
+    BenignPolicyObservation,
+    BenignScenario,
+    BenignScenarioSet,
+    NeutralizationResult,
+)
 from stac_attack_lab.interactions.construction import (
     ConstructionAttackerAction,
     ConstructionObservation,
@@ -93,6 +106,15 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "flow_analysis_report_v3": FlowAnalysisReport,
     "flow_macro_binding_v3": MacroBinding,
     "flow_intervention_record_v3": InterventionRecord,
+    "benign_scenario": BenignScenario,
+    "benign_scenario_set": BenignScenarioSet,
+    "benign_policy_observation": BenignPolicyObservation,
+    "benign_policy_action": BenignPolicyAction,
+    "benign_collection_config": BenignCollectionConfig,
+    "benign_source_mode_manifest": BenignSourceModeManifest,
+    "benign_preparation_manifest": BenignPreparationManifest,
+    "benign_trace_assessment": BenignTraceAssessment,
+    "benign_neutralization_result": NeutralizationResult,
 }
 
 

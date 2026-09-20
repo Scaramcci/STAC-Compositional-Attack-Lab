@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "applied_field_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Applied Field Paths",
+      "type": "array"
+    },
+    "sanitization_hash": {
+      "title": "Sanitization Hash",
+      "type": "string"
+    },
+    "sanitized_task": {
+      "additionalProperties": true,
+      "title": "Sanitized Task",
+      "type": "object"
+    },
+    "source_task_hash": {
+      "title": "Source Task Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_task_hash",
+    "sanitized_task",
+    "applied_field_paths",
+    "sanitization_hash"
+  ],
+  "title": "NeutralizationResult",
+  "type": "object"
+}

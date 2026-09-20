@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "GateStatus": {
+      "enum": [
+        "passed",
+        "failed",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "cross_session_capability": {
+      "$ref": "#/$defs/GateStatus"
+    },
+    "observation_valid": {
+      "$ref": "#/$defs/GateStatus"
+    },
+    "planning_reference_eligible": {
+      "$ref": "#/$defs/GateStatus"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "security_outcome": {
+      "const": "not_evaluated",
+      "default": "not_evaluated",
+      "title": "Security Outcome",
+      "type": "string"
+    },
+    "trajectory_id": {
+      "title": "Trajectory Id",
+      "type": "string"
+    },
+    "unknown_dependency_claim_count": {
+      "minimum": 0,
+      "title": "Unknown Dependency Claim Count",
+      "type": "integer"
+    },
+    "verified_dependency_claim_count": {
+      "minimum": 0,
+      "title": "Verified Dependency Claim Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "trajectory_id",
+    "observation_valid",
+    "planning_reference_eligible",
+    "verified_dependency_claim_count",
+    "unknown_dependency_claim_count",
+    "cross_session_capability",
+    "reason_codes"
+  ],
+  "title": "BenignTraceAssessment",
+  "type": "object"
+}

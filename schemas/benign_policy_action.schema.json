@@ -1,0 +1,40 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action_id": {
+      "title": "Action Id",
+      "type": "string"
+    },
+    "action_type": {
+      "enum": [
+        "deliver_legitimate_message",
+        "stop"
+      ],
+      "title": "Action Type",
+      "type": "string"
+    },
+    "message": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Message"
+    },
+    "reason_code": {
+      "title": "Reason Code",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action_id",
+    "action_type",
+    "reason_code"
+  ],
+  "title": "BenignPolicyAction",
+  "type": "object"
+}
