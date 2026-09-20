@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "DependencyRelation": {
+      "enum": [
+        "correlates_with",
+        "delivered_to",
+        "available_input",
+        "data_dep",
+        "control_dep",
+        "read_from",
+        "happens_before"
+      ],
+      "title": "DependencyRelation",
+      "type": "string"
+    },
+    "PrimitiveKind": {
+      "enum": [
+        "TRANSFER",
+        "DERIVE",
+        "UPDATE"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "dependency_relations": {
+      "items": {
+        "$ref": "#/$defs/DependencyRelation"
+      },
+      "title": "Dependency Relations",
+      "type": "array"
+    },
+    "macro_contract_version": {
+      "title": "Macro Contract Version",
+      "type": "string"
+    },
+    "primitive_kinds": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveKind"
+      },
+      "title": "Primitive Kinds",
+      "type": "array"
+    },
+    "projector_version": {
+      "title": "Projector Version",
+      "type": "string"
+    },
+    "registry_id": {
+      "title": "Registry Id",
+      "type": "string"
+    },
+    "registry_version": {
+      "title": "Registry Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "verifier_version": {
+      "title": "Verifier Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "registry_id",
+    "registry_version",
+    "primitive_kinds",
+    "dependency_relations",
+    "projector_version",
+    "verifier_version",
+    "macro_contract_version"
+  ],
+  "title": "FlowRegistry",
+  "type": "object"
+}

@@ -1,0 +1,322 @@
+{
+  "$defs": {
+    "AdmissionProfile": {
+      "enum": [
+        "descriptive_trace",
+        "verified_dependency",
+        "cross_session_propagation",
+        "intervention_comparison"
+      ],
+      "title": "AdmissionProfile",
+      "type": "string"
+    },
+    "AnalysisClassification": {
+      "enum": [
+        "accepted",
+        "infra_failure",
+        "incomplete",
+        "unsupported",
+        "verified_negative"
+      ],
+      "title": "AnalysisClassification",
+      "type": "string"
+    },
+    "GateStatus": {
+      "enum": [
+        "passed",
+        "failed",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "GateStatus",
+      "type": "string"
+    },
+    "InterventionResult": {
+      "enum": [
+        "not_evaluated",
+        "observed_change",
+        "observed_no_change",
+        "unknown"
+      ],
+      "title": "InterventionResult",
+      "type": "string"
+    },
+    "MacroBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "binding_id": {
+          "title": "Binding Id",
+          "type": "string"
+        },
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "constraints": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "object"
+        },
+        "effect_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Effect Ids",
+          "type": "array"
+        },
+        "macro_name": {
+          "enum": [
+            "PersistRecall",
+            "Bind"
+          ],
+          "title": "Macro Name",
+          "type": "string"
+        },
+        "macro_version": {
+          "title": "Macro Version",
+          "type": "string"
+        },
+        "port_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Port Ids",
+          "type": "array"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "3.0",
+          "default": "3.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/MacroBindingStatus"
+        }
+      },
+      "required": [
+        "binding_id",
+        "macro_name",
+        "macro_version",
+        "status",
+        "effect_ids",
+        "port_ids",
+        "claim_ids",
+        "constraints",
+        "reason_codes"
+      ],
+      "title": "MacroBinding",
+      "type": "object"
+    },
+    "MacroBindingStatus": {
+      "enum": [
+        "bound",
+        "unsupported",
+        "unknown"
+      ],
+      "title": "MacroBindingStatus",
+      "type": "string"
+    },
+    "ProfileAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "$ref": "#/$defs/AnalysisClassification"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "profile": {
+          "$ref": "#/$defs/AdmissionProfile"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/GateStatus"
+        }
+      },
+      "required": [
+        "profile",
+        "status",
+        "classification",
+        "reason_codes"
+      ],
+      "title": "ProfileAssessment",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analysis_id": {
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "analysis_key": {
+      "title": "Analysis Key",
+      "type": "string"
+    },
+    "claim_verdict_counts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Claim Verdict Counts",
+      "type": "object"
+    },
+    "deduplication_basis": {
+      "title": "Deduplication Basis",
+      "type": "string"
+    },
+    "effect_counts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Effect Counts",
+      "type": "object"
+    },
+    "execution_authorization": {
+      "enum": [
+        "absent",
+        "granted"
+      ],
+      "title": "Execution Authorization",
+      "type": "string"
+    },
+    "graph_count": {
+      "minimum": 0,
+      "title": "Graph Count",
+      "type": "integer"
+    },
+    "input_mode": {
+      "enum": [
+        "collection",
+        "interaction_graph"
+      ],
+      "title": "Input Mode",
+      "type": "string"
+    },
+    "intervention_result": {
+      "$ref": "#/$defs/InterventionResult"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "macro_bindings": {
+      "items": {
+        "$ref": "#/$defs/MacroBinding"
+      },
+      "title": "Macro Bindings",
+      "type": "array"
+    },
+    "object_counts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Object Counts",
+      "type": "object"
+    },
+    "official_outcome": {
+      "const": "not_evaluated",
+      "default": "not_evaluated",
+      "title": "Official Outcome",
+      "type": "string"
+    },
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/ProfileAssessment"
+      },
+      "title": "Profiles",
+      "type": "array"
+    },
+    "runtime_review": {
+      "$ref": "#/$defs/GateStatus"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope_or_version_error_counts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Scope Or Version Error Counts",
+      "type": "object"
+    },
+    "slice_count": {
+      "minimum": 0,
+      "title": "Slice Count",
+      "type": "integer"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "truncation_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Truncation Reasons",
+      "type": "array"
+    },
+    "unresolved_reason_counts": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "title": "Unresolved Reason Counts",
+      "type": "object"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "analysis_key",
+    "input_mode",
+    "graph_count",
+    "slice_count",
+    "object_counts",
+    "effect_counts",
+    "claim_verdict_counts",
+    "unresolved_reason_counts",
+    "scope_or_version_error_counts",
+    "deduplication_basis",
+    "profiles",
+    "macro_bindings",
+    "truncated",
+    "truncation_reasons",
+    "runtime_review",
+    "execution_authorization",
+    "intervention_result",
+    "limitations"
+  ],
+  "title": "FlowAnalysisReport",
+  "type": "object"
+}

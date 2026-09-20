@@ -14,6 +14,8 @@ def build_benchmark_binding(
     sample: PlannerSampleView,
     task: SafeClawPublicTaskView,
 ) -> BenchmarkBinding:
+    if not isinstance(sample, PlannerSampleView):
+        raise ValueError("planner_v3_effect_graph_unsupported")
     task_slots = {slot.slot_id: slot for slot in task.bindable_slots if slot.public}
     assignments: list[BindingAssignment] = []
     reason_codes: list[str] = []

@@ -1,5 +1,35 @@
 # Experiment Protocol
 
+## Primitive v3 research boundary and offline profiles
+
+Primitive v3 is a parallel representation for a fixed observation boundary, not a migration of
+formal metrics or a claim of universal minimality. Profile `stac.observable-flow@3.0.0` observes
+recorded messages, model/tool calls, domain identities, resource versions, and external effects.
+Model internal reasoning, unobserved tool internals, and unlogged external state are opaque.
+
+`TRANSFER` records delivery to a typed endpoint; `DERIVE` records an invocation output without
+assuming every available input contributed; `UPDATE` requires an effective, independently
+identified resource version change. Request/result correlation, input availability, field data
+dependency, control dependency, read-from, and happens-before are separate claims with separate
+proof obligations. A restart request is not a session update, a successful-looking tool result is
+not a commit, and sequence adjacency is not a dependency.
+
+The v3 verifier reports `dependency_verdict` separately from `intervention_result`. Current offline work runs no
+intervention or official evaluator, so both remain `not_evaluated` unless future evidence explicitly
+supports them. Provider request-boundary evidence can verify `available_input`; the disabled-by-default
+synthetic exact rule can support only its declared field value relation. Neither implies behavioral
+necessity, unique provenance, attack contribution, or official success.
+
+The four ordered analysis profiles are `descriptive_trace`, `verified_dependency`,
+`cross_session_propagation`, and `intervention_comparison`. Each has its own proof obligation;
+unknown is not a verified negative, and an unaccepted sample is not an attack negative. Slices use
+explicit sinks and retain external preconditions, join semantics, effect groups and truncation.
+
+Legacy v2 data remains readable under its existing semantics. Primitive v3 does not authorize planner,
+formal execution, library migration, or real provider calls. See
+[PRIMITIVE_V3_IMPLEMENTATION.md](PRIMITIVE_V3_IMPLEMENTATION.md) for implemented interfaces and the
+implementation and compatibility boundaries.
+
 ## Request-boundary evidence contract (experimental engineering policy)
 
 The versioned policy is configuration-owned. Its canonical fields are `policy_id`,

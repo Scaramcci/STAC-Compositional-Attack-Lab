@@ -1,0 +1,354 @@
+{
+  "$defs": {
+    "ClaimVerdict": {
+      "enum": [
+        "verified",
+        "refuted",
+        "unknown",
+        "unsupported"
+      ],
+      "title": "ClaimVerdict",
+      "type": "string"
+    },
+    "DependencyRelation": {
+      "enum": [
+        "correlates_with",
+        "delivered_to",
+        "available_input",
+        "data_dep",
+        "control_dep",
+        "read_from",
+        "happens_before"
+      ],
+      "title": "DependencyRelation",
+      "type": "string"
+    },
+    "ExternalPrecondition": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary_port_id": {
+          "title": "Boundary Port Id",
+          "type": "string"
+        },
+        "omitted_claim_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Omitted Claim Id"
+        },
+        "precondition_id": {
+          "title": "Precondition Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "precondition_id",
+        "boundary_port_id",
+        "reason_code"
+      ],
+      "title": "ExternalPrecondition",
+      "type": "object"
+    },
+    "JoinRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "join_group_id": {
+          "title": "Join Group Id",
+          "type": "string"
+        },
+        "k": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "K"
+        },
+        "member_claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Member Claim Ids",
+          "type": "array"
+        },
+        "origin": {
+          "enum": [
+            "observed",
+            "template_requirement"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "semantics": {
+          "$ref": "#/$defs/SliceJoinSemantics"
+        },
+        "target_port_id": {
+          "title": "Target Port Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "join_group_id",
+        "target_port_id",
+        "member_claim_ids",
+        "semantics",
+        "origin"
+      ],
+      "title": "JoinRequirement",
+      "type": "object"
+    },
+    "SliceBudget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_candidates": {
+          "default": 2048,
+          "exclusiveMinimum": 0,
+          "title": "Max Candidates",
+          "type": "integer"
+        },
+        "max_depth": {
+          "default": 32,
+          "exclusiveMinimum": 0,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_edges": {
+          "default": 512,
+          "exclusiveMinimum": 0,
+          "title": "Max Edges",
+          "type": "integer"
+        },
+        "max_nodes": {
+          "default": 256,
+          "exclusiveMinimum": 0,
+          "title": "Max Nodes",
+          "type": "integer"
+        },
+        "max_wall_time_ms": {
+          "default": 2000,
+          "exclusiveMinimum": 0,
+          "title": "Max Wall Time Ms",
+          "type": "integer"
+        }
+      },
+      "title": "SliceBudget",
+      "type": "object"
+    },
+    "SliceClaimRef": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "observed",
+            "template_requirement"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "relation": {
+          "$ref": "#/$defs/DependencyRelation"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "source_port_id": {
+          "title": "Source Port Id",
+          "type": "string"
+        },
+        "target_port_id": {
+          "title": "Target Port Id",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/ClaimVerdict"
+        }
+      },
+      "required": [
+        "claim_id",
+        "source_port_id",
+        "target_port_id",
+        "relation",
+        "verdict",
+        "origin",
+        "required"
+      ],
+      "title": "SliceClaimRef",
+      "type": "object"
+    },
+    "SliceJoinSemantics": {
+      "enum": [
+        "ALL",
+        "ANY",
+        "K_OF_N"
+      ],
+      "title": "SliceJoinSemantics",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "budget": {
+      "$ref": "#/$defs/SliceBudget"
+    },
+    "candidate_count": {
+      "minimum": 0,
+      "title": "Candidate Count",
+      "type": "integer"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/SliceClaimRef"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "display_paths": {
+      "items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Display Paths",
+      "type": "array"
+    },
+    "effect_group_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Effect Group Ids",
+      "type": "array"
+    },
+    "effect_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Effect Ids",
+      "type": "array"
+    },
+    "external_preconditions": {
+      "items": {
+        "$ref": "#/$defs/ExternalPrecondition"
+      },
+      "title": "External Preconditions",
+      "type": "array"
+    },
+    "graph_reference_consistency": {
+      "enum": [
+        "passed",
+        "failed"
+      ],
+      "title": "Graph Reference Consistency",
+      "type": "string"
+    },
+    "joins": {
+      "items": {
+        "$ref": "#/$defs/JoinRequirement"
+      },
+      "title": "Joins",
+      "type": "array"
+    },
+    "port_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Port Ids",
+      "type": "array"
+    },
+    "replay_consistency": {
+      "const": "not_evaluated",
+      "default": "not_evaluated",
+      "title": "Replay Consistency",
+      "type": "string"
+    },
+    "resource_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Resource Version Ids",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sink_port_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Sink Port Ids",
+      "type": "array"
+    },
+    "slice_hash": {
+      "title": "Slice Hash",
+      "type": "string"
+    },
+    "slice_id": {
+      "title": "Slice Id",
+      "type": "string"
+    },
+    "source_graph_hash": {
+      "title": "Source Graph Hash",
+      "type": "string"
+    },
+    "source_graph_id": {
+      "title": "Source Graph Id",
+      "type": "string"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "truncation_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Truncation Reasons",
+      "type": "array"
+    }
+  },
+  "required": [
+    "slice_id",
+    "source_graph_id",
+    "source_graph_hash",
+    "sink_port_ids",
+    "effect_ids",
+    "port_ids",
+    "resource_version_ids",
+    "effect_group_ids",
+    "claims",
+    "joins",
+    "external_preconditions",
+    "display_paths",
+    "budget",
+    "candidate_count",
+    "truncated",
+    "truncation_reasons",
+    "graph_reference_consistency",
+    "slice_hash"
+  ],
+  "title": "DependencySlice",
+  "type": "object"
+}

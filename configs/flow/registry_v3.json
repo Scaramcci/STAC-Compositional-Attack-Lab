@@ -1,0 +1,22 @@
+{
+  "dependency_relations": [
+    "correlates_with",
+    "delivered_to",
+    "available_input",
+    "data_dep",
+    "control_dep",
+    "read_from",
+    "happens_before"
+  ],
+  "macro_contract_version": "stac.flow.macros.v3.0.0",
+  "primitive_kinds": [
+    "TRANSFER",
+    "DERIVE",
+    "UPDATE"
+  ],
+  "projector_version": "stac.flow.projector.v3.0.0",
+  "registry_id": "stac.observable-flow",
+  "registry_version": "3.0.0",
+  "schema_version": "3.0",
+  "verifier_version": "stac.flow.verifier.v3.0.0"
+}

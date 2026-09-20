@@ -81,11 +81,13 @@ def test_formal_registry_is_stable_and_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(SCHEMA_MODELS) == 29
+    assert len(SCHEMA_MODELS) == 37
     assert {
         "sample_collection_stage_manifest",
         "sample_mining_stage_manifest",
         "sample_library_audit_report",
+        "observation_profile_v3",
+        "effect_graph_v3",
     } <= set(SCHEMA_MODELS)
     for model in SCHEMA_MODELS.values():
         schema = model.model_json_schema()

@@ -141,6 +141,7 @@ class FormalTaskSetConfig(StrictModel):
 
 class SafeClawFormalConfig(StrictModel):
     schema_version: Literal["2.0"] = "2.0"
+    analysis_representation: Literal["legacy_chain_v2"] = "legacy_chain_v2"
     experiment_id: str
     execution_enabled: bool = False
     track: SafeClawTrack

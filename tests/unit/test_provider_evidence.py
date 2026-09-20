@@ -23,6 +23,7 @@ from stac_attack_lab.execution.provider_evidence import (
 )
 from stac_attack_lab.hashing import file_hash, stable_hash
 from stac_attack_lab.interactions.models import RawInteractionTrajectory, SourceReference
+from stac_attack_lab.interactions.provider_flow_adapter import verify_and_adapt_provider_claims
 
 
 def _policy() -> dict[str, object]:
@@ -266,6 +267,60 @@ def test_context_and_derivation_recompute_valid_fixture() -> None:
     fixture = _fixture()
     assert _verify(fixture)["state"] == "observed"
     assert _verify(fixture, derivation=True)["state"] == "observed"
+
+
+def test_verified_provider_results_adapt_to_port_scoped_v3_claims() -> None:
+    trajectory, artifact, source, consumer, candidate, records = _fixture()
+    claims, evidence = verify_and_adapt_provider_claims(
+        trajectory=trajectory,
+        source_artifact=artifact,
+        source_event=source,
+        consumer_event=consumer,
+        candidate=candidate,
+        records=records,
+        bundle_status={"state": "observed", "reason_code": "test_bundle"},
+        source_port_id="port:source",
+        consumer_input_port_id="port:request-input",
+        consumer_output_port_id="port:tool-argument",
+    )
+    assert [item.relation.value for item in claims] == ["available_input", "data_dep"]
+    assert all(item.evidence_ids for item in claims)
+    assert {item.method.value for item in evidence} == {
+        "provider_request_context_recomputed_v1",
+        "exact_utf8_projection_recomputed_v1",
+    }
+
+
+def test_disabled_provider_policy_adapts_strong_relation_as_unknown() -> None:
+    trajectory, artifact, source, consumer, candidate, records = _fixture()
+    policy = disabled_provider_evidence_policy()
+    trajectory = trajectory.model_copy(
+        update={
+            "provenance": {
+                **trajectory.provenance,
+                "provider_evidence_policy_hash": provider_evidence_policy_hash(policy),
+                "provider_evidence_policy_json": json.dumps(
+                    policy, sort_keys=True, separators=(",", ":")
+                ),
+            }
+        }
+    )
+    claims, evidence = verify_and_adapt_provider_claims(
+        trajectory=trajectory,
+        source_artifact=artifact,
+        source_event=source,
+        consumer_event=consumer,
+        candidate=candidate,
+        records=records,
+        bundle_status={"state": "observed", "reason_code": "test_bundle"},
+        source_port_id="port:source",
+        consumer_input_port_id="port:request-input",
+        consumer_output_port_id="port:tool-argument",
+    )
+    derivation = next(item for item in claims if item.relation.value == "data_dep")
+    assert derivation.evidence_ids == []
+    assert derivation.reason_code == "experimental_derivation_policy_disabled"
+    assert not any(item.method.value == "exact_utf8_projection_recomputed_v1" for item in evidence)
 
 
 @pytest.mark.parametrize(

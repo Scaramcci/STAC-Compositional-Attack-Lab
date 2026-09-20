@@ -333,6 +333,8 @@ Prompt 是版本化实验输入，但权限与数据契约还必须由代码验�
 | `sample_generation/pilot_collection.yaml` | 小规模 pilot：2 tasks × 4 seeds，目标至少 2 accepted |
 | `sample_generation/main_collection.yaml` | main：12 tasks × 10 seeds，目标至少 30 accepted |
 | `sample_generation/cross_session_revalidation.disabled.json` | 默认禁用真实执行的跨会话复验模板 |
+| `sample_generation/provider_compatibility_revalidation.disabled.json` | 默认禁用、单请求/零重试的 provider 兼容性复验模板 |
+| `flow/observation_profile_v3.json`、`flow/registry_v3.json` | Primitive v3 固定观测边界与版本化 registry |
 | `experiments/formal_evaluation.yaml` | 正式条件、seeds、预算、冻结库与角色 prompt 路径 |
 
 部分 `.yaml` 文件使用 JSON 对象写法；JSON 是 YAML 的子集，应按内容及对应模型理解，而不是凭扩展名判断配置语义。
@@ -355,6 +357,7 @@ Prompt 是版本化实验输入，但权限与数据契约还必须由代码验�
 - 阶段与样本库：collection/mining manifest、library manifest、audit report、preflight report。
 - 规划与执行：planner input、case assignment、evaluation plan、attacker input、attack realization。
 - 环境与结果：task descriptor、public task view、public prompt、binding、episode result、formal run result。
+- Primitive v3：profile、effect graph、dependency slice、analysis manifest/report、macro binding 与 intervention record。
 
 `schema_registry.py` 和 `schemas build` 负责关联与生成。它们属于契约资产，不是每次实验的结果文件。
 
@@ -369,6 +372,7 @@ Prompt 是版本化实验输入，但权限与数据契约还必须由代码验�
 | `src/stac_attack_lab/diagnostics/openclaw_mock.py` | 本地 mock provider、重试回放与受限工具检查 |
 | `make check` | ruff 格式/静态检查、mypy 类型检查、pytest |
 | `make schemas` | 重新生成 schema |
+| `python -m stac_attack_lab.cli flow ...` | v3 profile 校验、重分析、analysis 校验、切片与 inspect/report |
 
 诊断证明的是特定协议或生命周期检查，不自动证明攻击成功，也不能计入正式评测指标。本次只阅读相关实现，没有执行这些运行入口。
 

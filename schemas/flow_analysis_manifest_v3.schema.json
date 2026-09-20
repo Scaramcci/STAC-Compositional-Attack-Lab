@@ -1,0 +1,291 @@
+{
+  "$defs": {
+    "AnalysisInputRef": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "relative_or_declared_path": {
+          "title": "Relative Or Declared Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_or_declared_path",
+        "content_hash",
+        "kind"
+      ],
+      "title": "AnalysisInputRef",
+      "type": "object"
+    },
+    "AnalysisOutputRef": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "type": "string"
+        },
+        "relative_path": {
+          "title": "Relative Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "relative_path",
+        "content_hash",
+        "kind"
+      ],
+      "title": "AnalysisOutputRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "analysis_id": {
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "analysis_key": {
+      "title": "Analysis Key",
+      "type": "string"
+    },
+    "collection_config_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Collection Config Hash"
+    },
+    "collection_manifest_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Collection Manifest Hash"
+    },
+    "collection_registry_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Collection Registry Hash"
+    },
+    "collection_tree_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Collection Tree Hash"
+    },
+    "completeness": {
+      "enum": [
+        "complete",
+        "partial",
+        "blocked",
+        "error"
+      ],
+      "title": "Completeness",
+      "type": "string"
+    },
+    "evidence_bundle_refs": {
+      "items": {
+        "$ref": "#/$defs/AnalysisInputRef"
+      },
+      "title": "Evidence Bundle Refs",
+      "type": "array"
+    },
+    "input_mode": {
+      "enum": [
+        "collection",
+        "interaction_graph"
+      ],
+      "title": "Input Mode",
+      "type": "string"
+    },
+    "input_refs": {
+      "items": {
+        "$ref": "#/$defs/AnalysisInputRef"
+      },
+      "title": "Input Refs",
+      "type": "array"
+    },
+    "legacy_verdicts_inherited": {
+      "const": false,
+      "default": false,
+      "title": "Legacy Verdicts Inherited",
+      "type": "boolean"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "output_refs": {
+      "items": {
+        "$ref": "#/$defs/AnalysisOutputRef"
+      },
+      "title": "Output Refs",
+      "type": "array"
+    },
+    "parameters": {
+      "additionalProperties": true,
+      "title": "Parameters",
+      "type": "object"
+    },
+    "policy_hashes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Policy Hashes",
+      "type": "array"
+    },
+    "processing_source_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Processing Source Hashes",
+      "type": "object"
+    },
+    "profile_hash": {
+      "title": "Profile Hash",
+      "type": "string"
+    },
+    "profile_id": {
+      "title": "Profile Id",
+      "type": "string"
+    },
+    "profile_version": {
+      "title": "Profile Version",
+      "type": "string"
+    },
+    "projector_version": {
+      "title": "Projector Version",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "registry_id": {
+      "title": "Registry Id",
+      "type": "string"
+    },
+    "registry_version": {
+      "title": "Registry Version",
+      "type": "string"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Id"
+    },
+    "sampling_bias_acknowledged": {
+      "const": true,
+      "default": true,
+      "title": "Sampling Bias Acknowledged",
+      "type": "boolean"
+    },
+    "sampling_strategy": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Sampling Strategy",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "template_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Template Id"
+    },
+    "truncated": {
+      "title": "Truncated",
+      "type": "boolean"
+    },
+    "truncation_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Truncation Reasons",
+      "type": "array"
+    },
+    "verifier_version": {
+      "title": "Verifier Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "analysis_key",
+    "input_mode",
+    "input_refs",
+    "sampling_strategy",
+    "profile_id",
+    "profile_version",
+    "profile_hash",
+    "registry_id",
+    "registry_version",
+    "registry_hash",
+    "projector_version",
+    "verifier_version",
+    "policy_hashes",
+    "processing_source_hashes",
+    "parameters",
+    "evidence_bundle_refs",
+    "output_refs",
+    "completeness",
+    "truncated",
+    "truncation_reasons",
+    "manifest_hash"
+  ],
+  "title": "AnalysisManifest",
+  "type": "object"
+}

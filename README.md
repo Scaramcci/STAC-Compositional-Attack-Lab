@@ -72,6 +72,17 @@ STAC_PYTHON=python bash scripts/run_cross_session_revalidation.sh offline \
 
 真实 `live` 子命令要求另行授权、prepared config 显式启用以及 `--authorize-live`，并以同一 run 内的原子标记防重复启动；详见 [scripts/README.md](scripts/README.md)。
 
+Primitive v3 保持为显式离线分析，不改变 legacy mine 默认语义：
+
+```bash
+python -m stac_attack_lab.cli flow profile-validate
+python -m stac_attack_lab.cli flow reanalyze --input <graph-or-collection> \
+  --output-root experiments/runs/<new-run>/analyses --terminal-outputs
+```
+
+输出包含独立 `analysis_manifest.json`、effect graph、依赖切片、四层准入和公共汇总。
+详见 [Primitive v3 实现说明](docs/PRIMITIVE_V3_IMPLEMENTATION.md)。
+
 `offline --collection` 是旧 collection 的重新分析；`offline --bridge-responses` 才是通过当前 driver mapping 重建 source events 的 bridge replay。后者要求完整 initialize/pre-state、action/response/post-state 和 finish 记录。`inputToolResultCallIds` 仍不可信；production relay 已能记录受控 request-boundary projection，但真实 provider 协议兼容性尚未复验，强派生规则默认禁用且仅限 synthetic experimental policy。因此 synthetic replay 成功不能解释为真实攻击、正式准入或 official outcome。
 
 统一诊断入口：

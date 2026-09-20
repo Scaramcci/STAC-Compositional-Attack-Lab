@@ -1,0 +1,108 @@
+{
+  "fixture_kind": "engineering_golden_not_human_annotation",
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "ordinary_message_read_only_tool",
+      "facts": ["A recorded message reached an identified agent domain.", "A read-only tool returned one recorded result."],
+      "expected_projection": ["TRANSFER"],
+      "expected_limit": "No resource change is implied."
+    },
+    {
+      "case_id": "same_text_distinct_sources",
+      "facts": ["Two tool-result occurrences contain the same UTF-8 bytes.", "The results have different producing call identities."],
+      "expected_projection": ["TRANSFER"],
+      "expected_limit": "The artifacts remain distinct."
+    },
+    {
+      "case_id": "transcript_result_absent_from_request",
+      "facts": ["A tool result exists in the transcript.", "The final serialized provider request does not contain it."],
+      "expected_projection": ["TRANSFER"],
+      "expected_limit": "available_input remains unknown."
+    },
+    {
+      "case_id": "handle_only",
+      "facts": ["A request contains a resource handle but not the referenced bytes."],
+      "expected_projection": ["TRANSFER"],
+      "expected_limit": "The handle is not the referenced content."
+    },
+    {
+      "case_id": "field_sources",
+      "facts": ["A user supplies a recipient field.", "A tool result supplies a body field."],
+      "expected_projection": ["DERIVE", "TRANSFER"],
+      "expected_limit": "Each field keeps its own port source."
+    },
+    {
+      "case_id": "condition_controls_call",
+      "facts": ["An instrumented condition changes whether a call occurs.", "The call body is fixed."],
+      "expected_projection": ["DERIVE"],
+      "expected_limit": "The condition is not a copied body value."
+    },
+    {
+      "case_id": "two_required_inputs",
+      "facts": ["Two identified fields are required by one invocation output."],
+      "expected_projection": ["DERIVE"],
+      "expected_limit": "Both field ports are retained."
+    },
+    {
+      "case_id": "atomic_file_acl",
+      "facts": ["One transaction commits a file version and an ACL version atomically."],
+      "expected_projection": ["UPDATE", "UPDATE"],
+      "expected_limit": "No internal serial order is invented."
+    },
+    {
+      "case_id": "failed_unknown_noop_write",
+      "facts": ["One write fails, one has unknown completion, and one reports the same version before and after."],
+      "expected_projection": [],
+      "expected_limit": "No committed state change is asserted."
+    },
+    {
+      "case_id": "same_path_different_workspace",
+      "facts": ["The same lexical path occurs under two workspace identities."],
+      "expected_projection": ["UPDATE", "UPDATE"],
+      "expected_limit": "Versions do not cross workspace scope."
+    },
+    {
+      "case_id": "version_rollback",
+      "facts": ["A resource changes A to B and later B to A."],
+      "expected_projection": ["UPDATE", "UPDATE"],
+      "expected_limit": "The two A-valued versions remain different occurrences."
+    },
+    {
+      "case_id": "partial_wrapped_read",
+      "facts": ["A read returns a bounded wrapped range rather than full file bytes."],
+      "expected_projection": ["TRANSFER"],
+      "expected_limit": "The range is not upgraded to a whole-resource value."
+    },
+    {
+      "case_id": "session_label_identity_mismatch",
+      "facts": ["A display label stays constant while the actual session identity changes."],
+      "expected_projection": ["UPDATE"],
+      "expected_limit": "Actual identity defines the transition."
+    },
+    {
+      "case_id": "concurrent_duplicate_late",
+      "facts": ["Two writes can commit without a known order.", "One log row is duplicated and a response arrives late."],
+      "expected_projection": ["UPDATE", "UPDATE"],
+      "expected_limit": "Duplicates are deduplicated and ambiguous read origins remain unresolved."
+    },
+    {
+      "case_id": "delete_and_opaque_gap",
+      "facts": ["A committed resource version records absence.", "Tool internals between request and commit were not observed."],
+      "expected_projection": ["UPDATE"],
+      "expected_limit": "The missing internal steps remain opaque."
+    },
+    {
+      "case_id": "restart_not_completed",
+      "facts": ["A restart was requested but no changed actual session identity was observed."],
+      "expected_projection": [],
+      "expected_limit": "No session state change is asserted."
+    },
+    {
+      "case_id": "missing_bad_versioned_evidence",
+      "facts": ["A reference is missing and another input declares an unsupported schema version."],
+      "expected_projection": [],
+      "expected_limit": "Validation fails closed or records unknown."
+    }
+  ]
+}

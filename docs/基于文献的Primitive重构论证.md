@@ -1,5 +1,9 @@
 # 基于文献的 Primitive 重构：传递、派生与状态更新
 
+> 状态说明（2026-09-20）：本文保留为设计论证，不是实验结果，也不证明三原语具有普适
+> 最小性。当前实现位置和版本边界以
+> [PRIMITIVE_V3_IMPLEMENTATION.md](PRIMITIVE_V3_IMPLEMENTATION.md) 为准。
+
 日期：2026-09-19  
 性质：研究设计报告；提出可供验证的抽象，不宣称已经完成实验或证明现实世界的绝对完备性。  
 材料：`primitive-related-papers/` 中的八篇 PDF，以及本目录原有 `README.md`。论文定位以本地 PDF 版本为准，页码从 PDF 第一页起计。

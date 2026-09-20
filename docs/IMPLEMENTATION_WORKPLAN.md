@@ -1,4 +1,20 @@
-# Current workplan — 2026-09-19 (authoritative)
+# Current workplan — 2026-09-20 Primitive v3 remaining work (authoritative)
+
+1. Review and preserve the new v3 schemas, explicit sink policy, manifests, layered profiles and public/private report boundary. Revalidate analyses whenever inputs or processing source hashes change.
+2. Implement the remaining seven macro matchers only for concrete downstream requirements; never infer bindings from names, counts or a single trace's missing alternatives.
+3. Design a distinct v3 library/freeze contract before planner migration. Legacy planner/formal remains the default and rejects v3; do not compress an effect graph into a legacy chain.
+4. Add v3 intervention execution only with actual changed fields/resources, paired invariants, affected relations and execution deviations. Legacy slot/source ablation is not automatically a single-relation causal intervention.
+5. Real provider compatibility, network isolation, cleanup and ledger closure remain pending. If separately authorized, use the tracked disabled single-request template for compatibility only; do not enter pilot/main/freeze/formal.
+
+# Completed phase-2 plan — 2026-09-20
+
+Phase 1 is implemented in parallel with legacy: fixed observation profile, v3 contracts and generated schemas, pure multi-effect projector, shared dependency verifier, strict provider-evidence adapter, neutral fact fixtures, and an offline observation-to-verdict integration test. Legacy collection, mining, libraries, planner, formal execution, budgets, and evidence production retain their existing behavior.
+
+The next phase must build on these interfaces rather than add a second contract: add explicit CLI commands and immutable analysis manifests; support read-only collection/source-event reanalysis into new analysis directories; implement bounded dependency-subgraph slicing with joins and truncation; add descriptive, verified-dependency, cross-session, and intervention-comparison profiles; add macro bindings and layered reports; and make planner/formal explicitly reject unsupported v3 graphs. It must not silently translate legacy verdicts or flatten v3 graphs into legacy paths.
+
+Real-provider compatibility, runtime network isolation/cleanup, and real budget/evidence ledger closure still require separately authorized real evidence. The exact projection policy remains disabled and synthetic-only. Phase 2 remains offline unless a later instruction grants a bounded live run.
+
+# Previous current workplan — 2026-09-19
 
 The work started from inspected HEAD `473f9751…`; the repository was externally updated during the round to current HEAD `9b95d1c…`, which contains the main hardening changes. The remaining worktree delta is uncommitted. Deterministic implementation is complete for strict policy binding, lifecycle binding, argument/projection recomputation, conservative response parsing, bounded persistence-failure handling, bundle sealing, redaction boundaries, and independent compatibility/accounting reports. No real request is authorized by this state.
 

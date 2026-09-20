@@ -1,0 +1,795 @@
+{
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "encoding": {
+          "title": "Encoding",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "hash_scope": {
+          "title": "Hash Scope",
+          "type": "string"
+        },
+        "immutable_value_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Immutable Value Ref"
+        },
+        "source_instance_id": {
+          "title": "Source Instance Id",
+          "type": "string"
+        },
+        "source_locator": {
+          "title": "Source Locator",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "source_instance_id",
+        "artifact_type",
+        "content_hash",
+        "encoding",
+        "hash_scope",
+        "source_locator",
+        "evidence_ids"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "ClaimVerdict": {
+      "enum": [
+        "verified",
+        "refuted",
+        "unknown",
+        "unsupported"
+      ],
+      "title": "ClaimVerdict",
+      "type": "string"
+    },
+    "DependencyClaim": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "dependency_verdict": {
+          "$ref": "#/$defs/ClaimVerdict",
+          "default": "unknown"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "hypothesis": {
+          "default": false,
+          "title": "Hypothesis",
+          "type": "boolean"
+        },
+        "intervention_result": {
+          "$ref": "#/$defs/InterventionResult",
+          "default": "not_evaluated"
+        },
+        "reason_code": {
+          "default": "not_verified",
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "relation": {
+          "$ref": "#/$defs/DependencyRelation"
+        },
+        "rule_version": {
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "source_port_id": {
+          "title": "Source Port Id",
+          "type": "string"
+        },
+        "target_port_id": {
+          "title": "Target Port Id",
+          "type": "string"
+        },
+        "verifier_id": {
+          "title": "Verifier Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim_id",
+        "relation",
+        "source_port_id",
+        "target_port_id",
+        "evidence_ids",
+        "verifier_id",
+        "rule_version"
+      ],
+      "title": "DependencyClaim",
+      "type": "object"
+    },
+    "DependencyRelation": {
+      "enum": [
+        "correlates_with",
+        "delivered_to",
+        "available_input",
+        "data_dep",
+        "control_dep",
+        "read_from",
+        "happens_before"
+      ],
+      "title": "DependencyRelation",
+      "type": "string"
+    },
+    "DomainRef": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Session Id"
+        },
+        "domain_id": {
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "identity_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Identity Evidence Ids",
+          "type": "array"
+        },
+        "instance_id": {
+          "title": "Instance Id",
+          "type": "string"
+        },
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "tenant_scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tenant Scope"
+        },
+        "workspace_scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workspace Scope"
+        }
+      },
+      "required": [
+        "domain_id",
+        "instance_id",
+        "role",
+        "identity_evidence_ids"
+      ],
+      "title": "DomainRef",
+      "type": "object"
+    },
+    "Effect": {
+      "additionalProperties": false,
+      "properties": {
+        "claim_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claim Ids",
+          "type": "array"
+        },
+        "domain_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Domain Ids",
+          "type": "array"
+        },
+        "effect_id": {
+          "title": "Effect Id",
+          "type": "string"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "execution_status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group Id"
+        },
+        "input_port_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Port Ids",
+          "type": "array"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invocation Id"
+        },
+        "output_port_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Output Port Ids",
+          "type": "array"
+        },
+        "primitive": {
+          "$ref": "#/$defs/PrimitiveKind"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "resource_version_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Resource Version Ids",
+          "type": "array"
+        },
+        "source_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Event Ids",
+          "type": "array"
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transaction Id"
+        }
+      },
+      "required": [
+        "effect_id",
+        "primitive",
+        "domain_ids",
+        "input_port_ids",
+        "output_port_ids",
+        "resource_version_ids",
+        "source_event_ids",
+        "execution_status",
+        "evidence_ids"
+      ],
+      "title": "Effect",
+      "type": "object"
+    },
+    "EffectGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "atomicity": {
+          "default": "unknown",
+          "enum": [
+            "atomic",
+            "non_atomic",
+            "unknown"
+          ],
+          "title": "Atomicity",
+          "type": "string"
+        },
+        "effect_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Effect Ids",
+          "type": "array"
+        },
+        "evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "group_id": {
+          "title": "Group Id",
+          "type": "string"
+        },
+        "operation_instance_id": {
+          "title": "Operation Instance Id",
+          "type": "string"
+        },
+        "ordered_pairs": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Ordered Pairs",
+          "type": "array"
+        },
+        "transaction_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transaction Id"
+        }
+      },
+      "required": [
+        "group_id",
+        "operation_instance_id",
+        "effect_ids"
+      ],
+      "title": "EffectGroup",
+      "type": "object"
+    },
+    "ExecutionStatus": {
+      "enum": [
+        "observed",
+        "committed",
+        "attempted",
+        "failed",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "ExecutionStatus",
+      "type": "string"
+    },
+    "InterventionResult": {
+      "enum": [
+        "not_evaluated",
+        "observed_change",
+        "observed_no_change",
+        "unknown"
+      ],
+      "title": "InterventionResult",
+      "type": "string"
+    },
+    "OfficialOutcome": {
+      "enum": [
+        "not_evaluated",
+        "passed",
+        "failed",
+        "unknown"
+      ],
+      "title": "OfficialOutcome",
+      "type": "string"
+    },
+    "PortRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "data_type": {
+          "title": "Data Type",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "input",
+            "output",
+            "state",
+            "endpoint"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "domain_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain Id"
+        },
+        "field_path": {
+          "title": "Field Path",
+          "type": "string"
+        },
+        "owner_id": {
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "enum": [
+            "effect",
+            "invocation",
+            "resource_version",
+            "domain"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
+        },
+        "port_id": {
+          "title": "Port Id",
+          "type": "string"
+        },
+        "resource_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource Version Id"
+        },
+        "value_scope": {
+          "enum": [
+            "whole",
+            "field",
+            "range",
+            "handle",
+            "summary",
+            "wrapped",
+            "partial"
+          ],
+          "title": "Value Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "port_id",
+        "owner_kind",
+        "owner_id",
+        "direction",
+        "field_path",
+        "data_type",
+        "value_scope"
+      ],
+      "title": "PortRef",
+      "type": "object"
+    },
+    "PrimitiveKind": {
+      "enum": [
+        "TRANSFER",
+        "DERIVE",
+        "UPDATE"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    },
+    "ResourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "commit_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Commit Evidence Ids",
+          "type": "array"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Hash"
+        },
+        "content_scope": {
+          "default": "unknown",
+          "enum": [
+            "whole",
+            "partial",
+            "wrapped",
+            "summary",
+            "unknown"
+          ],
+          "title": "Content Scope",
+          "type": "string"
+        },
+        "predecessor_version_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Predecessor Version Id"
+        },
+        "resource_id": {
+          "title": "Resource Id",
+          "type": "string"
+        },
+        "resource_version_id": {
+          "title": "Resource Version Id",
+          "type": "string"
+        },
+        "source_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Event Ids",
+          "type": "array"
+        },
+        "state": {
+          "enum": [
+            "present",
+            "tombstone",
+            "external_root",
+            "unknown"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version_id": {
+          "title": "Version Id",
+          "type": "string"
+        },
+        "workspace_scope": {
+          "title": "Workspace Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource_version_id",
+        "resource_id",
+        "workspace_scope",
+        "version_id",
+        "state",
+        "commit_evidence_ids",
+        "source_event_ids"
+      ],
+      "title": "ResourceVersion",
+      "type": "object"
+    },
+    "UnresolvedFlow": {
+      "additionalProperties": false,
+      "properties": {
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "related_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Ids",
+          "type": "array"
+        },
+        "source_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Event Ids",
+          "type": "array"
+        },
+        "unresolved_id": {
+          "title": "Unresolved Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unresolved_id",
+        "reason_code",
+        "source_event_ids"
+      ],
+      "title": "UnresolvedFlow",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/Artifact"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "claims": {
+      "items": {
+        "$ref": "#/$defs/DependencyClaim"
+      },
+      "title": "Claims",
+      "type": "array"
+    },
+    "domains": {
+      "items": {
+        "$ref": "#/$defs/DomainRef"
+      },
+      "title": "Domains",
+      "type": "array"
+    },
+    "effect_groups": {
+      "items": {
+        "$ref": "#/$defs/EffectGroup"
+      },
+      "title": "Effect Groups",
+      "type": "array"
+    },
+    "effects": {
+      "items": {
+        "$ref": "#/$defs/Effect"
+      },
+      "title": "Effects",
+      "type": "array"
+    },
+    "graph_hash": {
+      "title": "Graph Hash",
+      "type": "string"
+    },
+    "graph_id": {
+      "title": "Graph Id",
+      "type": "string"
+    },
+    "official_outcome": {
+      "$ref": "#/$defs/OfficialOutcome",
+      "default": "not_evaluated"
+    },
+    "ports": {
+      "items": {
+        "$ref": "#/$defs/PortRef"
+      },
+      "title": "Ports",
+      "type": "array"
+    },
+    "profile_id": {
+      "title": "Profile Id",
+      "type": "string"
+    },
+    "profile_version": {
+      "title": "Profile Version",
+      "type": "string"
+    },
+    "resource_versions": {
+      "items": {
+        "$ref": "#/$defs/ResourceVersion"
+      },
+      "title": "Resource Versions",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_graph_hash": {
+      "title": "Source Graph Hash",
+      "type": "string"
+    },
+    "source_graph_id": {
+      "title": "Source Graph Id",
+      "type": "string"
+    },
+    "unresolved": {
+      "items": {
+        "$ref": "#/$defs/UnresolvedFlow"
+      },
+      "title": "Unresolved",
+      "type": "array"
+    }
+  },
+  "required": [
+    "graph_id",
+    "profile_id",
+    "profile_version",
+    "source_graph_id",
+    "source_graph_hash",
+    "domains",
+    "artifacts",
+    "ports",
+    "resource_versions",
+    "effects",
+    "effect_groups",
+    "claims",
+    "unresolved",
+    "graph_hash"
+  ],
+  "title": "EffectGraph",
+  "type": "object"
+}

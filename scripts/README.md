@@ -8,6 +8,7 @@
 | `bash scripts/run_cross_session_revalidation.sh live --run-root PATH --authorize-live` | 仅在单独授权后运行已经显式启用的 prepared run；原子 `launch.marker` 防止同一 run 重复/并发启动，随后即使 collection partial/error 也尽可能执行离线 mine/audit/admission。执行或离线阶段失败均返回非 0。 |
 | `bash scripts/run_safeclaw_sample_collection.sh` | canonical pilot/main collection（需单独授权）。 |
 | `bash scripts/run_formal_evaluation.sh` | formal evaluation（需 frozen library 和单独授权）。 |
+| `python -m stac_attack_lab.cli flow reanalyze ...` | 显式 Primitive v3 离线重分析；校验 collection seal/registry，写新 manifest、效果图、切片、分层准入和报告。 |
 
 复验入口不复制历史 `experiments/runs`，不自动启用 live，不探测 provider，也不负责清理其他 run。prepare 会验证模板并写禁用配置、不可变 prepared snapshot、配置审核和 provenance；live 必须同时有仅改变 `execution_enabled` 的运行配置和 `--authorize-live`。launch reservation 在 collection 前原子创建，失败进程不能覆盖获胜进程的 live review/summary；可能已产生请求后的失败不会删除 marker。`max_tokens` 是 collection action 后累计的 Victim usage 检查，不是请求前硬 token 上限。
 
@@ -23,8 +24,8 @@ STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prep
 
 该命令仅生成 `execution_enabled=false` 配置，不是 live 授权。任何单条真实兼容性复验仍需单独审核 policy、provider payload 形状、预算和最终配置后再授权。
 
-本轮提供的有界兼容性模板位于
-`experiments/runs/provider-evidence-offline-20260919-135009/next_compatibility_config.disabled.json`：
+版本控制内的有界兼容性模板位于
+`configs/sample_generation/provider_compatibility_revalidation.disabled.json`：
 Attacker/Victim/Embedding 各最多 1 次、自动重试 0、墙钟 300 秒、provider evidence policy
 保持 disabled。后续应先用它执行 `prepare --template ... --run-id <new-unique-id>`，再审查生成的
 config/source hash；本轮不得执行 `live`。

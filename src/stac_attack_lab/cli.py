@@ -13,6 +13,10 @@ from stac_attack_lab.environments.safeclaw.preflight import (
 )
 from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
 from stac_attack_lab.execution.construction_admission import audit_construction_collection
+from stac_attack_lab.execution.flow_reanalysis import (
+    reanalyze_flow_v3,
+    validate_flow_analysis,
+)
 from stac_attack_lab.execution.revalidation import (
     launch_live_revalidation,
     offline_revalidation,
@@ -30,6 +34,11 @@ from stac_attack_lab.execution.sample_generation import (
     mine_sample_collection,
 )
 from stac_attack_lab.execution.sample_preflight import run_sample_collection_preflight
+from stac_attack_lab.extraction.flow_slice import slice_dependency_graph
+from stac_attack_lab.flow.analysis import AdmissionProfile, FlowAnalysisReport, SliceBudget
+from stac_attack_lab.flow.models import EffectGraph
+from stac_attack_lab.flow.profile import load_observation_profile
+from stac_attack_lab.flow.registry import load_flow_registry
 from stac_attack_lab.recording.formal_run_recorder import FormalRunRecorder
 from stac_attack_lab.reporting.formal_report import build_formal_report
 from stac_attack_lab.schema_registry import SCHEMA_MODELS, validate_schema_registry
@@ -94,6 +103,30 @@ def _build_parser() -> argparse.ArgumentParser:
     schemas = sub.add_parser("schemas")
     schemas.add_subparsers(dest="schemas_command", required=True).add_parser("build")
 
+    flow = sub.add_parser("flow", help="explicit Primitive v3 offline analysis")
+    flow_sub = flow.add_subparsers(dest="flow_command", required=True)
+    profile_validate = flow_sub.add_parser("profile-validate")
+    profile_validate.add_argument("--profile", default="configs/flow/observation_profile_v3.json")
+    profile_validate.add_argument("--registry", default="configs/flow/registry_v3.json")
+    reanalyze = flow_sub.add_parser("reanalyze")
+    reanalyze.add_argument("--input", required=True)
+    reanalyze.add_argument("--output-root", required=True)
+    reanalyze.add_argument("--profile", default="configs/flow/observation_profile_v3.json")
+    reanalyze.add_argument("--registry", default="configs/flow/registry_v3.json")
+    reanalyze.add_argument("--sink-port", action="append", default=[])
+    reanalyze.add_argument("--terminal-outputs", action="store_true")
+    reanalyze.add_argument("--require-profile", choices=[item.value for item in AdmissionProfile])
+    validate = flow_sub.add_parser("analysis-validate")
+    validate.add_argument("--analysis", required=True)
+    slice_parser = flow_sub.add_parser("slice")
+    slice_parser.add_argument("--graph", required=True)
+    slice_parser.add_argument("--sink-port", action="append", required=True)
+    slice_parser.add_argument("--output", required=True)
+    slice_parser.add_argument("--max-nodes", type=int, default=256)
+    slice_parser.add_argument("--max-edges", type=int, default=512)
+    inspect_parser = flow_sub.add_parser("inspect")
+    inspect_parser.add_argument("--analysis", required=True)
+
     sample = sub.add_parser("sample")
     sample_sub = sample.add_subparsers(dest="sample_command", required=True)
     for command in ("collect-preflight", "collect", "collect-and-mine"):
@@ -156,6 +189,74 @@ def _main(argv: list[str] | None = None) -> int:
     if args.command == "schemas":
         build_schemas(root)
         print("schemas built")
+        return 0
+
+    if args.command == "flow":
+        if args.flow_command == "profile-validate":
+            profile = load_observation_profile(_project_scoped_path(root, args.profile))
+            registry = load_flow_registry(_project_scoped_path(root, args.registry))
+            print(
+                json.dumps(
+                    {
+                        "status": "passed",
+                        "profile_id": profile.profile_id,
+                        "profile_version": profile.profile_version,
+                        "registry_id": registry.registry_id,
+                        "registry_version": registry.registry_version,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.flow_command == "reanalyze":
+            analysis_root = reanalyze_flow_v3(
+                root,
+                input_path=_project_scoped_path(root, args.input),
+                output_root=_project_scoped_path(root, args.output_root),
+                profile_path=_project_scoped_path(root, args.profile),
+                registry_path=_project_scoped_path(root, args.registry),
+                sink_port_ids=args.sink_port,
+                terminal_outputs=args.terminal_outputs,
+            )
+            print(analysis_root)
+            if args.require_profile:
+                flow_report = FlowAnalysisReport.model_validate_json(
+                    (analysis_root / "report.json").read_text(encoding="utf-8")
+                )
+                matched = next(
+                    (
+                        item
+                        for item in flow_report.profiles
+                        if item.profile.value == args.require_profile
+                    ),
+                    None,
+                )
+                return 0 if matched is not None and matched.status.value == "passed" else 10
+            return 0
+        if args.flow_command == "analysis-validate":
+            manifest = validate_flow_analysis(_project_scoped_path(root, args.analysis))
+            print(manifest.model_dump_json(indent=2))
+            return 0
+        if args.flow_command == "slice":
+            graph = EffectGraph.model_validate_json(
+                _project_scoped_path(root, args.graph).read_text(encoding="utf-8")
+            )
+            result = slice_dependency_graph(
+                graph,
+                sink_port_ids=args.sink_port,
+                budget=SliceBudget(max_nodes=args.max_nodes, max_edges=args.max_edges),
+            )
+            output = _project_scoped_path(root, args.output)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+            print(output)
+            return 10 if result.truncated else 0
+        analysis_root = _project_scoped_path(root, args.analysis)
+        flow_report = FlowAnalysisReport.model_validate_json(
+            (analysis_root / "report.json").read_text(encoding="utf-8")
+        )
+        print(flow_report.model_dump_json(indent=2))
         return 0
 
     if args.command == "revalidation":

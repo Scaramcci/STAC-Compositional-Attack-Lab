@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "InterventionResult": {
+      "enum": [
+        "not_evaluated",
+        "observed_change",
+        "observed_no_change",
+        "unknown"
+      ],
+      "title": "InterventionResult",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "changed_field_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Field Paths",
+      "type": "array"
+    },
+    "changed_resource_version_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Resource Version Ids",
+      "type": "array"
+    },
+    "execution_deviations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Execution Deviations",
+      "type": "array"
+    },
+    "execution_evidence_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Execution Evidence Ids",
+      "type": "array"
+    },
+    "intervention_id": {
+      "title": "Intervention Id",
+      "type": "string"
+    },
+    "paired_invariants": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Paired Invariants",
+      "type": "object"
+    },
+    "potentially_affected_claim_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Potentially Affected Claim Ids",
+      "type": "array"
+    },
+    "result": {
+      "$ref": "#/$defs/InterventionResult",
+      "default": "not_evaluated"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "target_claim_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Target Claim Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "intervention_id",
+    "changed_field_paths",
+    "changed_resource_version_ids",
+    "target_claim_ids",
+    "potentially_affected_claim_ids",
+    "paired_invariants",
+    "execution_evidence_ids",
+    "execution_deviations"
+  ],
+  "title": "InterventionRecord",
+  "type": "object"
+}

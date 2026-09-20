@@ -1,0 +1,70 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "hidden_components": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Hidden Components",
+      "type": "array"
+    },
+    "max_events": {
+      "default": 10000,
+      "exclusiveMinimum": 0,
+      "title": "Max Events",
+      "type": "integer"
+    },
+    "object_granularity": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Object Granularity",
+      "type": "array"
+    },
+    "observation_boundary": {
+      "title": "Observation Boundary",
+      "type": "string"
+    },
+    "profile_id": {
+      "title": "Profile Id",
+      "type": "string"
+    },
+    "profile_version": {
+      "title": "Profile Version",
+      "type": "string"
+    },
+    "projection_rule_version": {
+      "title": "Projection Rule Version",
+      "type": "string"
+    },
+    "resource_semantics": {
+      "title": "Resource Semantics",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "3.0",
+      "default": "3.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "visible_event_types": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Visible Event Types",
+      "type": "array"
+    }
+  },
+  "required": [
+    "profile_id",
+    "profile_version",
+    "observation_boundary",
+    "object_granularity",
+    "visible_event_types",
+    "hidden_components",
+    "resource_semantics",
+    "projection_rule_version"
+  ],
+  "title": "ObservationProfile",
+  "type": "object"
+}

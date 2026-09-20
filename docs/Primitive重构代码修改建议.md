@@ -1,9 +1,19 @@
 # Primitive 重构：代码修改建议与迁移方案
 
+> 状态说明（2026-09-20）：本文是设计建议及历史迁移依据。当前源码已经实现显式 v3
+> reanalysis、AnalysisManifest、有界子图、分层准入和报告；准确接口与剩余边界见
+> [PRIMITIVE_V3_IMPLEMENTATION.md](PRIMITIVE_V3_IMPLEMENTATION.md)。下文未来式描述不代表
+> 当前实现缺失，也不构成实验事实或真实执行授权。
+
 日期：2026-09-20  
 审查对象：`stac-compositional-attack-lab`，HEAD `df7f8da8032ba7f1dac420639038de4a35bf2b3a`。  
-理论依据：[基于文献的 Primitive 重构论证](/Users/scarramcci/Projects/Agent_Attack/primitive%20推理/基于文献的Primitive重构论证.md)。  
+理论依据：[基于文献的 Primitive 重构论证](基于文献的Primitive重构论证.md)。
 性质：设计建议。本次只新增本报告，没有修改实验代码、启动真实模型请求或进行正式评测。
+
+> 2026-09-20 补充：本文记录的是旧审查时点。第 5 节所述 request-boundary producer
+> 缺口已被后续 provider relay、policy、bundle seal 和独立 verifier 实现取代；当前能力与
+> 限制以 `IMPLEMENTATION_PROGRESS.md` 顶部及 `PRIMITIVE_V3_IMPLEMENTATION.md` 为准。
+> 真实 provider 协议兼容性仍未通过真实请求验证。
 
 ## 1. 结论：重构研究表示层，保留运行基础设施
 
@@ -45,7 +55,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.1 原语抽取以事件类型为中心，无法自然表示多效果事件
 
-定位：[extraction/occurrences.py:38](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/extraction/occurrences.py:38)。
+定位：[extraction/occurrences.py:38](../src/stac_attack_lab/extraction/occurrences.py:38)。
 
 `_match_event()` 返回一个原语或 `None`。`tool_call` 通常对应 `TRANSFER.request`，`tool_result` 对应传递，状态写入对应 `MUTATE`，部分消息通过 operation 子串对应 `TRANSFORM`。抽取出的 source/target component roles 都来自当前事件的同一个 component role，不能充分描述真实传递端点。
 
@@ -55,7 +65,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.2 当前关系类型没有充分区分“关联”“看见”和“依赖”
 
-定位：[interactions/normalizer.py:161](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/interactions/normalizer.py:161)、[models.py:27](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/interactions/models.py:27)。
+定位：[interactions/normalizer.py:161](../src/stac_attack_lab/interactions/normalizer.py:161)、[models.py:27](../src/stac_attack_lab/interactions/models.py:27)。
 
 归一化器根据 input artifact 的 producer 建立 data 边；根据 `request_event_id` 建立 control 边。前一种关系的可信程度取决于上游“input”的具体含义；后一种关系首先证明请求与响应配对，并不等同于程序分支控制依赖。
 
@@ -75,7 +85,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.3 `causal_pass` 的实际判据主要是结构依赖
 
-定位：[verification/edges.py:62](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/verification/edges.py:62)。
+定位：[verification/edges.py:62](../src/stac_attack_lab/verification/edges.py:62)。
 
 `verify_causal_edge()` 在上下游 occurrence passed 后，对匹配且 `observable=True` 的 typed edge 返回 `causal_pass`；artifact ancestry fallback 也可以返回同一结果。这里没有要求实际干预实验。
 
@@ -85,7 +95,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.4 原语证据判定分散，部分判据只验证字段形状
 
-定位：[extraction/occurrences.py:82](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/extraction/occurrences.py:82)、[verification/occurrence.py:40](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/verification/occurrence.py:40)。
+定位：[extraction/occurrences.py:82](../src/stac_attack_lab/extraction/occurrences.py:82)、[verification/occurrence.py:40](../src/stac_attack_lab/verification/occurrence.py:40)。
 
 抽取器为匹配事件先附 E1，再根据条件附 E2。例如，传递有输入或输出 artifact，写入有不同的 pre/post ref 字符串，控制事件有 lifecycle ID 或 public payload。验证器另有一套规则；对 transform 的 lineage 检查比抽取器更具体。
 
@@ -95,7 +105,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.5 通用状态关联仍依赖排序中的最近写者
 
-定位：[interactions/normalizer.py:213](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/interactions/normalizer.py:213)。
+定位：[interactions/normalizer.py:213](../src/stac_attack_lab/interactions/normalizer.py:213)。
 
 归一化器通过 `latest_state_writer[state_ref]` 连接读写，末尾根据 write refs 更新索引。它没有在这一层要求精确的 read-from version，也没有在更新该索引时按写入成功状态过滤。对于并发、失败写入、部分读取和版本回滚，这不足以证明读取来源。
 
@@ -105,7 +115,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.6 链挖掘和过滤仍以单路径为基本单位
 
-定位：[extraction/chains.py:172](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/extraction/chains.py:172)、[filtering.py:55](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/extraction/filtering.py:55)。
+定位：[extraction/chains.py:172](../src/stac_attack_lab/extraction/chains.py:172)、[filtering.py:55](../src/stac_attack_lab/extraction/filtering.py:55)。
 
 当前使用有界路径枚举，过滤要求 `len(core_edges) == len(core_nodes) - 1`。模型虽有 ALL/ANY/K_OF_N，但仅有这些字段还不能保留完整的多输入汇合结构。
 
@@ -115,7 +125,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.7 “回放一致性”名称超过了该过滤项的实际能力
 
-定位：[extraction/filtering.py:169](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/extraction/filtering.py:169)。
+定位：[extraction/filtering.py:169](../src/stac_attack_lab/extraction/filtering.py:169)。
 
 这里的 replay consistency gate 主要检查 unresolved links，并没有执行回放。仓库另有区分 collection reanalysis 与 bridge replay 的实现，应继续保留这种区分。
 
@@ -123,7 +133,7 @@ tests/unit/test_primitive_chain_library.py
 
 ### 3.8 采集与原语注册表绑定，限制理论迭代
 
-定位：[execution/sample_generation.py:619](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/execution/sample_generation.py:619)。
+定位：[execution/sample_generation.py:619](../src/stac_attack_lab/execution/sample_generation.py:619)。
 
 当前 mining 要求 registry hash 与 collection stage 中记录的一致。这能避免隐式漂移，但也限制了在相同 raw 上比较四原语和三原语。
 
@@ -201,7 +211,7 @@ UPDATE(resource, before_version, after_version, commit_evidence)
 
 ## 5. 前置工程：补齐请求边界证据，不放松消费判据
 
-定位：[provider_relay.py:307](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/environments/safeclaw/provider_relay.py:307)、[construction_admission.py:20](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/execution/construction_admission.py:20)。
+定位：[provider_relay.py:307](../src/stac_attack_lab/environments/safeclaw/provider_relay.py:307)、[construction_admission.py:20](../src/stac_attack_lab/execution/construction_admission.py:20)。
 
 relay 当前记录最终请求哈希、工具列表、状态、usage 和预算，但没有输出逐 artifact 到实际 request 字段的映射。进度文档也明确指出，production context reachability producer 和 strong-consumption producer 尚未接通。
 
@@ -253,7 +263,7 @@ Ingest、Adopt、Persist、Recall、Select、Bind、Act、Record、Recover 保�
 
 ### 6.3 planner 绑定领域实例和约束
 
-定位：[planning/binding_planner.py:13](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/planning/binding_planner.py:13)。
+定位：[planning/binding_planner.py:13](../src/stac_attack_lab/planning/binding_planner.py:13)。
 
 当前按 component role 唯一匹配，遇到多个候选会拒绝；session 根据线性位置及 boundary 标记递增。这种拒绝比随意选择安全，但不足以表达多 Agent 与交错会话。
 
@@ -289,7 +299,7 @@ official_outcome     = evaluator-owned result / not_evaluated
 
 ## 8. 现有消融应保留，但需要限定因果解释
 
-定位：[planning/formal_baselines.py:223](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/planning/formal_baselines.py:223)、[execution/safeclaw_formal.py:736](/Users/scarramcci/Projects/Agent_Attack/stac-compositional-attack-lab/src/stac_attack_lab/execution/safeclaw_formal.py:736)。
+定位：[planning/formal_baselines.py:223](../src/stac_attack_lab/planning/formal_baselines.py:223)、[execution/safeclaw_formal.py:736](../src/stac_attack_lab/execution/safeclaw_formal.py:736)。
 
 仓库已有 dependency ablation：选择 required edge，绑定 materialization slot，替换成 baseline 内容，并检查 slot 注册和实际差异。不能把它描述成“没有消融”。
 

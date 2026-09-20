@@ -26,6 +26,15 @@ from stac_attack_lab.execution.sample_generation import (
     SampleMiningStageManifest,
 )
 from stac_attack_lab.execution.sample_preflight import SampleCollectionPreflightReport
+from stac_attack_lab.flow.analysis import (
+    AnalysisManifest,
+    DependencySlice,
+    FlowAnalysisReport,
+    FlowRegistry,
+    InterventionRecord,
+    MacroBinding,
+)
+from stac_attack_lab.flow.models import EffectGraph, ObservationProfile
 from stac_attack_lab.interactions.construction import (
     ConstructionAttackerAction,
     ConstructionObservation,
@@ -76,6 +85,14 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "sample_collection_stage_manifest": SampleCollectionStageManifest,
     "sample_mining_stage_manifest": SampleMiningStageManifest,
     "sample_library_audit_report": SampleLibraryAuditReport,
+    "observation_profile_v3": ObservationProfile,
+    "effect_graph_v3": EffectGraph,
+    "flow_registry_v3": FlowRegistry,
+    "dependency_slice_v3": DependencySlice,
+    "flow_analysis_manifest_v3": AnalysisManifest,
+    "flow_analysis_report_v3": FlowAnalysisReport,
+    "flow_macro_binding_v3": MacroBinding,
+    "flow_intervention_record_v3": InterventionRecord,
 }
 
 

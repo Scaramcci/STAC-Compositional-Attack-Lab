@@ -1,0 +1,32 @@
+{
+  "hidden_components": [
+    "model_internal_reasoning",
+    "unobserved_tool_internals",
+    "unlogged_external_state"
+  ],
+  "max_events": 10000,
+  "object_granularity": [
+    "domain_instance",
+    "artifact_occurrence",
+    "field_port",
+    "resource_version",
+    "effect"
+  ],
+  "observation_boundary": "recorded human-agent-model-tool-environment interactions; model internals are opaque",
+  "profile_id": "stac.observable-flow",
+  "profile_version": "3.0.0",
+  "projection_rule_version": "stac.flow.projector.v3.0.0",
+  "resource_semantics": "workspace-scoped explicit versions; content identity is not version identity",
+  "schema_version": "3.0",
+  "visible_event_types": [
+    "message",
+    "model_request",
+    "model_response",
+    "tool_call",
+    "tool_result",
+    "state_read",
+    "state_write",
+    "lifecycle",
+    "policy"
+  ]
+}
