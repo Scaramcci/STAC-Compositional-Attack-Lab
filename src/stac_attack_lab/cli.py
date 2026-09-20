@@ -14,6 +14,7 @@ from stac_attack_lab.environments.safeclaw.preflight import (
 from stac_attack_lab.environments.safeclaw.task_adapter import inventory_safeclaw_tasks
 from stac_attack_lab.execution.benign_collection import (
     collect_benign_fixture,
+    collect_benign_live,
     prepare_benign_collection,
     validate_benign_collection_config,
 )
@@ -22,6 +23,7 @@ from stac_attack_lab.execution.flow_reanalysis import (
     reanalyze_flow_v3,
     validate_flow_analysis,
 )
+from stac_attack_lab.execution.readiness import diagnose_workflow
 from stac_attack_lab.execution.revalidation import (
     launch_live_revalidation,
     offline_revalidation,
@@ -110,12 +112,31 @@ def _build_parser() -> argparse.ArgumentParser:
 
     benign = sub.add_parser("benign", help="benign pre-evaluation collection")
     benign_sub = benign.add_subparsers(dest="benign_command", required=True)
-    for command in ("validate", "prepare", "collect-fixture"):
+    for command in ("validate", "prepare", "collect-fixture", "collect-live"):
         action = benign_sub.add_parser(command)
         action.add_argument(
             "--config",
             default="configs/benign_collection/synthetic_stage_a.disabled.json",
         )
+        if command == "collect-live":
+            action.add_argument("--authorize-live", action="store_true")
+            action.add_argument("--run-id", required=True)
+        elif command == "prepare":
+            action.add_argument("--run-id")
+
+    doctor = sub.add_parser("doctor", help="offline workflow readiness diagnosis")
+    doctor.add_argument("--config", required=True)
+    doctor.add_argument(
+        "--workflow-kind",
+        choices=[
+            "fixture",
+            "compatibility_probe",
+            "benign_collection",
+            "legacy_attack_collection",
+            "formal",
+        ],
+    )
+    doctor.add_argument("--run-root")
 
     flow = sub.add_parser("flow", help="explicit Primitive v3 offline analysis")
     flow_sub = flow.add_subparsers(dest="flow_command", required=True)
@@ -205,6 +226,16 @@ def _main(argv: list[str] | None = None) -> int:
         print("schemas built")
         return 0
 
+    if args.command == "doctor":
+        readiness_report = diagnose_workflow(
+            root,
+            Path(args.config),
+            workflow_kind=args.workflow_kind,
+            run_root=_project_scoped_path(root, args.run_root) if args.run_root else None,
+        )
+        print(readiness_report.model_dump_json(indent=2))
+        return 10 if readiness_report.all_independent_blockers else 0
+
     if args.command == "benign":
         config_path = _project_scoped_path(root, args.config)
         if args.benign_command == "validate":
@@ -225,9 +256,17 @@ def _main(argv: list[str] | None = None) -> int:
             )
             return 0
         if args.benign_command == "prepare":
-            print(prepare_benign_collection(root, config_path))
+            print(prepare_benign_collection(root, config_path, args.run_id))
             return 0
-        collection, analysis = collect_benign_fixture(root, config_path)
+        if args.benign_command == "collect-live":
+            collection, analysis = collect_benign_live(
+                root,
+                config_path,
+                authorized=args.authorize_live,
+                run_id=args.run_id,
+            )
+        else:
+            collection, analysis = collect_benign_fixture(root, config_path)
         print(json.dumps({"collection": str(collection), "analysis": str(analysis)}, indent=2))
         return 0
 

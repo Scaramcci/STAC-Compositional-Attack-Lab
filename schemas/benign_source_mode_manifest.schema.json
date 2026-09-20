@@ -50,8 +50,17 @@
       "title": "Prompt Hash",
       "type": "string"
     },
+    "real_model_request_status": {
+      "default": "not_performed",
+      "enum": [
+        "not_performed",
+        "observed",
+        "unknown"
+      ],
+      "title": "Real Model Request Status",
+      "type": "string"
+    },
     "real_model_requests": {
-      "const": false,
       "default": false,
       "title": "Real Model Requests",
       "type": "boolean"

@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
+import yaml  # type: ignore[import-untyped]
 from pydantic import Field, PositiveInt, model_validator
 
 from stac_attack_lab.config import RoleModelConfig, load_simple_yaml
@@ -235,7 +236,12 @@ class SampleLibraryAuditReport(StrictModel):
 
 
 def load_sample_generation_config(path: Path) -> SampleGenerationConfig:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        value = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError("sample_generation_config_parse_failed") from exc
+    if not isinstance(value, dict):
+        raise ValueError("sample_generation_config_root_invalid")
     return SampleGenerationConfig.model_validate(value)
 
 

@@ -81,7 +81,7 @@ def test_formal_registry_is_stable_and_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(SCHEMA_MODELS) == 46
+    assert len(SCHEMA_MODELS) == 48
     assert {
         "sample_collection_stage_manifest",
         "sample_mining_stage_manifest",

@@ -1,0 +1,55 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "accepted_sample_required": {
+      "const": false,
+      "default": false,
+      "title": "Accepted Sample Required",
+      "type": "boolean"
+    },
+    "cross_session_required": {
+      "const": false,
+      "default": false,
+      "title": "Cross Session Required",
+      "type": "boolean"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "request_attempt_count": {
+      "title": "Request Attempt Count",
+      "type": "integer"
+    },
+    "response_observed": {
+      "title": "Response Observed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "incomplete"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "request_attempt_count",
+    "response_observed",
+    "reason_codes"
+  ],
+  "title": "CompatibilityProbeAssessment",
+  "type": "object"
+}

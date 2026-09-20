@@ -24,6 +24,10 @@ from stac_attack_lab.execution.revalidation import (
     offline_revalidation,
     prepare_revalidation,
 )
+from stac_attack_lab.execution.sample_preflight import (
+    SampleCollectionPreflightCheck,
+    SampleCollectionPreflightReport,
+)
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.base import CollectionBudget
 from stac_attack_lab.interactions.construction import ConstructionAttackerAction
@@ -984,11 +988,17 @@ def test_prepare_is_offline_and_live_launch_is_atomic(
     import stac_attack_lab.execution.sample_generation as generation
     import stac_attack_lab.execution.sample_preflight as preflight_module
 
-    class Passed:
-        passed = True
-
     calls: list[str] = []
-    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: Passed())
+    passed = SampleCollectionPreflightReport(
+        passed=True,
+        config_valid=True,
+        environment_ready=True,
+        implementation_ready=True,
+        execution_enabled=True,
+        readiness_mode="live",
+        checks=[],
+    )
+    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: passed)
     monkeypatch.setattr(
         generation,
         "collect_sample_interactions",
@@ -1049,10 +1059,16 @@ def test_live_collection_exception_preserves_partial_artifact_outcome(
     import stac_attack_lab.execution.sample_generation as generation
     import stac_attack_lab.execution.sample_preflight as preflight_module
 
-    class Passed:
-        passed = True
-
-    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: Passed())
+    passed = SampleCollectionPreflightReport(
+        passed=True,
+        config_valid=True,
+        environment_ready=True,
+        implementation_ready=True,
+        execution_enabled=True,
+        readiness_mode="live",
+        checks=[],
+    )
+    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: passed)
 
     def fail_after_write(_root: Path, loaded: object) -> Path:
         candidate = (
@@ -1089,6 +1105,54 @@ def test_live_collection_exception_preserves_partial_artifact_outcome(
         assert result["collection"] is None
         assert result["offline_status"] == "not_run"
         assert result["execution_status"] == "blocked_no_valid_collection"
+
+
+def test_live_preflight_failure_persists_complete_reason_report(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    run_root = prepare_revalidation(
+        tmp_path,
+        ROOT / "configs/sample_generation/cross_session_revalidation.disabled.json",
+        "preflight-report-test",
+    )
+    config_path = run_root / "runtime_config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["execution_enabled"] = True
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    report = SampleCollectionPreflightReport(
+        passed=False,
+        config_valid=True,
+        environment_ready=False,
+        implementation_ready=True,
+        execution_enabled=True,
+        readiness_mode="live",
+        checks=[
+            SampleCollectionPreflightCheck(
+                check_id="docker",
+                passed=False,
+                reason_code="docker_daemon_unreachable",
+            ),
+            SampleCollectionPreflightCheck(
+                check_id="model_environment",
+                passed=False,
+                reason_code="sample_collection_model_environment_missing",
+            ),
+        ],
+    )
+    import stac_attack_lab.execution.sample_preflight as preflight_module
+
+    monkeypatch.setattr(preflight_module, "run_sample_collection_preflight", lambda *_: report)
+    with pytest.raises(RuntimeError, match="docker_daemon_unreachable"):
+        launch_live_revalidation(tmp_path, run_root, authorized=True)
+    persisted = json.loads(
+        (run_root / "sample_collection_preflight.json").read_text(encoding="utf-8")
+    )
+    assert {item["reason_code"] for item in persisted["checks"]} == {
+        "docker_daemon_unreachable",
+        "sample_collection_model_environment_missing",
+    }
+    summary = json.loads((run_root / "launch_validation_summary.json").read_text(encoding="utf-8"))
+    assert "sample_collection_preflight.json" in summary["stage_errors"][0]["error"]
 
 
 def test_bridge_replay_uses_real_driver_mapping_mining_audit_and_admission(

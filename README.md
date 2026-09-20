@@ -37,12 +37,11 @@ make check PYTHON=python
 ## 最短上手
 
 ```bash
-cp .env.example .env
-chmod 600 .env
-make sample-preflight PYTHON=python
+make doctor-benign PYTHON=python
+make benign-prepare PYTHON=python RUN_ID=<unique-run-id>
 ```
 
-唯一推荐 collection 入口：
+旧 adversarial collection 入口保留用于复现，不是正常 pilot：
 
 ```bash
 STAC_PYTHON=python bash scripts/run_safeclaw_sample_collection.sh \
@@ -83,16 +82,21 @@ python -m stac_attack_lab.cli flow reanalyze --input <graph-or-collection> \
 输出包含独立 `analysis_manifest.json`、effect graph、依赖切片、四层准入和公共汇总。
 详见 [Primitive v3 实现说明](docs/PRIMITIVE_V3_IMPLEMENTATION.md)。
 
-正常交互采集阶段 A 提供独立、默认禁用的契约和离线 fixture 闭环：
+正常交互采集提供独立、默认禁用的契约、离线 fixture 闭环和 SafeClaw live adapter：
 
 ```bash
 python -m stac_attack_lab.cli benign validate
 python -m stac_attack_lab.cli benign prepare
 python -m stac_attack_lab.cli benign collect-fixture
+python -m stac_attack_lab.cli doctor \
+  --workflow-kind benign_collection \
+  --config configs/benign_collection/live_pilot.disabled.json
 ```
 
-`collect-fixture` 不访问模型服务；真实正常采集尚未授权或实现。详见
-[阶段 A 交接](docs/BENIGN_COLLECTION_STAGE_A.md)。
+`collect-fixture` 和 `doctor` 不访问模型服务；正常 live adapter 已接入现有
+driver/relay 合同，但模板禁用且真实 provider 尚未验证或授权。详见
+[阶段 A 交接](docs/BENIGN_COLLECTION_STAGE_A.md) 和
+[Pilot 诊断与正常入口](docs/PILOT_READINESS_IMPLEMENTATION.md)。
 
 `offline --collection` 是旧 collection 的重新分析；`offline --bridge-responses` 才是通过当前 driver mapping 重建 source events 的 bridge replay。后者要求完整 initialize/pre-state、action/response/post-state 和 finish 记录。`inputToolResultCallIds` 仍不可信；production relay 已能记录受控 request-boundary projection，但真实 provider 协议兼容性尚未复验，强派生规则默认禁用且仅限 synthetic experimental policy。因此 synthetic replay 成功不能解释为真实攻击、正式准入或 official outcome。
 

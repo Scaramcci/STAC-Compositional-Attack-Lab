@@ -1,4 +1,23 @@
-# Current workplan — after benign collection stage A (authoritative)
+# Current workplan — after pilot reliability implementation (authoritative)
+
+Offline implementation work is complete for unified readiness, bounded preflight diagnostics,
+entrypoint path/config handling, read-only historical status classification, independent
+compatibility-probe assessment, and the normal SafeClaw driver adapter. The checked-in benign live
+template remains disabled.
+
+Remaining evidence requires a separately authorized, single-run compatibility review: confirm the
+real provider request/response shape, Docker/network isolation, cleanup ownership and provider versus
+budget-ledger closure. Review the final enabled snapshot, at most two target requests, one embedding request,
+zero automatic retries and 300-second wall clock before authorization. A compatibility observation
+does not authorize pilot, main, freeze or formal execution and does not enable the experimental exact
+rule. Do not increase budgets or retry a possibly sent request automatically.
+
+After compatibility succeeds, a separately authorized benign pilot may use the same reviewed normal
+scenario. Analyze its new collection with v3 and report legitimate completion, observation integrity,
+planning-reference eligibility, runtime review and official outcome separately. No frozen formal
+library is required for collection.
+
+# Previous current workplan — after benign collection stage A
 
 1. Stage B: define FlowPattern abstraction, origin/split audit, public/private views, immutable benign library build/audit/freeze and no-outcome-driven selection. Do not use historical adversarial runs to fill the benign library.
 2. Before any real benign collection, implement the reviewed SafeClaw-derived runtime mapping and separately authorize exact tasks, models, per-role request caps, wall clock and output. Current Stage A supports deterministic synthetic fixtures only.

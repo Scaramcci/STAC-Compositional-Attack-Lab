@@ -14,6 +14,15 @@ resource `read_from`. Collection completion and planning eligibility do not esta
 outcome. Real pre-evaluation collection is an online activity and always needs separate request
 authorization despite occurring before formal evaluation.
 
+The normal pilot uses `workflow_kind=benign_collection` and the cooperative policy. Its execution
+success criterion is legitimate task completion plus observable artifact integrity; it does not
+require an accepted adversarial chain, cross-session persistence, intervention comparison, or a
+frozen formal library. A scenario that explicitly claims cross-session propagation is still judged
+by the strict cross-session profile. `implementation_ready`, `environment_ready`,
+`execution_enabled`, explicit request authorization, runtime review, and official outcome remain
+independent. The checked-in live template is disabled and its one-request limits are not evidence
+that the real provider protocol has been validated.
+
 ## Primitive v3 research boundary and offline profiles
 
 Primitive v3 is a parallel representation for a fixed observation boundary, not a migration of

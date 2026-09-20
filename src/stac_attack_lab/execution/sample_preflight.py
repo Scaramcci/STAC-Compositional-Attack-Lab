@@ -29,8 +29,13 @@ class SampleCollectionPreflightCheck(StrictModel):
 
 
 class SampleCollectionPreflightReport(StrictModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.1"] = "1.1"
     passed: bool
+    config_valid: bool
+    environment_ready: bool
+    implementation_ready: bool
+    execution_enabled: bool
+    readiness_mode: Literal["prepare", "live"]
     execution_started: Literal[False] = False
     checks: list[SampleCollectionPreflightCheck]
 
@@ -45,7 +50,33 @@ def _default_runner(command: list[str], cwd: Path | None) -> subprocess.Complete
         text=True,
         capture_output=True,
         check=False,
+        timeout=10,
     )
+
+
+def run_bounded_external_check(
+    command: list[str], cwd: Path | None, runner: CommandRunner
+) -> tuple[subprocess.CompletedProcess[str] | None, str | None]:
+    try:
+        result = runner(command, cwd)
+    except FileNotFoundError:
+        return None, "executable_missing"
+    except PermissionError:
+        return None, "permission_denied"
+    except subprocess.TimeoutExpired:
+        return None, "command_timeout"
+    except OSError:
+        return None, "command_os_error"
+    if result.returncode == 0:
+        return result, None
+    stderr = (result.stderr or "").casefold()
+    if "permission denied" in stderr:
+        return result, "permission_denied"
+    if command[:2] == ["docker", "info"] and any(
+        marker in stderr for marker in ("daemon", "socket", "cannot connect")
+    ):
+        return result, "daemon_unreachable"
+    return result, "command_failed"
 
 
 def run_sample_collection_preflight(
@@ -54,6 +85,7 @@ def run_sample_collection_preflight(
     *,
     environment: Mapping[str, str] | None = None,
     command_runner: CommandRunner = _default_runner,
+    readiness_mode: Literal["prepare", "live"] = "live",
 ) -> SampleCollectionPreflightReport:
     env = environment if environment is not None else os.environ
     checks: list[SampleCollectionPreflightCheck] = []
@@ -283,8 +315,10 @@ def run_sample_collection_preflight(
     upstream = project_root / config.upstream_dir if config.upstream_dir else None
     observed_commit = "unavailable"
     if upstream is not None and upstream.is_dir():
-        result = command_runner(["git", "rev-parse", "HEAD"], upstream)
-        if result.returncode == 0:
+        result, git_error = run_bounded_external_check(
+            ["git", "rev-parse", "HEAD"], upstream, command_runner
+        )
+        if result is not None and git_error is None:
             observed_commit = result.stdout.strip()
     commit_ok = task_set is not None and observed_commit == task_set.upstream_commit
     add(
@@ -298,27 +332,41 @@ def run_sample_collection_preflight(
     if upstream is not None and config.safety_patch_path:
         patch = project_root / config.safety_patch_path
         if upstream.is_dir() and patch.is_file():
-            patch_check = command_runner(
-                ["git", "apply", "--unidiff-zero", "--check", str(patch)], upstream
+            patch_check, patch_error = run_bounded_external_check(
+                ["git", "apply", "--unidiff-zero", "--check", str(patch)],
+                upstream,
+                command_runner,
             )
-            patch_ok = patch_check.returncode == 0
+            patch_ok = patch_check is not None and patch_error is None
     add(
         "safety_patch",
         patch_ok,
         "safeclaw_safety_patch_applies",
         "safeclaw_safety_patch_not_applicable",
     )
-    docker = command_runner(["docker", "info", "--format", "{{json .ServerVersion}}"], None)
-    image = command_runner(
+    docker, docker_error = run_bounded_external_check(
+        ["docker", "info", "--format", "{{json .ServerVersion}}"], None, command_runner
+    )
+    image, image_error = run_bounded_external_check(
         ["docker", "image", "inspect", config.image_tag, "--format", "{{json .Id}}"],
         None,
+        command_runner,
     )
-    add("docker", docker.returncode == 0, "docker_available", "docker_unavailable")
+    add(
+        "docker",
+        docker is not None and docker_error is None,
+        "docker_available",
+        f"docker_{docker_error or 'unavailable'}",
+    )
     add(
         "docker_image",
-        image.returncode == 0,
+        image is not None and image_error is None,
         "safeclaw_image_present",
-        "safeclaw_image_missing",
+        (
+            "safeclaw_image_missing"
+            if image is not None and image_error == "command_failed"
+            else f"docker_image_{image_error or 'unavailable'}"
+        ),
         {"image_tag": config.image_tag},
     )
     disk_base = upstream if upstream is not None and upstream.exists() else project_root
@@ -342,7 +390,37 @@ def run_sample_collection_preflight(
         "collection_output_has_incomplete_atomic_files",
         {"temporary_file_count": str(len(temporary_files))},
     )
+    by_id = {check.check_id: check for check in checks}
+    implementation_ready = by_id["real_adapter"].passed
+    execution_enabled = by_id["execution_gate"].passed
+    environment_ready = all(
+        check.passed for check in checks if check.check_id not in {"execution_gate", "real_adapter"}
+    )
+    config_valid = all(
+        by_id[item].passed
+        for item in (
+            "delivery_surfaces",
+            "tool_scope",
+            "construction_split",
+            "formal_exclusion",
+            "safety_constraints",
+            "required_paths",
+            "task_set",
+            "attacker_prompt",
+            "attacker_model",
+            "embedding_configuration",
+            "victim_model",
+        )
+    )
+    passed = config_valid and implementation_ready and environment_ready
+    if readiness_mode == "live":
+        passed = passed and execution_enabled
     return SampleCollectionPreflightReport(
-        passed=all(check.passed for check in checks),
+        passed=passed,
+        config_valid=config_valid,
+        environment_ready=environment_ready,
+        implementation_ready=implementation_ready,
+        execution_enabled=execution_enabled,
+        readiness_mode=readiness_mode,
         checks=checks,
     )

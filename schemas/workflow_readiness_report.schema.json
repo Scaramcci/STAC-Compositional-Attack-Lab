@@ -1,0 +1,274 @@
+{
+  "$defs": {
+    "SampleCollectionPreflightCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "public_details": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Public Details",
+          "type": "object"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_id",
+        "passed",
+        "reason_code"
+      ],
+      "title": "SampleCollectionPreflightCheck",
+      "type": "object"
+    },
+    "SampleCollectionPreflightReport": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/SampleCollectionPreflightCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "config_valid": {
+          "title": "Config Valid",
+          "type": "boolean"
+        },
+        "environment_ready": {
+          "title": "Environment Ready",
+          "type": "boolean"
+        },
+        "execution_enabled": {
+          "title": "Execution Enabled",
+          "type": "boolean"
+        },
+        "execution_started": {
+          "const": false,
+          "default": false,
+          "title": "Execution Started",
+          "type": "boolean"
+        },
+        "implementation_ready": {
+          "title": "Implementation Ready",
+          "type": "boolean"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "readiness_mode": {
+          "enum": [
+            "prepare",
+            "live"
+          ],
+          "title": "Readiness Mode",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.1",
+          "default": "1.1",
+          "title": "Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "passed",
+        "config_valid",
+        "environment_ready",
+        "implementation_ready",
+        "execution_enabled",
+        "readiness_mode",
+        "checks"
+      ],
+      "title": "SampleCollectionPreflightReport",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "all_independent_blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "All Independent Blockers",
+      "type": "array"
+    },
+    "authorization_state": {
+      "const": "absent",
+      "default": "absent",
+      "title": "Authorization State",
+      "type": "string"
+    },
+    "blocked_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blocked Checks",
+      "type": "array"
+    },
+    "can_analyze": {
+      "title": "Can Analyze",
+      "type": "boolean"
+    },
+    "can_collect": {
+      "title": "Can Collect",
+      "type": "boolean"
+    },
+    "can_evaluate": {
+      "title": "Can Evaluate",
+      "type": "boolean"
+    },
+    "can_prepare": {
+      "title": "Can Prepare",
+      "type": "boolean"
+    },
+    "config_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Config Hash"
+    },
+    "config_path": {
+      "title": "Config Path",
+      "type": "string"
+    },
+    "config_valid": {
+      "title": "Config Valid",
+      "type": "boolean"
+    },
+    "environment_ready": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Environment Ready"
+    },
+    "execution_enabled": {
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "existing_run_state": {
+      "title": "Existing Run State",
+      "type": "string"
+    },
+    "failed_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Failed Checks",
+      "type": "array"
+    },
+    "first_actionable_blocker": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "First Actionable Blocker"
+    },
+    "implementation_ready": {
+      "title": "Implementation Ready",
+      "type": "boolean"
+    },
+    "inspected_head": {
+      "title": "Inspected Head",
+      "type": "string"
+    },
+    "interpreter": {
+      "title": "Interpreter",
+      "type": "string"
+    },
+    "launch_reservation_state": {
+      "title": "Launch Reservation State",
+      "type": "string"
+    },
+    "pending_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Pending Checks",
+      "type": "array"
+    },
+    "preflight": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SampleCollectionPreflightReport"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "recommended_next_command": {
+      "title": "Recommended Next Command",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_hash": {
+      "title": "Source Hash",
+      "type": "string"
+    },
+    "workflow_kind": {
+      "enum": [
+        "fixture",
+        "compatibility_probe",
+        "benign_collection",
+        "legacy_attack_collection",
+        "formal"
+      ],
+      "title": "Workflow Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "inspected_head",
+    "source_hash",
+    "config_path",
+    "config_hash",
+    "interpreter",
+    "workflow_kind",
+    "implementation_ready",
+    "config_valid",
+    "environment_ready",
+    "execution_enabled",
+    "existing_run_state",
+    "launch_reservation_state",
+    "first_actionable_blocker",
+    "can_prepare",
+    "can_collect",
+    "can_analyze",
+    "can_evaluate",
+    "recommended_next_command"
+  ],
+  "title": "WorkflowReadinessReport",
+  "type": "object"
+}

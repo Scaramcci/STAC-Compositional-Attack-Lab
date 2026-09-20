@@ -2,6 +2,12 @@
 
 > 阅读基准：2026-09-17 当前工作区的源码、配置和文档。本文是学习路线与源码导航，不是运行验收报告；没有启动 Docker、调用模型或重新运行实验。后续可以直接按章节编号提问。
 
+当前 Pilot 入口诊断位于 `execution/readiness.py`，正常采集 orchestration 位于
+`execution/benign_collection.py`，合作式 fixture/live adapter 位于
+`interactions/benign.py`。正常 live 禁用模板是
+`configs/benign_collection/live_pilot.disabled.json`；旧 `sample_generation` pilot 仍是
+legacy adversarial workflow，二者不会自动互换。
+
 ## 1. 项目总体目标：它究竟在研究什么？
 
 本项目是一个面向授权、隔离 SafeClaw/OpenClaw 环境的组合攻击研究框架。它关注的不只是最后是否触发某个不安全结果，还包括：不可信内容如何进入代理上下文、是否改变持久状态、是否在之后的会话中被读取、是否影响工具调用，以及这些步骤之间是否存在可验证的依赖。

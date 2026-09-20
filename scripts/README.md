@@ -6,7 +6,10 @@
 | `bash scripts/run_cross_session_revalidation.sh offline --run-root PATH --collection COLLECTION` | collection reanalysis：读取已有 collection，重新 normalize/mine/audit/admission；不叫 bridge replay。 |
 | `bash scripts/run_cross_session_revalidation.sh offline --run-root PATH --bridge-responses RESPONSES.jsonl` | true bridge replay：要求 initialize/pre-state、每个 action/response/post-state 和 finish，经 live 共用 driver mapper 生成新 source events 后再 mine/audit/admission。缺字段或坏行返回 blocked，不猜 action。 |
 | `bash scripts/run_cross_session_revalidation.sh live --run-root PATH --authorize-live` | 仅在单独授权后运行已经显式启用的 prepared run；原子 `launch.marker` 防止同一 run 重复/并发启动，随后即使 collection partial/error 也尽可能执行离线 mine/audit/admission。执行或离线阶段失败均返回非 0。 |
-| `bash scripts/run_safeclaw_sample_collection.sh` | canonical pilot/main collection（需单独授权）。 |
+| `python -m stac_attack_lab.cli doctor --config ...` | 离线 workflow readiness；分开 config、implementation、environment、enabled 和 authorization。 |
+| `python -m stac_attack_lab.cli benign prepare --config configs/benign_collection/live_pilot.disabled.json --run-id ID` | 创建正常 pilot 禁用快照；不访问 provider。 |
+| `python -m stac_attack_lab.cli benign collect-live --config ... --run-id ID --authorize-live` | 正常 SafeClaw adapter；要求同一 prepared run、另行审核的 enabled runtime config 和调用授权。 |
+| `bash scripts/run_safeclaw_sample_collection.sh` | legacy adversarial pilot/main collection（需单独授权）。 |
 | `bash scripts/run_formal_evaluation.sh` | formal evaluation（需 frozen library 和单独授权）。 |
 | `python -m stac_attack_lab.cli flow reanalyze ...` | 显式 Primitive v3 离线重分析；校验 collection seal/registry，写新 manifest、效果图、切片、分层准入和报告。 |
 | `python -m stac_attack_lab.cli benign validate/prepare` | 校验正常场景并生成默认禁用快照；零网络请求。 |

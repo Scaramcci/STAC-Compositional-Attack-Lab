@@ -16,6 +16,9 @@
     "cross_session_capability": {
       "$ref": "#/$defs/GateStatus"
     },
+    "normal_task_completion": {
+      "$ref": "#/$defs/GateStatus"
+    },
     "observation_valid": {
       "$ref": "#/$defs/GateStatus"
     },
@@ -59,6 +62,7 @@
   "required": [
     "trajectory_id",
     "observation_valid",
+    "normal_task_completion",
     "planning_reference_eligible",
     "verified_dependency_claim_count",
     "unknown_dependency_claim_count",

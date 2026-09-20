@@ -41,25 +41,54 @@
       "title": "Checks",
       "type": "array"
     },
+    "config_valid": {
+      "title": "Config Valid",
+      "type": "boolean"
+    },
+    "environment_ready": {
+      "title": "Environment Ready",
+      "type": "boolean"
+    },
+    "execution_enabled": {
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
     "execution_started": {
       "const": false,
       "default": false,
       "title": "Execution Started",
       "type": "boolean"
     },
+    "implementation_ready": {
+      "title": "Implementation Ready",
+      "type": "boolean"
+    },
     "passed": {
       "title": "Passed",
       "type": "boolean"
     },
+    "readiness_mode": {
+      "enum": [
+        "prepare",
+        "live"
+      ],
+      "title": "Readiness Mode",
+      "type": "string"
+    },
     "schema_version": {
-      "const": "1.0",
-      "default": "1.0",
+      "const": "1.1",
+      "default": "1.1",
       "title": "Schema Version",
       "type": "string"
     }
   },
   "required": [
     "passed",
+    "config_valid",
+    "environment_ready",
+    "implementation_ready",
+    "execution_enabled",
+    "readiness_mode",
     "checks"
   ],
   "title": "SampleCollectionPreflightReport",

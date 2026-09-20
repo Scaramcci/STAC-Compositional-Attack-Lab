@@ -4,12 +4,7 @@ set -Eeuo pipefail
 umask 077
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ -f "${PROJECT_ROOT}/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${PROJECT_ROOT}/.env"
-  set +a
-fi
+cd "${PROJECT_ROOT}"
 CONFIG="configs/sample_generation/pilot_collection.yaml"
 RUN_ID=""
 PYTHON_BIN="${STAC_PYTHON:-python3}"
@@ -64,33 +59,52 @@ if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
   echo "Python environment not found: ${PYTHON_BIN}" >&2
   exit 2
 fi
-if [[ ! -f "${PROJECT_ROOT}/${CONFIG}" ]]; then
+if [[ "${CONFIG}" = /* ]]; then
+  CONFIG_PATH="${CONFIG}"
+else
+  CONFIG_PATH="${PROJECT_ROOT}/${CONFIG}"
+fi
+if [[ ! -f "${CONFIG_PATH}" ]]; then
   echo "Sample collection config not found: ${CONFIG}" >&2
   exit 2
 fi
 if [[ -z "${RUN_ID}" ]]; then
   RUN_ID="collection-$(${PYTHON_BIN} -c 'import uuid; print(uuid.uuid4().hex[:12])')"
 fi
-if [[ ! "${RUN_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-  echo "Invalid run id: use only letters, numbers, dot, underscore, and hyphen." >&2
+if [[ "${RUN_ID}" == "." || "${RUN_ID}" == ".." || ! "${RUN_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  echo "Invalid run id: begin with a letter or number and use letters, numbers, underscore, or hyphen." >&2
   exit 2
 fi
 
 RUN_ROOT="${PROJECT_ROOT}/experiments/runs/${RUN_ID}"
+if [[ "${PRINT_OUTPUT}" == "true" ]]; then
+  PYTHONPATH="${PROJECT_ROOT}/src" "${PYTHON_BIN}" - "${CONFIG_PATH}" "${RUN_ID}" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+value = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(Path("experiments/runs") / sys.argv[2] / value["library_version"] / "interactions/raw" / value["pipeline_id"])
+PY
+  exit 0
+fi
 mkdir -p "${RUN_ROOT}"
 RUNTIME_CONFIG="${RUN_ROOT}/runtime_collection_config.json"
 DERIVATION_METADATA="${RUN_ROOT}/runtime_collection_config_derivation.json"
-"${PYTHON_BIN}" - "${PROJECT_ROOT}/${CONFIG}" "${RUNTIME_CONFIG}" "${DERIVATION_METADATA}" "${RUN_ID}" <<'PY'
+"${PYTHON_BIN}" - "${CONFIG_PATH}" "${RUNTIME_CONFIG}" "${DERIVATION_METADATA}" "${RUN_ID}" <<'PY'
 import hashlib
 import json
 import sys
 from pathlib import Path
+import yaml
 
 source = Path(sys.argv[1])
 target = Path(sys.argv[2])
 metadata_path = Path(sys.argv[3])
 run_id = sys.argv[4]
-value = json.loads(source.read_text(encoding="utf-8"))
+value = yaml.safe_load(source.read_text(encoding="utf-8"))
+if not isinstance(value, dict):
+    raise SystemExit("sample_generation_config_root_invalid")
 original_output_root = value.get("output_root")
 value["output_root"] = str(Path("experiments/runs") / run_id)
 encoded = json.dumps(value, indent=2, sort_keys=True) + "\n"
@@ -138,10 +152,6 @@ IFS=$'\t' read -r LIBRARY_VERSION PIPELINE_ID BUILD_REL COLLECTION_REL <<< "${RU
 BUILD_ROOT="${PROJECT_ROOT}/${BUILD_REL}"
 LOG_FILE="${BUILD_ROOT}/tmux-collection.log"
 
-if [[ "${PRINT_OUTPUT}" == "true" ]]; then
-  printf '%s\n' "${COLLECTION_REL}"
-  exit 0
-fi
 if [[ ! "${LIBRARY_VERSION}" =~ ^[A-Za-z0-9._-]+$ ]] || \
    [[ ! "${PIPELINE_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "Invalid library version or pipeline id" >&2
@@ -166,7 +176,6 @@ finish() {
 }
 trap finish EXIT
 
-cd "${PROJECT_ROOT}"
 export PYTHONPATH="${PROJECT_ROOT}/src"
 echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] starting library_version=${LIBRARY_VERSION}"
 echo "config=${CONFIG}"

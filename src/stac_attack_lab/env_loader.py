@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
+
+_ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def load_env_file(path: Path) -> list[str]:
@@ -14,8 +17,10 @@ def load_env_file(path: Path) -> list[str]:
             continue
         key, value = line.split("=", 1)
         key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        if _ENV_NAME.fullmatch(key) and key not in os.environ:
             os.environ[key] = value
             loaded.append(key)
     return loaded

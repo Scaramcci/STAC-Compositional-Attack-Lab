@@ -16,6 +16,13 @@
       "title": "Allowed Source Splits",
       "type": "array"
     },
+    "allowed_victim_models": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Victim Models",
+      "type": "array"
+    },
     "collection_id": {
       "title": "Collection Id",
       "type": "string"
@@ -26,6 +33,76 @@
       "title": "Collection Mode",
       "type": "string"
     },
+    "construction_bridge_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Construction Bridge Path"
+    },
+    "embedding_api_key_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Api Key Env"
+    },
+    "embedding_base_url_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Base Url Env"
+    },
+    "embedding_model_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Model Env"
+    },
+    "embedding_provider": {
+      "anyOf": [
+        {
+          "enum": [
+            "openai",
+            "ark_multimodal"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Embedding Provider"
+    },
+    "embedding_request_budget": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Embedding Request Budget",
+      "type": "integer"
+    },
     "environment_version": {
       "title": "Environment Version",
       "type": "string"
@@ -34,6 +111,11 @@
       "default": false,
       "title": "Execution Enabled",
       "type": "boolean"
+    },
+    "image_tag": {
+      "default": "openclaw-env:2026.3.12",
+      "title": "Image Tag",
+      "type": "string"
     },
     "interaction_policy_id": {
       "title": "Interaction Policy Id",
@@ -57,6 +139,12 @@
       "title": "Max Sessions",
       "type": "integer"
     },
+    "max_tokens": {
+      "default": 8192,
+      "exclusiveMinimum": 0,
+      "title": "Max Tokens",
+      "type": "integer"
+    },
     "max_tool_calls": {
       "default": 16,
       "exclusiveMinimum": 0,
@@ -67,6 +155,12 @@
       "default": 8,
       "exclusiveMinimum": 0,
       "title": "Max Turns",
+      "type": "integer"
+    },
+    "minimum_free_disk_gb": {
+      "default": 20,
+      "exclusiveMinimum": 0,
+      "title": "Minimum Free Disk Gb",
       "type": "integer"
     },
     "output_root": {
@@ -85,6 +179,38 @@
       "title": "Prompt Version",
       "type": "string"
     },
+    "provider_allowed_tools": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Provider Allowed Tools"
+    },
+    "provider_evidence_policy": {
+      "additionalProperties": true,
+      "title": "Provider Evidence Policy",
+      "type": "object"
+    },
+    "provider_request_budget": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Provider Request Budget",
+      "type": "integer"
+    },
+    "provider_timeout_seconds": {
+      "default": 90,
+      "exclusiveMinimum": 0,
+      "title": "Provider Timeout Seconds",
+      "type": "integer"
+    },
     "registry_path": {
       "title": "Registry Path",
       "type": "string"
@@ -96,6 +222,37 @@
       },
       "title": "Request Caps By Role",
       "type": "object"
+    },
+    "safeclaw_task_set_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Safeclaw Task Set Path"
+    },
+    "safety_constraint_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Safety Constraint Ids",
+      "type": "array"
+    },
+    "safety_patch_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Safety Patch Path"
     },
     "scenario_ids": {
       "items": {
@@ -139,6 +296,66 @@
       "exclusiveMinimum": 0,
       "title": "Timeout Seconds",
       "type": "integer"
+    },
+    "upstream_dir": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Upstream Dir"
+    },
+    "victim_api_key_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Victim Api Key Env"
+    },
+    "victim_base_url_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Victim Base Url Env"
+    },
+    "victim_model_env": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Victim Model Env"
+    },
+    "victim_model_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Victim Model Hash"
     },
     "wall_clock_seconds": {
       "exclusiveMinimum": 0,

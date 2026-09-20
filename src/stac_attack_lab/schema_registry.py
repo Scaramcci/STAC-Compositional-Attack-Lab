@@ -26,6 +26,10 @@ from stac_attack_lab.execution.formal_attacker import (
     FormalAttackerInput,
     FormalAttackRealization,
 )
+from stac_attack_lab.execution.readiness import (
+    CompatibilityProbeAssessment,
+    WorkflowReadinessReport,
+)
 from stac_attack_lab.execution.sample_generation import (
     SampleCollectionStageManifest,
     SampleLibraryAuditReport,
@@ -95,6 +99,8 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "formal_attacker_input": FormalAttackerInput,
     "formal_attack_realization": FormalAttackRealization,
     "sample_collection_preflight_report": SampleCollectionPreflightReport,
+    "workflow_readiness_report": WorkflowReadinessReport,
+    "compatibility_probe_assessment": CompatibilityProbeAssessment,
     "sample_collection_stage_manifest": SampleCollectionStageManifest,
     "sample_mining_stage_manifest": SampleMiningStageManifest,
     "sample_library_audit_report": SampleLibraryAuditReport,

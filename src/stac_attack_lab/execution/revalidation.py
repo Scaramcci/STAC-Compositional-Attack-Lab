@@ -567,8 +567,17 @@ def launch_live_revalidation(root: Path, run_root: Path, *, authorized: bool) ->
         _validate_live_binding(root, run_root, config_data)
         config = load_sample_generation_config(config_path)
         preflight = run_sample_collection_preflight(root, config)
+        preflight_path = run_root / "sample_collection_preflight.json"
+        _atomic_json(preflight_path, preflight.model_dump(mode="json"))
         if not preflight.passed:
-            raise RuntimeError("revalidation_live_preflight_failed")
+            failed = [
+                item.reason_code for item in getattr(preflight, "checks", []) if not item.passed
+            ]
+            raise RuntimeError(
+                "revalidation_live_preflight_failed:"
+                + ",".join(failed)
+                + f":report={preflight_path}"
+            )
     except Exception as exc:
         validation = {
             "pipeline_execution": {"status": "not_started"},

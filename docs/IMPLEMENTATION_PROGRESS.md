@@ -1,4 +1,17 @@
-# Current status — 2026-09-20 benign collection stage A (authoritative)
+# Current status — 2026-09-20 pilot diagnosis and benign live adapter (authoritative)
+
+- Inspected HEAD is `f33c74e`; conda `stac` is Python 3.11.16. The only initial worktree item was the user-provided untracked pilot review document. Pinned SafeClaw remains at the configured `a11f5cceaba0676be721021f8d232638fd111305` contract; no live request was made.
+- `doctor` now reports workflow kind, config/implementation/environment readiness, execution enablement, authorization, existing run state and independent blockers. Disabled preparation can be ready without becoming collectable. Existing complete runs with failed admission remain `execution_complete_admission_failed` and are not rewritten.
+- Sample preflight has bounded external commands and stable missing/permission/timeout/daemon/image reasons. Live revalidation persists its full preflight report before refusing launch. The legacy shell accepts absolute paths and YAML, works outside the repository cwd, rejects path-like run IDs, treats dotenv as data and makes print-only inspection side-effect free.
+- The normal SafeClaw adapter uses the existing victim driver/bridge/relay contract with reviewed cooperative messages and no construction attacker or security evaluator. A version-controlled disabled one-scenario template binds a sanitized normal runtime task, at most two target requests for one tool round trip, one embedding request and a 300-second wall clock. Single-session observation does not require cross-session admission.
+- Engineering tests cover the adapter through collector persistence and v3 reanalysis with a fake driver contract; existing local fake HTTP tests cover the production provider relay/parser. This is production-code compatibility preparation, not real-provider or official-evaluation evidence.
+
+- Fresh offline diagnostics: `experiments/runs/pilot-readiness-offline-20260920-v5/`; disabled preparation: `experiments/runs/benign-pilot/benign-pilot-ready-20260920-v3/`. The restricted diagnostic doctor correctly exits 10 because Docker socket access is unavailable while `can_prepare=true`, execution remains disabled and authorization absent. The v5 manifest binds the current source/config hashes and labels its compatibility result as a synthetic contract check rather than a provider observation.
+- Final `make check` passed ruff, mypy over 89 source files and all 328 tests in 16.52 seconds, including loopback fake HTTP tests. A restricted-sandbox targeted run separately recorded 75 passes and 8 socket-construction failures. Schema generation was byte-identical across consecutive runs; shell syntax, bridge import/compile and `git diff --check` passed.
+
+See [PILOT_READINESS_IMPLEMENTATION.md](PILOT_READINESS_IMPLEMENTATION.md). Historical totals below remain historical.
+
+# Previous current status — 2026-09-20 benign collection stage A
 
 - Inspected HEAD is `2bdb203`; conda `stac` is Python 3.11.16 and pinned SafeClawArena remains clean at `a11f5cceaba0676be721021f8d232638fd111305`. User-provided `docs/Sok*`, the new research-design document and `tmp/` were not overwritten.
 - A separate strict benign contract now represents reviewed legitimate goals, authorized operations, normal completion, follow-up/lifecycle limits, domain/surface inventories and hash-bound source neutralization. It rejects adversarial-only configuration fields rather than accepting empty placeholders.
