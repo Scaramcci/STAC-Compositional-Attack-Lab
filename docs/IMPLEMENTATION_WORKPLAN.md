@@ -1,4 +1,13 @@
-# Current workplan — after pilot reliability implementation (authoritative)
+# 当前计划 — 2026-09-21 九原语 capability 实验
+
+规范来源：[老师九原语方案](老师九原语_SafeClawArena自下向上实验重构方案.md)。实际完成情况见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)。下方旧路线仅供历史复现，不作为当前任务列表。
+
+1. **待做 / M0**：核对工作区与固定 upstream 合同；实现九原语严格模型、registry、case/compiler、F1 benign/direct/semantic fixtures、视图隔离和判分边界测试。验收：无需旧样本库即可离线 compile/replay/report，unknown 不被改写为成功或失败。
+2. **待做 / M1 离线部分**：实现薄 runtime adapter，复用 relay/预算/清理；打通事件落盘、状态 oracle、约束和原语分析。验收：集成覆盖实际 synthetic 状态改变、拒绝与缺证据三类结果，不 mock 掉全部关键阶段。
+3. **待做 / 验证与交付**：执行受影响测试和适当质量门，记录真实结果；交付离线演示、示例报告和禁用的真实兼容性配置。每完成一个子任务立即更新进度及剩余计划。
+4. **待落实环境与批次授权 / M1 真实部分及 M2–M5**：按方案分阶段推进；离线准备可继续，真实模型请求与实验不能凭此计划自行启动。
+
+# 历史计划 — after pilot reliability implementation
 
 Offline implementation work is complete for unified readiness, bounded preflight diagnostics,
 entrypoint path/config handling, read-only historical status classification, independent

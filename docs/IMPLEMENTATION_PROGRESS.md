@@ -1,4 +1,13 @@
-# Current status — 2026-09-20 pilot diagnosis and benign live adapter (authoritative)
+# 当前进度 — 2026-09-21 九原语重构方案与续接规范
+
+- 当前目标：按[老师九原语方案](老师九原语_SafeClawArena自下向上实验重构方案.md)建立新的 capability 实验；旧 collection/freeze/Planner 路线不作为新实验前置条件。
+- 已完成：详细方案文档（定义、实验、接口、指标及 M0–M5 实施顺序）；`Agent.md` / `AGENTS.md` 已加入分段更新进度及恢复前读取检查点的规范。
+- 当前阶段：方案与协作规范完成，九原语实验代码尚未开始实施。本次只修改文档，未运行代码测试、真实模型请求或实验；不继承下方历史测试数量作为当前验证结果。
+- 本次文档验证：`git diff --check` 通过；已检查入口、规范与进度/计划的链接及职责一致性。
+- 下一步：按[剩余计划](IMPLEMENTATION_WORKPLAN.md)开始 M0，再完成 M1 离线/fake transport 集成。先核对实际工作区和目标模块，不直接续跑历史 pilot。
+- 限制：真实兼容性、pilot/main 的环境与批次授权仍需单独落实；具体实施指令见方案第 16 节及用户后续 prompt。
+
+# 历史进度 — 2026-09-20 pilot diagnosis and benign live adapter
 
 - Inspected HEAD is `f33c74e`; conda `stac` is Python 3.11.16. The only initial worktree item was the user-provided untracked pilot review document. Pinned SafeClaw remains at the configured `a11f5cceaba0676be721021f8d232638fd111305` contract; no live request was made.
 - `doctor` now reports workflow kind, config/implementation/environment readiness, execution enablement, authorization, existing run state and independent blockers. Disabled preparation can be ready without becoming collectable. Existing complete runs with failed admission remain `execution_complete_admission_failed` and are not rewritten.
