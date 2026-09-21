@@ -7,6 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from stac_attack_lab.capability.compatibility import (
+    bind_compatibility_execution,
     build_compatibility_report,
     diagnose_capability_compatibility,
     prepare_capability_compatibility,
@@ -149,6 +150,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--config", default="configs/capability/provider_compatibility.disabled.json"
     )
     capability_prepare.add_argument("--run-id")
+    capability_bind = capability_sub.add_parser("bind-compatibility")
+    capability_bind.add_argument("--run-root", required=True)
+    capability_bind.add_argument("--authorization-reference", required=True)
+    capability_bind.add_argument("--authorize-live", action="store_true")
     capability_probe = capability_sub.add_parser("probe")
     capability_probe.add_argument("--run-root", required=True)
     capability_probe.add_argument("--stage", choices=("P0", "P1", "P2"), required=True)
@@ -320,6 +325,15 @@ def _main(argv: list[str] | None = None) -> int:
                 root, _project_scoped_path(root, args.config), run_id=args.run_id
             )
             print(prepared_root)
+            return 0
+        if args.capability_command == "bind-compatibility":
+            if not args.authorize_live:
+                raise ValueError("capability_execution_authorization_missing")
+            print(
+                bind_compatibility_execution(
+                    _project_scoped_path(root, args.run_root), args.authorization_reference
+                )
+            )
             return 0
         if args.capability_command == "probe":
             probe_status = run_compatibility_stage(

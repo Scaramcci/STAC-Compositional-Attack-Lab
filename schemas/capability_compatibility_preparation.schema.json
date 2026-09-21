@@ -120,6 +120,18 @@
       "title": "Patch Hash",
       "type": "string"
     },
+    "processing_source_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Processing Source Hash"
+    },
     "run_root": {
       "title": "Run Root",
       "type": "string"

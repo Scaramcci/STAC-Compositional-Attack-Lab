@@ -518,6 +518,8 @@ class SafeClawSubprocessVictimDriver:
         self._current_embedding_requests = 0
         self._last_provider_request_records: list[dict[str, Any]] = []
         self._last_embedding_request_records: list[dict[str, Any]] = []
+        self.last_cleanup_status: str = "unknown"
+        self.last_cleanup_error: str | None = None
         self._boundary_evidence_records: list[dict[str, Any]] = []
         self._boundary_evidence_record_ids: set[str] = set()
         # Only versions established by an observed successful write are eligible
@@ -554,6 +556,10 @@ class SafeClawSubprocessVictimDriver:
     def observed_snapshot(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Return append-only observations collected before an abort."""
         return list(self._events), list(self._checkpoints)
+
+    def provider_request_records_snapshot(self) -> list[dict[str, Any]]:
+        """Preserve the last bridge ledger even if finish subsequently fails."""
+        return list(self._last_provider_request_records)
 
     def boundary_evidence_snapshot(self) -> list[dict[str, Any]]:
         return list(getattr(self, "_boundary_evidence_records", []))
@@ -1755,13 +1761,22 @@ class SafeClawSubprocessVictimDriver:
                 embedding_request_records=list(self._last_embedding_request_records),
             )
         finally:
-            if self._process is not None and self._process.poll() is None:
-                self._terminate_process()
-            if self._stderr is not None:
-                self._stderr.close()
-            if self._temporary is not None:
-                self._temporary.cleanup()
-            self._process = None
+            primary_error = sys.exc_info()[1]
+            try:
+                if self._process is not None and self._process.poll() is None:
+                    self._terminate_process()
+                if self._stderr is not None:
+                    self._stderr.close()
+                if self._temporary is not None:
+                    self._temporary.cleanup()
+                self.last_cleanup_status = "completed"
+            except Exception as cleanup_exc:
+                self.last_cleanup_status = "failed"
+                self.last_cleanup_error = type(cleanup_exc).__name__
+                if primary_error is None:
+                    raise
+            finally:
+                self._process = None
 
     def abort(self) -> None:
         process = self._process
@@ -1775,11 +1790,20 @@ class SafeClawSubprocessVictimDriver:
                 except Exception:
                     self._terminate_process()
         finally:
-            if self._stderr is not None and not self._stderr.closed:
-                self._stderr.close()
-            if self._temporary is not None:
-                self._temporary.cleanup()
-            self._process = None
+            primary_error = sys.exc_info()[1]
+            try:
+                if self._stderr is not None and not self._stderr.closed:
+                    self._stderr.close()
+                if self._temporary is not None:
+                    self._temporary.cleanup()
+                self.last_cleanup_status = "completed"
+            except Exception as cleanup_exc:
+                self.last_cleanup_status = "failed"
+                self.last_cleanup_error = type(cleanup_exc).__name__
+                if primary_error is None:
+                    raise
+            finally:
+                self._process = None
 
     def _terminate_process(self) -> None:
         process = self._process

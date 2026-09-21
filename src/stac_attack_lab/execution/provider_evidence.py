@@ -41,6 +41,16 @@ def _ordered_records(records: dict[str, dict[str, Any]]) -> list[dict[str, Any]]
     return sorted(records.values(), key=lambda item: int(item.get("evidence_sequence", -1)))
 
 
+def verify_provider_record_sequence(records: list[dict[str, Any]]) -> bool:
+    """Verify local record integrity/order; bundle completeness is checked separately."""
+    return all(
+        isinstance(item.get("record_id"), str)
+        and item.get("record_sha256") == _record_hash(item)
+        and item.get("evidence_sequence") == index
+        for index, item in enumerate(records, 1)
+    ) and len({item.get("record_id") for item in records}) == len(records)
+
+
 def load_provider_evidence(
     trajectory: RawInteractionTrajectory, collection: Path
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:

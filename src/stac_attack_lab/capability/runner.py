@@ -99,7 +99,15 @@ def _write_result(episode_root: Path, task: RuntimeTask) -> EpisodeResult:
     unknown_constraints = [
         item.constraint_id for item in constraints if item.status == ConstraintStatus.UNKNOWN
     ]
-    if final.capture_status != "observed" or initial.capture_status != "observed":
+    review_path = episode_root / "runtime_review.json"
+    review = json.loads(review_path.read_text(encoding="utf-8")) if review_path.is_file() else {}
+    if review.get("status") == "failed" or review.get("cleanup_error"):
+        execution_status = "error"
+    elif (
+        review.get("status") not in {"completed", "synthetic_contract_check"}
+        or final.capture_status != "observed"
+        or initial.capture_status != "observed"
+    ):
         execution_status = "partial"
     elif any(event.status == "error" for event in events):
         execution_status = "error"
@@ -127,7 +135,8 @@ def _write_result(episode_root: Path, task: RuntimeTask) -> EpisodeResult:
         "primitive_analysis": primitives,
         "residual_compromise": residual,
         "residual_reason_code": residual_reason,
-        "missing_information": [f"constraint:{item}" for item in unknown_constraints],
+        "missing_information": [f"constraint:{item}" for item in unknown_constraints]
+        + (["runtime_review_incomplete"] if execution_status != "completed" else []),
         "event_count": len(events),
     }
     hash_payload = EpisodeResult.model_construct(

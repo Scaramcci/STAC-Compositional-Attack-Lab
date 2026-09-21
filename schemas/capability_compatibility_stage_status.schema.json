@@ -1,6 +1,15 @@
 {
   "additionalProperties": false,
   "properties": {
+    "attempt_observation": {
+      "default": "unknown",
+      "enum": [
+        "known",
+        "unknown"
+      ],
+      "title": "Attempt Observation",
+      "type": "string"
+    },
     "batch_id": {
       "title": "Batch Id",
       "type": "string"

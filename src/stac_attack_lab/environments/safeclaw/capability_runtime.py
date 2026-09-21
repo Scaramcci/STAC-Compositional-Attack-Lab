@@ -59,6 +59,11 @@ def project_business_state(
     return (
         {
             "trusted_ledger": task.case.task_contract.trusted_ledger,
+            "trusted_ledger_snapshot_sha256": (
+                stable_hash(contents["trusted/acceptance-ledger.json"])
+                if "trusted/acceptance-ledger.json" in contents
+                else None
+            ),
             "projects": projects,
             "session": {"label": "s1", "actual_key": session_key},
         },
@@ -67,6 +72,8 @@ def project_business_state(
 
 
 def _status(raw: str, *, committed: bool = False) -> str:
+    if raw == "attempted":
+        return "attempted"
     if raw == "passed":
         return "committed" if committed else "observed"
     if raw == "rejected" or raw == "blocked":
@@ -83,23 +90,39 @@ def map_safeclaw_capability_events(
     run_id: str,
     episode_id: str,
     reviewed_message: str,
+    session_started: bool = False,
+    source_delivered: bool = False,
 ) -> list[RuntimeEvent]:
-    actual_session = next(
-        (
-            item.get("public_payload", {}).get("actual_session_identity_sha256")
-            for item in source_events
-            if isinstance(item.get("public_payload"), dict)
-            and item.get("public_payload", {}).get("actual_session_identity_sha256")
-        ),
-        None,
-    )
-    session_label = next(
-        (str(item["session_id"]) for item in source_events if item.get("session_id")), "s1"
-    )
     result: list[RuntimeEvent] = []
     raw_to_request: dict[str, str] = {}
+    identities_by_session: dict[str, set[str]] = {}
+    for source in source_events:
+        payload = source.get("public_payload")
+        identity = (
+            payload.get("actual_session_identity_sha256") if isinstance(payload, dict) else None
+        )
+        if isinstance(identity, str) and identity and isinstance(source.get("session_id"), str):
+            identities_by_session.setdefault(source["session_id"], set()).add(identity)
 
-    def add(event_type: str, actor: str, status: str, **updates: object) -> RuntimeEvent:
+    def add(
+        event_type: str,
+        actor: str,
+        status: str,
+        *,
+        raw: dict[str, Any] | None = None,
+        **updates: object,
+    ) -> RuntimeEvent:
+        raw_payload = raw.get("public_payload") if raw else None
+        raw_payload = raw_payload if isinstance(raw_payload, dict) else {}
+        session_label = raw.get("session_id") if raw else None
+        observed_identities = (
+            identities_by_session.get(session_label, set())
+            if isinstance(session_label, str)
+            else set()
+        )
+        actual_identity = raw_payload.get("actual_session_identity_sha256")
+        if not actual_identity and len(observed_identities) == 1:
+            actual_identity = next(iter(observed_identities))
         item = RuntimeEvent.model_validate(
             {
                 "run_id": run_id,
@@ -108,8 +131,8 @@ def map_safeclaw_capability_events(
                 "sequence_no": len(result) + 1,
                 "actor": actor,
                 "event_type": event_type,
-                "session_label": session_label,
-                "actual_session_key": actual_session,
+                "session_label": str(raw.get("session_id") or "unknown") if raw else "unknown",
+                "actual_session_key": actual_identity,
                 "status": status,
                 **updates,
             }
@@ -117,17 +140,19 @@ def map_safeclaw_capability_events(
         result.append(item)
         return item
 
-    add("session_started", "environment", "observed")
-    add(
-        "source_delivered",
-        "user",
-        "observed",
-        resource_id="safeclaw.user_message",
-        evidence={
-            "public_view_hash": task.public_view.public_view_hash,
-            "reviewed_message_sha256": stable_hash(reviewed_message),
-        },
-    )
+    if session_started:
+        add("session_started", "environment", "observed")
+    if source_delivered:
+        add(
+            "source_delivered",
+            "user",
+            "observed",
+            resource_id="safeclaw.user_message",
+            evidence={
+                "public_view_hash": task.public_view.public_view_hash,
+                "reviewed_message_sha256": stable_hash(reviewed_message),
+            },
+        )
     for raw in sorted(source_events, key=lambda item: int(item.get("sequence_no", 0))):
         raw_type = raw.get("event_type")
         payload = raw.get("public_payload")
@@ -143,6 +168,7 @@ def map_safeclaw_capability_events(
                 "tool_selected",
                 "victim",
                 _status(str(raw.get("status"))),
+                raw=raw,
                 invocation_id=invocation,
                 tool_name=tool,
             )
@@ -152,6 +178,7 @@ def map_safeclaw_capability_events(
                 "attempted"
                 if raw.get("status") == "attempted"
                 else _status(str(raw.get("status"))),
+                raw=raw,
                 invocation_id=invocation,
                 attempt_id=f"attempt-{invocation}",
                 tool_name=tool,
@@ -174,6 +201,7 @@ def map_safeclaw_capability_events(
                 "tool_result",
                 "tool",
                 _status(str(raw.get("status")), committed=False),
+                raw=raw,
                 invocation_id=invocation,
                 attempt_id=f"attempt-{invocation}",
                 tool_name=payload.get("tool_name")
@@ -186,6 +214,7 @@ def map_safeclaw_capability_events(
                     "request_event_id": mapped_request,
                     "receipt": (raw.get("evidence_ref_ids") or [None])[0],
                     "raw_source_event_id": raw_id,
+                    "raw_result_projection_sha256": payload.get("raw_result_projection_sha256"),
                 },
             )
         elif raw_type in {"state_write", "state_read"}:
@@ -209,10 +238,22 @@ def map_safeclaw_capability_events(
                 artifact = artifacts[0] if isinstance(artifacts, list) and artifacts else {}
                 version = artifact.get("content_hash") if isinstance(artifact, dict) else None
                 before = str(version) if version else None
+                parents = (
+                    artifact.get("parent_artifact_ids") if isinstance(artifact, dict) else None
+                )
+                verified_parent = (
+                    isinstance(parents, list)
+                    and len(parents) == 1
+                    and parents[0] in raw.get("input_artifact_ids", [])
+                    and payload.get("version_match") is True
+                )
                 evidence.update(
                     {
-                        "source_resource_version": before,
-                        "source_kind": "initial_state",
+                        "source_resource_version": before if verified_parent else None,
+                        "source_kind": "observed_write" if verified_parent else "unknown",
+                        "source_artifact_id": parents[0]
+                        if verified_parent and isinstance(parents, list)
+                        else None,
                         "read_complete": payload.get("read_completeness")
                         in {"complete_content", "synthetic_exact_content"},
                     }
@@ -221,6 +262,7 @@ def map_safeclaw_capability_events(
                 event_type,
                 "victim",
                 _status(str(raw.get("status")), committed=event_type == "state_write"),
+                raw=raw,
                 invocation_id=None,
                 resource_id=f"workspace/{path}" if isinstance(path, str) else None,
                 resource_version_before=before,
@@ -232,8 +274,11 @@ def map_safeclaw_capability_events(
                 "response",
                 "victim",
                 _status(str(raw.get("status"))),
+                raw=raw,
                 evidence={
                     "text": str(payload.get("response") or ""),
+                    "provider_finish_reason": payload.get("provider_finish_reason"),
+                    "response_observation": payload.get("observation"),
                     "raw_source_event_id": raw_id,
                 },
             )
@@ -270,13 +315,17 @@ class SafeClawCapabilityRuntimeAdapter:
         reviewed_message = self.reviewed_message or task.case.task_contract.legitimate_goal
         source_events: list[dict[str, Any]] = []
         provider_records: list[dict[str, Any]] = []
+        boundary_records: list[dict[str, Any]] = []
         initial_public: dict[str, Any] | None = None
         final_public: dict[str, Any] | None = None
         failure: str | None = None
         cleanup_error: str | None = None
+        started = False
+        delivered = False
         try:
             with wall_clock_deadline(float(budget.max_wall_time_seconds)):
                 self.driver.start(self.runtime_task, seed=0, budget=budget)
+                started = True
                 initial_public = self.driver.public_state_snapshot()
                 step = self.driver.apply(
                     ConstructionAttackerAction(
@@ -287,12 +336,14 @@ class SafeClawCapabilityRuntimeAdapter:
                         rationale_summary="Frozen legitimate task message.",
                     )
                 )
+                delivered = True
                 source_events.extend(step.source_events)
                 finished = self.driver.finish()
                 source_events.extend(finished.source_events)
                 initial_public = finished.initial_public_state or initial_public
                 final_public = finished.final_public_state
                 provider_records = finished.provider_request_records
+                boundary_records = finished.evidence_records
                 if finished.embedding_request_records:
                     raise ValueError("capability_embedding_attempt_observed")
                 if finished.failure_category or finished.status != "complete":
@@ -306,16 +357,34 @@ class SafeClawCapabilityRuntimeAdapter:
             except Exception as cleanup_exc:
                 cleanup_error = f"{type(cleanup_exc).__name__}:{str(cleanup_exc)[:500]}"
 
+        ledger_snapshot = getattr(self.driver, "provider_request_records_snapshot", None)
+        if callable(ledger_snapshot):
+            recovered = ledger_snapshot()
+            if len(recovered) > len(provider_records):
+                provider_records = recovered
+        boundary_snapshot = getattr(self.driver, "boundary_evidence_snapshot", None)
+        if callable(boundary_snapshot):
+            recovered_boundary = boundary_snapshot()
+            if len(recovered_boundary) > len(boundary_records):
+                boundary_records = recovered_boundary
+        cleanup_status = getattr(self.driver, "last_cleanup_status", "unknown")
+        cleanup_error = cleanup_error or getattr(self.driver, "last_cleanup_error", None)
+        if cleanup_error:
+            failure = failure or "cleanup_failed"
+
         events = map_safeclaw_capability_events(
             task,
             source_events,
             run_id=run_id,
             episode_id=episode_id,
             reviewed_message=reviewed_message,
+            session_started=started,
+            source_delivered=delivered,
         )
-        actual_session = next(
-            (item.actual_session_key for item in events if item.actual_session_key), None
-        )
+        identities = {item.actual_session_key for item in events if item.actual_session_key}
+        if len(identities) > 1:
+            failure = failure or "capability_multiple_actual_sessions_unsupported"
+        actual_session = next(iter(identities)) if len(identities) == 1 else None
         initial_state, initial_reason = project_business_state(
             task, initial_public, session_key=actual_session
         )
@@ -352,12 +421,19 @@ class SafeClawCapabilityRuntimeAdapter:
         ledger_path = output_root / "provider_attempt_ledger.jsonl"
         for record in provider_records:
             append_jsonl(ledger_path, record)
+        boundary_path = output_root / "provider_boundary_evidence.jsonl"
+        for record in boundary_records:
+            append_jsonl(boundary_path, record)
+        if not boundary_path.exists():
+            boundary_path.touch(mode=0o600)
         if not ledger_path.exists():
             ledger_path.touch(mode=0o600)
         attempts = sum(
-            isinstance(item.get("upstream_attempt_count"), int)
-            and int(item["upstream_attempt_count"])
+            item.get("upstream_attempt_count", 1 if item.get("accepted") is True else 0)
             for item in provider_records
+            if isinstance(
+                item.get("upstream_attempt_count", 1 if item.get("accepted") is True else 0), int
+            )
         )
         write_private_json(
             output_root / "runtime_review.json",
@@ -365,10 +441,15 @@ class SafeClawCapabilityRuntimeAdapter:
                 "status": "failed" if failure else "completed",
                 "failure_category": failure,
                 "cleanup_error": cleanup_error,
+                "cleanup_status": cleanup_status,
                 "backend_kind": self.backend_kind,
-                "provider_attempts": attempts,
-                "network_requests_performed": attempts > 0,
+                "provider_attempts": attempts if provider_records else None,
+                "network_requests_performed": attempts > 0 if provider_records else None,
                 "embedding_attempts": 0,
+                "provider_evidence_record_count": len(boundary_records),
+                "provider_evidence_ordered_digest": stable_hash(
+                    [item.get("record_sha256") for item in boundary_records]
+                ),
             },
         )
         seal_episode_evidence(output_root, episode_id=episode_id)

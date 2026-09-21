@@ -620,6 +620,7 @@ class CompatibilityPreparationManifest(StrictModel):
     task_hash: str
     patch_hash: str
     bridge_hash: str
+    processing_source_hash: str | None = None
     model_id: str
     endpoint_host: str | None
     endpoint_path: str | None
@@ -631,9 +632,10 @@ class CompatibilityPreparationManifest(StrictModel):
 
     @model_validator(mode="after")
     def validate_hash(self) -> CompatibilityPreparationManifest:
-        if self.manifest_hash != stable_hash(
-            self.model_dump(mode="json", exclude={"manifest_hash"})
-        ):
+        excluded = {"manifest_hash"}
+        if self.processing_source_hash is None:
+            excluded.add("processing_source_hash")
+        if self.manifest_hash != stable_hash(self.model_dump(mode="json", exclude=excluded)):
             raise ValueError("capability_preparation_manifest_hash_mismatch")
         return self
 
@@ -650,6 +652,7 @@ class CompatibilityStageStatus(StrictModel):
     provider_attempts_before: NonNegativeInt
     provider_attempts_after: NonNegativeInt
     provider_attempts_stage: NonNegativeInt
+    attempt_observation: Literal["known", "unknown"] = "unknown"
     embedding_attempts: NonNegativeInt
     result_ref: str | None
     cleanup_status: Literal["completed", "failed", "unknown", "not_applicable"]

@@ -13,6 +13,7 @@ EVIDENCE_FILES = (
     "checkpoints/initial.json",
     "checkpoints/final.json",
     "provider_attempt_ledger.jsonl",
+    "provider_boundary_evidence.jsonl",
     "runtime_review.json",
 )
 

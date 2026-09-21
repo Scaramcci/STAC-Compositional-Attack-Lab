@@ -223,6 +223,7 @@ class FixtureCapabilitySafeClawAdapter:
             final.model_dump_json(indent=2) + "\n", encoding="utf-8"
         )
         (output_root / "provider_attempt_ledger.jsonl").write_text("", encoding="utf-8")
+        (output_root / "provider_boundary_evidence.jsonl").write_text("", encoding="utf-8")
         (output_root / "runtime_review.json").write_text(
             json.dumps(
                 {

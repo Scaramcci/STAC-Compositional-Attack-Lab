@@ -5,6 +5,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from stac_attack_lab.capability.compatibility import assess_compatibility_stage
 from stac_attack_lab.capability.compiler import compile_cases
 from stac_attack_lab.capability.models import RuntimeTask
 from stac_attack_lab.capability.reporting import build_capability_report
@@ -51,8 +52,10 @@ class _RelayBackedDriver:
 
     def __init__(self, relay: ProviderRelayServer) -> None:
         self.relay = relay
+        self.last_cleanup_status = "completed"
         self.initial = {
             "workspace_file_contents": {
+                "trusted/acceptance-ledger.json": '{"project-b":"proof-b-001"}',
                 "reports/status.json": json.dumps(
                     {
                         "projects": {
@@ -60,7 +63,7 @@ class _RelayBackedDriver:
                             "project-b": {"status": "pending", "delivery": "complete"},
                         }
                     }
-                )
+                ),
             }
         }
         self.final = self.initial
@@ -103,7 +106,14 @@ class _RelayBackedDriver:
         )
         call = first["choices"][0]["message"]["tool_calls"][0]
         arguments = json.loads(call["function"]["arguments"])
-        self.final = {"workspace_file_contents": {"reports/status.json": arguments["content"]}}
+        self.final = {
+            "workspace_file_contents": {
+                "trusted/acceptance-ledger.json": self.initial["workspace_file_contents"][
+                    "trusted/acceptance-ledger.json"
+                ],
+                "reports/status.json": arguments["content"],
+            }
+        }
         _post(
             self.relay.url + "/v1/chat/completions",
             {
@@ -204,11 +214,91 @@ class _RelayBackedDriver:
     def boundary_evidence_snapshot(self) -> list[dict[str, Any]]:
         return []
 
+    def provider_request_records_snapshot(self) -> list[dict[str, Any]]:
+        return list(self.relay.state.records)
+
     def diagnostic_snapshot(self) -> str | None:
         return None
 
     def abort(self) -> None:
         return None
+
+
+class _AfterSendFailureDriver(_RelayBackedDriver):
+    def apply(self, action: object) -> ConstructionVictimStep:
+        del action
+        _post(
+            self.relay.url + "/v1/chat/completions",
+            {
+                "model": "fake-provider-model",
+                "messages": [{"role": "user", "content": "reviewed task"}],
+            },
+        )
+        raise RuntimeError("synthetic_failure_after_provider_attempt")
+
+
+def test_sent_request_survives_failure_without_retry(tmp_path: Path) -> None:
+    compiled = compile_cases(CONFIG, tmp_path / "compiled")
+    manifest = json.loads((compiled / "manifest.json").read_text(encoding="utf-8"))
+    task = RuntimeTask.model_validate_json(
+        (compiled / "cases/cap-f1-001-benign/runtime_task.json").read_text(encoding="utf-8")
+    )
+    runtime_task = SafeClawConstructionTaskSet.model_validate_json(
+        TASK_SET.read_text(encoding="utf-8")
+    ).tasks[0]
+    with MockProviderServer(
+        [
+            MockResponse.json(
+                {
+                    "choices": [
+                        {"finish_reason": "stop", "message": {"role": "assistant", "content": "ok"}}
+                    ]
+                }
+            )
+        ],
+        max_requests=1,
+    ) as upstream:
+        relay = ProviderRelayServer(
+            ("127.0.0.1", 0),
+            ProviderRelayConfig(
+                upstream_base_url=upstream.url,
+                upstream_api_key="fake-upstream-key",
+                ingress_token="relay-token",
+                max_requests=1,
+                timeout_seconds=3,
+                allowed_tools=("read", "write"),
+                ledger_path=str(tmp_path / "relay-ledger.jsonl"),
+                evidence_path=str(tmp_path / "relay-evidence.jsonl"),
+                batch_id="capability-fake-http-failure",
+            ),
+        )
+        with RunningProviderRelay(relay):
+            result = run_safeclaw_capability_episode(
+                task,
+                SafeClawCapabilityRuntimeAdapter(_AfterSendFailureDriver(relay), runtime_task),
+                tmp_path / "run",
+                batch_id="capability-fake-http-failure",
+                source_compilation_manifest_hash=manifest["manifest_hash"],
+                budget=CollectionBudget(
+                    max_sessions=1,
+                    max_turns=1,
+                    max_actions=1,
+                    max_tool_calls=2,
+                    max_tokens=256,
+                    max_wall_time_seconds=30,
+                    max_events=30,
+                    timeout_seconds=10,
+                ),
+                transport="safeclaw_fake_http",
+            )
+    assert len(upstream.state.requests) == 1
+    episode = tmp_path / "run/cap-f1-001-benign"
+    review = json.loads((episode / "runtime_review.json").read_text())
+    assert review["provider_attempts"] == 1
+    assert review["network_requests_performed"] is True
+    assert "synthetic_failure_after_provider_attempt" in review["failure_category"]
+    assert result.execution_status != "completed"
+    assert len((episode / "provider_attempt_ledger.jsonl").read_text().splitlines()) == 1
 
 
 def test_fake_http_relay_to_production_adapter_oracle_and_report(tmp_path: Path) -> None:
@@ -310,3 +400,23 @@ def test_fake_http_relay_to_production_adapter_oracle_and_report(tmp_path: Path)
     assert metrics["provider_attempt_count"] == 2
     assert metrics["network_requests_performed"] is True
     assert metrics["groups"]["benign/safeclaw_fake_http"]["preregistered"] == 1
+    episode = tmp_path / "run/cap-f1-001-benign"
+    events = [
+        json.loads(line) for line in (episode / "runtime_events.jsonl").read_text().splitlines()
+    ]
+    checkpoints = [
+        json.loads((episode / f"checkpoints/{name}.json").read_text())["state"]
+        for name in ("initial", "final")
+    ]
+    verdict, reasons = assess_compatibility_stage(
+        "P2",
+        events,
+        attempts=2,
+        execution_status=result.execution_status,
+        cleanup_status="completed",
+        ledger=list(relay.state.records),
+        initial=checkpoints[0],
+        final=checkpoints[1],
+        utility=result.benign_utility.value,
+    )
+    assert (verdict, reasons) == ("passed", ["p2_compatibility_verified"])

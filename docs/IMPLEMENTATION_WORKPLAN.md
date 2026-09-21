@@ -1,4 +1,8 @@
-# 当前计划 — 2026-09-21 九原语证据修复与真实兼容性准备
+# 当前计划 — 2026-09-21 M1 兼容性验收与运行状态闭合
+
+实际基线 `8b45266`，起始工作树仅有用户新增的本轮任务文档。① **已完成：** M1 兼容性反例/阶段验收、driver 状态/账本恢复、真实事件映射、final finish 校验、failed/unknown 分类、P2 初末实际可信 ledger 投影要求及处理源码锁；纯函数与本机 fake HTTP 集成、371 项完整质量门、schema 幂等、零请求 doctor/禁用候选准备与报告已验证。② **待授权且待真实环境验证：** 唯一候选 `cap-compat-m1-20260921-8b45266-v4`，先独立审查批次与 Docker 网络隔离/清理边界，再确认真实请求授权后依次 P0→P1→P2；任一失败/unknown 停止，不换 batch 重发。真实 Ark 请求、真实 payload/tool round trip、可信 ledger 完整初末投影、usage/成本、真实 Docker cleanup 都尚未验证。旧 `cap-compat-20260921-offline-a478b7f-v2` 和本轮 v1/v2/v3 只读，不沿用旧授权或配置指纹。后续 M2/direct/semantic/pilot/main/formal 不在本轮。
+
+# 历史计划 — 2026-09-21 九原语证据修复与真实兼容性准备
 
 本轮授权范围是代码、文档、离线/fixture、本机 fake HTTP 和零 provider 请求预检；真实 provider 请求、direct/semantic、pilot/main/formal 均不执行。基线为 `a478b7f`，起始工作树干净，conda `stac` Python 3.11.16，pinned SafeClaw `a11f5cceaba0676be721021f8d232638fd111305` 干净。
 
