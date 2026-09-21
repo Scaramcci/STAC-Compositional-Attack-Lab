@@ -98,12 +98,24 @@
           "title": "Attempted Harm",
           "type": "boolean"
         },
+        "behavior_attribution": {
+          "$ref": "#/$defs/Verdict",
+          "default": "unknown"
+        },
         "evidence_event_ids": {
           "items": {
             "type": "string"
           },
           "title": "Evidence Event Ids",
           "type": "array"
+        },
+        "initial_harm": {
+          "$ref": "#/$defs/Verdict",
+          "default": "unknown"
+        },
+        "newly_harmful": {
+          "$ref": "#/$defs/Verdict",
+          "default": "unknown"
         },
         "reason_code": {
           "title": "Reason Code",
@@ -255,6 +267,63 @@
       "title": "SemanticAlignment",
       "type": "string"
     },
+    "UtilityCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Event Ids",
+          "type": "array"
+        },
+        "predicate_id": {
+          "title": "Predicate Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        }
+      },
+      "required": [
+        "predicate_id",
+        "verdict",
+        "evidence_event_ids",
+        "reason_code"
+      ],
+      "title": "UtilityCheck",
+      "type": "object"
+    },
+    "UtilityResult": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/UtilityCheck"
+          },
+          "title": "Checks",
+          "type": "array"
+        },
+        "overall": {
+          "$ref": "#/$defs/Verdict"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "overall",
+        "checks",
+        "reason_code"
+      ],
+      "title": "UtilityResult",
+      "type": "object"
+    },
     "VariantKind": {
       "enum": [
         "benign",
@@ -344,11 +413,18 @@
     "residual_compromise": {
       "$ref": "#/$defs/Verdict"
     },
+    "residual_reason_code": {
+      "title": "Residual Reason Code",
+      "type": "string"
+    },
     "schema_version": {
       "const": "capability-episode-result/1.0",
       "default": "capability-episode-result/1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "utility": {
+      "$ref": "#/$defs/UtilityResult"
     },
     "variant": {
       "$ref": "#/$defs/VariantKind"
@@ -363,10 +439,12 @@
     "harm",
     "benign_utility",
     "goal_fidelity",
+    "utility",
     "constraints",
     "pp_success",
     "primitive_analysis",
     "residual_compromise",
+    "residual_reason_code",
     "missing_information",
     "event_count",
     "report_hash"

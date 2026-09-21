@@ -1,4 +1,28 @@
-# 当前进度 — 2026-09-21 capability 续接审查与任务交接
+# 当前进度 — 2026-09-21 九原语证据修复与真实兼容性准备
+
+- **检查点 0 / 已完成（2026-09-21）：** 已读仓库规范、`SECURITY.md`、当前进度/计划和完整续接任务；核对实际 HEAD `a478b7f`、起始工作树干净、conda `stac` Python 3.11.16、pinned SafeClaw `a11f5cceaba0676be721021f8d232638fd111305` 干净。
+- **当前阶段：** 本轮离线实现与质量门完成；真实 provider compatibility 未授权、未执行，verdict 为 not_evaluated。
+- **检查点 1 / 反例已暴露（2026-09-21）：** 新增 `tests/unit/test_capability_evidence_hardening.py`，在未改生产逻辑前专项得到 **7 failed**。失败分别证明：空事件仍把适用约束判 satisfied、缺 proof 被当成 null 并误判 harm、任意 rubric 可自证 Adopt、同会话版本绑定读取不能成为 Recall、harness 初始化被误判 D5 违规、重算全部 hash 后的 public view 语义替换可通过、非字符串 material 被 `str(...)` 接受。
+- **反例命令：** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 conda run -n stac python -m pytest -q tests/unit/test_capability_evidence_hardening.py`；结果为 7 failed，均为目标语义缺陷，不是环境或 socket 失败。
+- **检查点 2 / A+B 核心修复已实现并专项验证（2026-09-21）：** `capability/evaluation.py` 将初始危害、最终危害、新发生危害、行为归因、三项业务 utility 和 residual 分开；无 runtime 覆盖的适用约束保持 unknown，单会话 D8 为 not_applicable，harness 初始化不再冒充 Persist 或自动违规。`analysis.py` 对事件 identity/顺序/引用、request/result、resource/version/receipt 做共同校验，Adopt 只接受版本化独立标注，Recall 不再要求跨会话。`compiler.py` 使用严格顶层模型、分离可信 ledger 与可写状态、重建并逐字段比较 public view，并绑定 profile/registry/三变体与初始世界。fixture evidence 新增 seal，只读 replay 校验输入 hash 并输出独立 analysis manifest；batch manifest 预注册完整分母，报告按 variant/transport 分组并从 ledger 复算网络请求。
+- **专项验证：** `tests/unit/test_capability_evidence_hardening.py`、原 capability evaluation/compiler 和离线 pipeline 共 **22 passed in 0.16s**。新增反例覆盖 utility/no-op、初始已危险、倒序/跨 episode 引用、sealed replay 篡改和缺结果仍保留 3 单元分母。当前仅为纯函数与 fixture 证据；生产 adapter/fake HTTP 尚未完成。
+- **下一步：** 完成 C 的 SafeClaw production backend 与本机 fake HTTP 贯通，保持现有 relay ledger、deadline、redaction 和清理边界。
+- **检查点 3 / C production backend 与 fake HTTP 已验证（2026-09-21）：** 新增 `environments/safeclaw/capability_runtime.py`，以冻结合法消息调用现有 `ConstructionVictimDriver`，不在 adapter 中代替 Agent 修改业务状态；映射实际 source events，业务 checkpoint 只从 `workspace_file_contents/reports/status.json` 读取，缺失即 unknown。`SafeClawSubprocessVictimDriver` 结果现携带受限 initial/final public state 和 provider/embedding ledger；single-session 可明确 `embedding=None`、预算 0，仍走现有 relay、deadline、脱敏和 owned cleanup。fixture executor 已命名为 `FixtureCapabilitySafeClawAdapter` 并在 runtime review 标记 `fixture_in_memory`。
+- **生产路径集成：** 新增真实本机 HTTP 测试 `tests/integration/test_capability_safeclaw_runtime.py`，实际经过 `MockProviderServer → ProviderRelayServer/parser/持久预算账本 → SafeClawCapabilityRuntimeAdapter → runtime events/seal → 独立 oracle → manifest 分母报告`，两次请求后 benign utility verified、harm false，ledger 报告 2 attempts、embedding 0。没有 mock compiler、adapter、oracle 或 report。
+- **专项验证：** capability/compiler/evaluation/runtime、model config 和 provider relay 共 **55 passed in 5.94s**；其中 loopback 测试在允许本机 socket 的环境执行。真实 Docker、真实 provider payload 和清理仍未验证。
+- **下一步：** D+E 零 provider doctor、唯一禁用 P0/P1/P2 batch、编号 Bash/status/report 与中文手册；核对当前 Ark 配置和新模板冲突，不自动替换模型。
+- **检查点 4 / D+E 已实现、待完整质量门（2026-09-21）：** 新增 `capability/compatibility.py` 与 CLI doctor/prepare/probe/status/report；doctor 只读取配置和环境变量存在性并运行本机 git/Docker/磁盘检查，不访问 endpoint。禁用模板绑定实际 Ark `ep-20260909180104-hmx9m` 和 `SAFECLAW_*`，P0/P1/P2 单阶段 1/2/5、累计 1/3/8、其他角色与 embedding 0、自动重试 0、2048 output、90 秒 timeout、1200 秒 batch；现金门明确 `unimplemented_estimate_only`。阶段使用原子 reservation、前置阶段和 prepared config hash，失败后仍从落盘 ledger 对账 attempt。
+- **运行入口：** 新增 `scripts/capability/00_doctor.sh` 至 `06_report.sh` 及 `status.sh`，支持任意 cwd、带空格参数和 `STAC_PYTHON`；dry-run 在授权/marker 前返回。`docs/CAPABILITY_RUNBOOK_ZH.md` 记录逐步命令、退出/恢复和真实验证缺口，README、scripts、结构导航、AGENTS、SECURITY 已同步边界。
+- **本阶段验证：** compatibility config 解析及全部 Bash `bash -n` 通过；新增 doctor identity mismatch、dry-run 零 marker、未授权 fail-before-marker 单元测试。受限执行的无 socket 专项 **39 passed**，9 项 loopback 在建立 socket 时被环境拒绝，尚需允许 loopback 后复跑；这不是断言失败。
+- **下一步：** 生成 schema、执行实际零请求 doctor/prepare/dry-run/offline demo 产物，再在允许 loopback 环境完成专项和 `make check`。
+- **检查点 5 / F 离线验收完成（2026-09-21）：** 实际 doctor 确认配置和环境均指向 Ark `ep-20260909180104-hmx9m`，effective endpoint `ark.cn-beijing.volces.com/api/v3/chat/completions`；未发送 HTTP。实现 readiness 为 true，环境 readiness 因当前执行上下文无 Docker socket/image 权限为 false，磁盘 550 GiB、pinned upstream/patch/tool contract 通过。最终唯一禁用 batch 为 `experiments/runs/capability/compatibility/cap-compat-20260921-offline-a478b7f-v2/`，manifest hash `3d1c5df6d048877f5e373791fd6d71be059856ccddd294dab9f034eed56c7176`；三个 dry-run 均 not_evaluated，ledger 0 字节且无 launch marker。
+- **离线产物：** `experiments/runs/capability/capability-evidence-offline-20260921-a478b7f/` 提供三 fixture 完整分母、sealed evidence、utility/harm/primitive/constraint 和报告；`experiments/runs/capability/compatibility-report-20260921-a478b7f-v2/` 提供未运行三阶段报告。Fixture ASR 为 null，network=false，official outcome 未评估。
+- **最终验证：** 首轮目标反例为 7 failed；修复后的无 socket 专项 28 passed。schema 生成连续两次 hash 一致；Bash 全部 `bash -n` 通过，任意 cwd 只读 status 成功。最终 `conda run -n stac make check` 在允许 loopback 的环境通过：ruff format/check、mypy **101 source files**、pytest **356 passed in 18.18s**；`git diff --check` 通过。早先受限沙箱 39 passed/9 socket permission failures 已由最终 loopback 完整门覆盖。
+- **真实状态：** provider、Docker Victim、direct/semantic live、pilot/main/formal 均未运行；所有角色实际 HTTP 消耗为 0。现金成本门仍为 estimate-only，真实 payload/tool round trip、网络隔离、owned cleanup 和账本/usage 闭合仍待同一 batch 的明确授权及 Docker 环境恢复后验证。
+- **执行边界：** 本轮只允许离线、fixture、本机 fake HTTP 和零 provider 请求预检。没有真实请求授权，不执行 direct/semantic、pilot/main/formal；不自动 commit/push/reset/clean。
+- **下一步：** 为 constraint、harm/utility、primitive evidence、compiler/view/pair/replay/denominator 写最小失败回归，修复后运行专项并保存检查点。
+
+# 历史当前进度 — 2026-09-21 capability 续接审查与任务交接
 
 - 本次仅审查和编写服务器实施任务；基线 `2195593`，起始工作树干净，未改实现、未运行模型/API 或实验。
 - 纠正上一轮完成结论：已有可执行 fixture 闭环，但 `CapabilitySafeClawAdapter` 仍直接改 Python state，未连接真实 SafeClaw/relay；constraints 有无证据默认 satisfied、utility 由 harm 取反、report 以已有文件充当完整分母等缺陷。因此不能称生产接入只差环境授权。

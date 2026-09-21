@@ -46,7 +46,7 @@ python -m stac_attack_lab.cli capability demo \
   --output experiments/runs/capability/<unique-offline-run-id>
 ```
 
-演示实际经过 compiler → fake SafeClaw adapter → runtime events/checkpoints → 独立 harm oracle → D1–D11 constraints → 九原语分析 → report。Fake/synthetic 结果仅是工程证据；`provider_compatibility.disabled.json` 保持禁用，也不构成真实请求授权。研究定义见[九原语重构方案](docs/老师九原语_SafeClawArena自下向上实验重构方案.md)。
+演示实际经过 compiler → fake SafeClaw adapter → runtime events/checkpoints → 独立 harm oracle → D1–D11 constraints → 九原语分析 → report。Fake/synthetic 结果仅是工程证据；`provider_compatibility.disabled.json` 保持禁用，也不构成真实请求授权。零请求诊断、唯一 batch 准备和分阶段命令见[中文运行手册](docs/CAPABILITY_RUNBOOK_ZH.md)。研究定义见[九原语重构方案](docs/老师九原语_SafeClawArena自下向上实验重构方案.md)。
 
 历史正常交互/graph-prior 工具仍可复现：
 

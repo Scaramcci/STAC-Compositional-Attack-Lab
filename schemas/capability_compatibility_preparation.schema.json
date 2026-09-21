@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "CompatibilityStage": {
+      "additionalProperties": false,
+      "properties": {
+        "cumulative_victim_http_limit": {
+          "exclusiveMinimum": 0,
+          "title": "Cumulative Victim Http Limit",
+          "type": "integer"
+        },
+        "max_output_tokens_per_request": {
+          "exclusiveMinimum": 0,
+          "title": "Max Output Tokens Per Request",
+          "type": "integer"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string"
+        },
+        "reviewed_message": {
+          "title": "Reviewed Message",
+          "type": "string"
+        },
+        "stage_id": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ],
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "victim_http_limit": {
+          "exclusiveMinimum": 0,
+          "title": "Victim Http Limit",
+          "type": "integer"
+        },
+        "wallclock_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Wallclock Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stage_id",
+        "purpose",
+        "victim_http_limit",
+        "cumulative_victim_http_limit",
+        "wallclock_seconds",
+        "max_output_tokens_per_request",
+        "reviewed_message"
+      ],
+      "title": "CompatibilityStage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "authorization_needed": {
+      "title": "Authorization Needed",
+      "type": "boolean"
+    },
+    "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "bridge_hash": {
+      "title": "Bridge Hash",
+      "type": "string"
+    },
+    "compilation_manifest_hash": {
+      "title": "Compilation Manifest Hash",
+      "type": "string"
+    },
+    "config_hash": {
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "endpoint_host": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Endpoint Host"
+    },
+    "endpoint_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Endpoint Path"
+    },
+    "execution_enabled": {
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "model_id": {
+      "title": "Model Id",
+      "type": "string"
+    },
+    "network_requests_performed": {
+      "const": false,
+      "default": false,
+      "title": "Network Requests Performed",
+      "type": "boolean"
+    },
+    "patch_hash": {
+      "title": "Patch Hash",
+      "type": "string"
+    },
+    "run_root": {
+      "title": "Run Root",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-compatibility-preparation/1.0",
+      "default": "capability-compatibility-preparation/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_config_hash": {
+      "title": "Source Config Hash",
+      "type": "string"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/CompatibilityStage"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "task_hash": {
+      "title": "Task Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "batch_id",
+    "run_root",
+    "config_hash",
+    "source_config_hash",
+    "compilation_manifest_hash",
+    "task_hash",
+    "patch_hash",
+    "bridge_hash",
+    "model_id",
+    "endpoint_host",
+    "endpoint_path",
+    "stages",
+    "execution_enabled",
+    "authorization_needed",
+    "manifest_hash"
+  ],
+  "title": "CompatibilityPreparationManifest",
+  "type": "object"
+}

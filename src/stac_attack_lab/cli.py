@@ -6,6 +6,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from stac_attack_lab.capability.compatibility import (
+    build_compatibility_report,
+    diagnose_capability_compatibility,
+    prepare_capability_compatibility,
+    read_compatibility_status,
+    run_compatibility_stage,
+)
 from stac_attack_lab.capability.compiler import (
     compile_cases,
     inventory_upstream,
@@ -133,6 +140,25 @@ def _build_parser() -> argparse.ArgumentParser:
     compatibility_validate.add_argument(
         "--config", default="configs/capability/provider_compatibility.disabled.json"
     )
+    capability_doctor = capability_sub.add_parser("doctor")
+    capability_doctor.add_argument(
+        "--config", default="configs/capability/provider_compatibility.disabled.json"
+    )
+    capability_prepare = capability_sub.add_parser("prepare-compatibility")
+    capability_prepare.add_argument(
+        "--config", default="configs/capability/provider_compatibility.disabled.json"
+    )
+    capability_prepare.add_argument("--run-id")
+    capability_probe = capability_sub.add_parser("probe")
+    capability_probe.add_argument("--run-root", required=True)
+    capability_probe.add_argument("--stage", choices=("P0", "P1", "P2"), required=True)
+    capability_probe.add_argument("--authorize-live", action="store_true")
+    capability_probe.add_argument("--dry-run", action="store_true")
+    capability_status = capability_sub.add_parser("status")
+    capability_status.add_argument("--run-root", required=True)
+    capability_compat_report = capability_sub.add_parser("compatibility-report")
+    capability_compat_report.add_argument("--run-root", required=True)
+    capability_compat_report.add_argument("--output", required=True)
     capability_replay = capability_sub.add_parser("replay")
     capability_replay.add_argument("--episode", required=True)
     capability_replay.add_argument("--output", required=True)
@@ -282,6 +308,45 @@ def _main(argv: list[str] | None = None) -> int:
                 _project_scoped_path(root, args.config)
             )
             print(compatibility_config.model_dump_json(indent=2))
+            return 0
+        if args.capability_command == "doctor":
+            doctor_report = diagnose_capability_compatibility(
+                root, _project_scoped_path(root, args.config)
+            )
+            print(doctor_report.model_dump_json(indent=2))
+            return 10 if doctor_report.blockers else 0
+        if args.capability_command == "prepare-compatibility":
+            prepared_root = prepare_capability_compatibility(
+                root, _project_scoped_path(root, args.config), run_id=args.run_id
+            )
+            print(prepared_root)
+            return 0
+        if args.capability_command == "probe":
+            probe_status = run_compatibility_stage(
+                root,
+                _project_scoped_path(root, args.run_root),
+                args.stage,
+                authorized=args.authorize_live,
+                dry_run=args.dry_run,
+            )
+            print(probe_status.model_dump_json(indent=2))
+            return 0 if args.dry_run or probe_status.verdict == "passed" else 10
+        if args.capability_command == "status":
+            print(
+                json.dumps(
+                    read_compatibility_status(_project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "compatibility-report":
+            print(
+                build_compatibility_report(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
             return 0
         if args.capability_command == "replay":
             replay_result = replay_episode(

@@ -1,0 +1,54 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "analysis_id": {
+      "title": "Analysis Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "output_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Output Hashes",
+      "type": "object"
+    },
+    "processing_source_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Processing Source Hashes",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "capability-replay-analysis/1.0",
+      "default": "capability-replay-analysis/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_bundle_hash": {
+      "title": "Source Bundle Hash",
+      "type": "string"
+    },
+    "source_input_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Source Input Hashes",
+      "type": "object"
+    }
+  },
+  "required": [
+    "analysis_id",
+    "source_bundle_hash",
+    "source_input_hashes",
+    "processing_source_hashes",
+    "output_hashes",
+    "manifest_hash"
+  ],
+  "title": "ReplayAnalysisManifest",
+  "type": "object"
+}

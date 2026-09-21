@@ -2,6 +2,13 @@
 
 | 命令 | 用途与退出语义 |
 |---|---|
+| `bash scripts/capability/00_doctor.sh` | 九原语兼容性零 provider 诊断；只报告模型/endpoint 的非秘密身份及 blocker。 |
+| `bash scripts/capability/01_offline_demo.sh OUTPUT` | 新目录中的 fixture compiler→runtime→oracle→report 闭环。 |
+| `bash scripts/capability/02_prepare_compatibility.sh [RUN_ID]` | 冻结默认禁用的唯一 P0/P1/P2 batch，0 请求。 |
+| `bash scripts/capability/03_probe_text.sh RUN_ROOT --dry-run` | P0 参数预演；`--authorize-live` 仍要求已启用快照和明确授权。 |
+| `bash scripts/capability/04_probe_tool.sh RUN_ROOT --dry-run` | P1 参数预演；真实执行要求 P0 passed。 |
+| `bash scripts/capability/05_probe_benign.sh RUN_ROOT --dry-run` | P2 参数预演；真实执行要求 P0/P1 passed。 |
+| `bash scripts/capability/status.sh RUN_ROOT` / `06_report.sh RUN_ROOT OUTPUT` | 只读状态和 partial/error 报告；见 `docs/CAPABILITY_RUNBOOK_ZH.md`。 |
 | `python -m stac_attack_lab.cli capability demo --config configs/capability/f1_status_acceptance.json --output experiments/runs/capability/<unique-id>` | 九原语 M0/M1 离线完整闭环；fake transport，零真实请求。 |
 | `python -m stac_attack_lab.cli capability inventory/compile/validate/replay/report ...` | 九原语固定 upstream 核对、确定性编译、密封校验、只读重分析和报告。 |
 | `bash scripts/run_cross_session_revalidation.sh prepare` | 创建唯一、默认禁用真实执行的复验目录，写入新 provenance/configuration review；不访问 provider。成功 0。 |

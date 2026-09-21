@@ -20,6 +20,7 @@
 | 研究定义、准入、对照设计 | `docs/EXPERIMENT_PROTOCOL.md` | 当前 task/config、对应 verifier |
 | 三原语 v3 重构 | `docs/基于文献的Primitive重构论证.md`、`docs/Primitive重构代码修改建议.md` | `primitives/`、`interactions/`、`extraction/`、`verification/` |
 | Provider/预算/证据 | `environments/safeclaw/provider_relay.py`、`evidence_policy.py`、`execution/provider_evidence.py` | `tests/unit/test_provider_evidence.py`、`test_provider_relay.py` |
+| 九原语 capability | `capability/`、`environments/safeclaw/capability_runtime.py` | `docs/CAPABILITY_RUNBOOK_ZH.md`、capability 单元/集成测试 |
 | Bridge/采集/生命周期 | `integrations/safeclaw/construction_bridge.py`、`interactions/safeclaw_collection.py` | `interactions/collector.py`、对应 bridge/collection 测试 |
 | Reanalysis/replay/准入 | `execution/revalidation.py`、`execution/construction_admission.py`、`execution/sample_generation.py` | `cli.py`、`tests/unit/test_cross_session_revalidation.py` |
 | 图、抽取、样本库 | `interactions/models.py`、`normalizer.py`、`extraction/`、`datasets/` | normalization/extraction/chain/library 测试 |

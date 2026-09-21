@@ -7,19 +7,20 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from stac_attack_lab.capability.models import (
-    AttackSurface,
     CapabilityCase,
+    CapabilityExperimentConfig,
     CapabilityProfile,
     CompatibilityConfig,
     CompilationManifest,
-    CompositionSpec,
     RuntimeTask,
-    TaskContract,
     VariantKind,
     VictimPublicView,
 )
 from stac_attack_lab.capability.registry import validate_registry
 from stac_attack_lab.contracts import StrictModel
+from stac_attack_lab.environments.safeclaw.evidence_policy import (
+    validate_provider_evidence_policy,
+)
 from stac_attack_lab.environments.safeclaw.redaction import scan_for_secrets
 from stac_attack_lab.hashing import file_hash, stable_hash
 
@@ -79,14 +80,12 @@ def _public_view(case: CapabilityCase) -> VictimPublicView:
 
 
 def compile_cases(config_path: Path, output_root: Path) -> Path:
-    config = _load_object(config_path)
-    profile = CapabilityProfile.model_validate(config["capability_profile"])
-    contract = TaskContract.model_validate(config["task_contract"])
-    surface = AttackSurface.model_validate(config["attack_surface"])
-    composition = CompositionSpec.model_validate(config["composition"])
-    materials = config.get("materials")
-    if not isinstance(materials, dict) or set(materials) != {item.value for item in VariantKind}:
-        raise ValueError("capability_material_variants_must_be_exact")
+    config = CapabilityExperimentConfig.model_validate(_load_object(config_path))
+    profile = config.capability_profile
+    contract = config.task_contract
+    surface = config.attack_surface
+    composition = config.composition
+    materials = config.materials
     if surface.editable_json_pointers != ["/low_trust_material"]:
         raise ValueError("capability_f1_editable_pointer_not_minimal")
     validate_registry()
@@ -115,14 +114,22 @@ def compile_cases(config_path: Path, output_root: Path) -> Path:
                 "task_contract": contract,
                 "attack_surface": surface,
                 "composition": composition,
-                "low_trust_material": str(materials[variant.value]),
+                "low_trust_material": materials[variant],
                 "contract_hash": stable_hash(contract.model_dump(mode="json")),
             },
             "case_hash",
         )
         public = _public_view(case)
         initial_state = {
-            "projects": contract.trusted_ledger,
+            "trusted_ledger": contract.trusted_ledger,
+            "projects": {
+                project_id: {
+                    key: value
+                    for key, value in project.items()
+                    if key != contract.oracle.trusted_proof_field
+                }
+                for project_id, project in contract.trusted_ledger.items()
+            },
             "artifacts": {},
             "session": {"label": "s1", "actual_key": f"{case_id}-actual-s1"},
         }
@@ -178,13 +185,34 @@ def validate_compilation(root: Path) -> CompilationManifest:
     manifest = CompilationManifest.model_validate_json(
         (root / "manifest.json").read_text(encoding="utf-8")
     )
+    if len(manifest.case_refs) != len(set(manifest.case_refs)):
+        raise ValueError("capability_compilation_case_ref_duplicate")
+    profile = CapabilityProfile.model_validate_json(
+        (root / "capability_profile.json").read_text(encoding="utf-8")
+    )
+    if stable_hash(profile.model_dump(mode="json")) != manifest.profile_hash:
+        raise ValueError("capability_manifest_profile_hash_mismatch")
+    registry_payload = json.loads((root / "primitive_registry.json").read_text(encoding="utf-8"))
+    registry = validate_registry()
+    expected_registry = [item.model_dump(mode="json") for item in registry]
+    if (
+        registry_payload != expected_registry
+        or stable_hash(registry_payload) != manifest.registry_hash
+    ):
+        raise ValueError("capability_manifest_registry_mismatch")
     seen_contracts: set[str] = set()
+    seen_variants: set[VariantKind] = set()
+    seen_case_ids: set[str] = set()
     split_assignments: list[tuple[str, str]] = []
     for ref in manifest.case_refs:
         path = (root / ref).resolve()
         if root.resolve() not in path.parents:
             raise ValueError("capability_manifest_ref_outside_root")
         runtime = RuntimeTask.model_validate_json(path.read_text(encoding="utf-8"))
+        if runtime.case.case_id in seen_case_ids:
+            raise ValueError("capability_compilation_case_id_duplicate")
+        seen_case_ids.add(runtime.case.case_id)
+        seen_variants.add(runtime.case.variant)
         if manifest.case_hashes.get(runtime.case.case_id) != runtime.case.case_hash:
             raise ValueError("capability_manifest_case_hash_mismatch")
         if manifest.runtime_task_hashes.get(runtime.case.case_id) != runtime.runtime_task_hash:
@@ -193,8 +221,28 @@ def validate_compilation(root: Path) -> CompilationManifest:
         split_assignments.append(
             (runtime.case.task_contract.split_group_id, runtime.case.task_contract.split)
         )
-        _public_view(runtime.case)
-    if len(seen_contracts) != 1 or len(manifest.case_refs) != 3:
+        expected_public = _public_view(runtime.case)
+        if runtime.public_view != expected_public:
+            raise ValueError("capability_public_view_semantic_mismatch")
+        expected_projects = {
+            project_id: {
+                key: value
+                for key, value in project.items()
+                if key != runtime.private_oracle.trusted_proof_field
+            }
+            for project_id, project in runtime.case.task_contract.trusted_ledger.items()
+        }
+        if runtime.initial_state.get("trusted_ledger") != runtime.case.task_contract.trusted_ledger:
+            raise ValueError("capability_initial_trusted_ledger_mismatch")
+        if runtime.initial_state.get("projects") != expected_projects:
+            raise ValueError("capability_initial_business_state_mismatch")
+    if (
+        len(seen_contracts) != 1
+        or len(manifest.case_refs) != 3
+        or seen_variants != set(VariantKind)
+        or set(manifest.case_hashes) != seen_case_ids
+        or set(manifest.runtime_task_hashes) != seen_case_ids
+    ):
         raise ValueError("capability_compilation_pairing_incomplete")
     validate_split_assignments(split_assignments)
     return manifest
@@ -272,4 +320,6 @@ def inventory_upstream(upstream_root: Path) -> dict[str, Any]:
 
 
 def validate_compatibility_config(path: Path) -> CompatibilityConfig:
-    return CompatibilityConfig.model_validate(_load_object(path))
+    config = CompatibilityConfig.model_validate(_load_object(path))
+    validate_provider_evidence_policy(config.provider_evidence_policy)
+    return config

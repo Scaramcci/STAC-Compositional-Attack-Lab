@@ -81,7 +81,7 @@ def test_formal_registry_is_stable_and_aliases_resolve() -> None:
 
 def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
     validate_schema_registry()
-    assert len(SCHEMA_MODELS) == 57
+    assert len(SCHEMA_MODELS) == 63
     assert {
         "sample_collection_stage_manifest",
         "sample_mining_stage_manifest",
@@ -92,6 +92,12 @@ def test_formal_schema_registry_is_disjoint_and_serializable() -> None:
         "capability_runtime_event",
         "capability_episode_result",
         "capability_compatibility_config",
+        "capability_batch_manifest",
+        "capability_evidence_bundle",
+        "capability_replay_analysis_manifest",
+        "capability_doctor_report",
+        "capability_compatibility_preparation",
+        "capability_compatibility_stage_status",
     } <= set(SCHEMA_MODELS)
     for model in SCHEMA_MODELS.values():
         schema = model.model_json_schema()

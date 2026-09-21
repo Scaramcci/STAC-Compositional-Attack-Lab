@@ -159,7 +159,7 @@ STAC-Compositional-Attack-Lab/
 
 CLI 当前主要分为六组：
 
-- `capability`：九原语 inventory、compile、validate、fake demo、replay 和 report；
+- `capability`：九原语 inventory、compile、validate、fake demo、sealed replay/report，以及 compatibility doctor/prepare/dry-run/status；
 - `doctor`：离线检查 workflow readiness；
 - `benign`：正常交互 validate、prepare、fixture/live collection；
 - `flow`：v3 profile、reanalyze、validate、slice、inspect；
@@ -168,9 +168,9 @@ CLI 当前主要分为六组：
 
 ### 4.1 九原语 capability 主线
 
-`capability/models.py` 将九原语、task/surface/composition、public/runtime view、runtime event、checkpoint、constraint、harm 与 episode result 分开建模。`compiler.py` 只允许 F1 三条件修改登记的低信任材料并密封 runtime task；`environments/safeclaw/capability_adapter.py` 是中性 reviewed-session adapter，fake transport 不调用 provider。`evaluation.py` 从状态 checkpoint 独立判断业务危害，`analysis.py` 只从实际事件产生 occurrence，`runner.py`/`reporting.py` 支持离线 replay 与完整分母报告。
+`capability/models.py` 将九原语、task/surface/composition、public/runtime view、runtime event、checkpoint、constraint、harm、utility 与 episode result 分开建模。`compiler.py` 只允许 F1 三条件修改登记的低信任材料并密封 runtime task；`environments/safeclaw/capability_adapter.py` 是 fixture executor，`capability_runtime.py` 通过现有 driver/relay/deadline/清理合同提供 production backend。`evaluation.py` 从状态 checkpoint 独立判断业务危害和效用，`analysis.py` 只从实际事件产生 occurrence，`runner.py`/`reporting.py` 支持 sealed replay 与完整 manifest 分母报告，`capability/compatibility.py` 提供零请求诊断、禁用准备和阶段门。
 
-当前 F1 配置是 `configs/capability/f1_status_acceptance.json`。真实兼容性模板 `configs/capability/provider_compatibility.disabled.json` 固定 benign case、模型、三次 Victim HTTP 上限、零重试、300 秒墙钟与唯一输出，但 `execution_enabled=false` 且没有授权引用。
+当前 F1 配置是 `configs/capability/f1_status_acceptance.json`。真实兼容性模板 `configs/capability/provider_compatibility.disabled.json` 固定 benign case、当前 Ark 模型以及 P0/P1/P2 的 1/2/5 次 Victim 上限（累计 8）、零 embedding/自动重试和 1200 秒 batch 墙钟，但 `execution_enabled=false` 且没有授权引用。详见 `docs/CAPABILITY_RUNBOOK_ZH.md`。
 
 ---
 

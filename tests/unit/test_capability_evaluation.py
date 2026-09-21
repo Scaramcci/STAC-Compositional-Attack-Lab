@@ -116,7 +116,7 @@ def test_harness_write_is_not_victim_persist_and_session_label_is_not_identity(
     )
     assert (
         next(item for item in constraints if item.constraint_id == "D8").status
-        == ConstraintStatus.UNKNOWN
+        == ConstraintStatus.NOT_APPLICABLE
     )
 
 

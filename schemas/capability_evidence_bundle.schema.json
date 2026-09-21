@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "bundle_hash": {
+      "title": "Bundle Hash",
+      "type": "string"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "event_count": {
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "input_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Input Hashes",
+      "type": "object"
+    },
+    "processing_version": {
+      "const": "capability-evidence-v2",
+      "default": "capability-evidence-v2",
+      "title": "Processing Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-evidence-bundle/1.0",
+      "default": "capability-evidence-bundle/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "episode_id",
+    "input_hashes",
+    "event_count",
+    "bundle_hash"
+  ],
+  "title": "EvidenceBundleManifest",
+  "type": "object"
+}

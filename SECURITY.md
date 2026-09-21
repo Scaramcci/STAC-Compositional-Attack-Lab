@@ -14,10 +14,11 @@
 - Chat 与 embedding endpoint/key 使用独立环境变量。
 - 日志和 artifact 在落盘前进行 secret scan 与 redaction。
 - Frozen library 不得覆盖；任何修改都必须产生新版本。
+- Frozen library、pilot admission 和 formal matrix 是 legacy Planner/formal 路线的执行门。九原语 capability 入口不消费该 library，但必须通过自己的 compiler/view/pair 校验、默认禁用配置、唯一 batch、provider 预算、原子阶段 reservation、证据封存和独立授权门；两套门均不得互相替代。
 
 ## Fail-closed conditions
 
-出现以下情况必须停止：preflight 失败、upstream/hash/patch 不一致、pilot 未达门槛、library audit 失败、public/private view 泄漏、secret scan 失败、pair invariant 失败或 formal matrix 不完整。
+出现以下情况必须停止其依赖的执行：preflight 失败、upstream/hash/patch 不一致、对应路线的 admission/audit 失败、public/private view 泄漏、secret scan 失败、pair invariant 失败、预算/唯一 batch 不一致或 formal matrix 不完整。某一路线的停止不阻止无关的只读离线分析。
 
 ## Incident response
 

@@ -13,8 +13,15 @@
       "type": "string"
     },
     "actual_session_key": {
-      "title": "Actual Session Key",
-      "type": "string"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Actual Session Key"
     },
     "arguments": {
       "anyOf": [

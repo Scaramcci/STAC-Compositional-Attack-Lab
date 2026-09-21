@@ -1,0 +1,127 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "authorization_state": {
+      "enum": [
+        "absent",
+        "configured_not_session_authorized"
+      ],
+      "title": "Authorization State",
+      "type": "string"
+    },
+    "blockers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Blockers",
+      "type": "array"
+    },
+    "checks": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Checks",
+      "type": "object"
+    },
+    "config_valid": {
+      "title": "Config Valid",
+      "type": "boolean"
+    },
+    "endpoint_host": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Endpoint Host"
+    },
+    "endpoint_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Endpoint Path"
+    },
+    "environment_ready": {
+      "title": "Environment Ready",
+      "type": "boolean"
+    },
+    "environment_variable_presence": {
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "title": "Environment Variable Presence",
+      "type": "object"
+    },
+    "execution_enabled": {
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "implementation_ready": {
+      "title": "Implementation Ready",
+      "type": "boolean"
+    },
+    "model_id_configured": {
+      "title": "Model Id Configured",
+      "type": "string"
+    },
+    "model_id_environment": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model Id Environment"
+    },
+    "model_identity_match": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Model Identity Match"
+    },
+    "network_requests_performed": {
+      "const": false,
+      "default": false,
+      "title": "Network Requests Performed",
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "capability-doctor/1.0",
+      "default": "capability-doctor/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "config_valid",
+    "implementation_ready",
+    "environment_ready",
+    "execution_enabled",
+    "authorization_state",
+    "model_id_configured",
+    "model_id_environment",
+    "model_identity_match",
+    "endpoint_host",
+    "endpoint_path",
+    "environment_variable_presence",
+    "checks",
+    "blockers"
+  ],
+  "title": "CapabilityDoctorReport",
+  "type": "object"
+}

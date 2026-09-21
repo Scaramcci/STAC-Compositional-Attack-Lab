@@ -54,7 +54,7 @@ def build_safeclaw_model_config(
     provider_request_budget: int = 128,
     provider_timeout_seconds: int = 90,
     provider_allowed_tools: list[str] | None = None,
-    embedding_request_budget: int = 128,
+    embedding_request_budget: int | None = None,
     provider_context_window: int = 200000,
     provider_max_output_tokens: int = 1024,
     provider_evidence_policy: dict[str, Any] | None = None,
@@ -63,17 +63,22 @@ def build_safeclaw_model_config(
     target_api_key = environment.get(target_api_key_env)
     if not target_api_key:
         raise ValueError(f"missing_environment_variable:{target_api_key_env}")
-    if (
-        min(
-            provider_request_budget,
-            provider_timeout_seconds,
-            provider_context_window,
-            provider_max_output_tokens,
-            embedding_request_budget,
-        )
-        < 1
+    if min(
+        provider_request_budget,
+        provider_timeout_seconds,
+        provider_context_window,
+        provider_max_output_tokens,
+    ) < 1 or (
+        embedding is not None
+        and embedding_request_budget is not None
+        and embedding_request_budget < 1
     ):
         raise ValueError("safeclaw_provider_transport_limits_must_be_positive")
+    effective_embedding_budget = (
+        (embedding_request_budget if embedding_request_budget is not None else 128)
+        if embedding is not None
+        else 0
+    )
     if provider_allowed_tools is not None and len(provider_allowed_tools) != len(
         set(provider_allowed_tools)
     ):
@@ -91,7 +96,7 @@ def build_safeclaw_model_config(
         "provider_request_budget": provider_request_budget,
         "provider_timeout_seconds": provider_timeout_seconds,
         "provider_allowed_tools": provider_allowed_tools,
-        "embedding_request_budget": embedding_request_budget,
+        "embedding_request_budget": effective_embedding_budget,
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
         "provider_evidence_policy": validate_provider_evidence_policy(provider_evidence_policy),

@@ -1,0 +1,108 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "cleanup_status": {
+      "enum": [
+        "completed",
+        "failed",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "Cleanup Status",
+      "type": "string"
+    },
+    "embedding_attempts": {
+      "minimum": 0,
+      "title": "Embedding Attempts",
+      "type": "integer"
+    },
+    "execution_status": {
+      "enum": [
+        "not_started",
+        "completed",
+        "partial",
+        "blocked",
+        "error"
+      ],
+      "title": "Execution Status",
+      "type": "string"
+    },
+    "provider_attempts_after": {
+      "minimum": 0,
+      "title": "Provider Attempts After",
+      "type": "integer"
+    },
+    "provider_attempts_before": {
+      "minimum": 0,
+      "title": "Provider Attempts Before",
+      "type": "integer"
+    },
+    "provider_attempts_stage": {
+      "minimum": 0,
+      "title": "Provider Attempts Stage",
+      "type": "integer"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "result_ref": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Result Ref"
+    },
+    "schema_version": {
+      "const": "capability-compatibility-stage/1.0",
+      "default": "capability-compatibility-stage/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage_id": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2"
+      ],
+      "title": "Stage Id",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "passed",
+        "failed",
+        "unknown",
+        "not_evaluated"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "required": [
+    "batch_id",
+    "stage_id",
+    "execution_status",
+    "verdict",
+    "reason_codes",
+    "provider_attempts_before",
+    "provider_attempts_after",
+    "provider_attempts_stage",
+    "embedding_attempts",
+    "result_ref",
+    "cleanup_status"
+  ],
+  "title": "CompatibilityStageStatus",
+  "type": "object"
+}

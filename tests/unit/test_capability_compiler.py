@@ -74,7 +74,12 @@ def test_real_compatibility_template_is_concrete_disabled_and_zero_retry() -> No
     )
     assert config.execution_enabled is False
     assert config.max_attacker_http_attempts == 0
-    assert config.max_victim_http_attempts == config.max_batch_http_attempts == 3
+    assert config.max_victim_http_attempts == config.max_batch_http_attempts == 8
+    assert [stage.victim_http_limit for stage in config.stages] == [1, 2, 5]
+    assert [stage.cumulative_victim_http_limit for stage in config.stages] == [1, 3, 8]
+    assert config.max_embedding_http_attempts == 0
+    assert config.automatic_retries == 0
+    assert config.cost_control_mode == "unimplemented_estimate_only"
     assert config.max_embedding_http_attempts == 0
     assert config.automatic_retries == 0
     assert config.authorization_reference is None

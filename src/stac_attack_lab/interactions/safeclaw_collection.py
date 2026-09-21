@@ -102,6 +102,10 @@ class ConstructionVictimResult(StrictModel):
     status: Literal["complete", "partial", "blocked", "error"]
     failure_category: str | None = None
     provenance: dict[str, str]
+    initial_public_state: dict[str, Any] | None = None
+    final_public_state: dict[str, Any] | None = None
+    provider_request_records: list[dict[str, Any]] = Field(default_factory=list)
+    embedding_request_records: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ConstructionVictimDriver(Protocol):
@@ -125,6 +129,8 @@ class ConstructionVictimDriver(Protocol):
     def boundary_evidence_snapshot(self) -> list[dict[str, Any]]: ...
 
     def diagnostic_snapshot(self) -> str | None: ...
+
+    def public_state_snapshot(self) -> dict[str, Any]: ...
 
     def abort(self) -> None: ...
 
@@ -464,12 +470,14 @@ class SafeClawSubprocessVictimDriver:
         target_model_id: str,
         target_base_url: str,
         target_api_key_env: str,
-        embedding: SafeClawEmbeddingRuntime,
+        embedding: SafeClawEmbeddingRuntime | None,
         model_hash: str,
         provider_request_budget: int = 128,
         provider_timeout_seconds: int = 90,
+        provider_context_window: int = 200000,
+        provider_max_output_tokens: int = 1024,
         provider_allowed_tools: list[str] | None = None,
-        embedding_request_budget: int = 128,
+        embedding_request_budget: int = 0,
         provider_evidence_policy: dict[str, Any] | None = None,
         environment: Mapping[str, str] | None = None,
         batch_id: str | None = None,
@@ -485,6 +493,8 @@ class SafeClawSubprocessVictimDriver:
         self.model_hash = model_hash
         self.provider_request_budget = provider_request_budget
         self.provider_timeout_seconds = provider_timeout_seconds
+        self.provider_context_window = provider_context_window
+        self.provider_max_output_tokens = provider_max_output_tokens
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
         self.provider_evidence_policy = validate_provider_evidence_policy(provider_evidence_policy)
@@ -506,6 +516,8 @@ class SafeClawSubprocessVictimDriver:
         self._embedding_requests_spent = 0
         self._current_provider_requests = 0
         self._current_embedding_requests = 0
+        self._last_provider_request_records: list[dict[str, Any]] = []
+        self._last_embedding_request_records: list[dict[str, Any]] = []
         self._boundary_evidence_records: list[dict[str, Any]] = []
         self._boundary_evidence_record_ids: set[str] = set()
         # Only versions established by an observed successful write are eligible
@@ -575,6 +587,9 @@ class SafeClawSubprocessVictimDriver:
         text = path.read_text(encoding="utf-8", errors="replace")
         return str(redact_value(text[-4000:]).sanitized)
 
+    def public_state_snapshot(self) -> dict[str, Any]:
+        return dict(self._last_state or self._pre_state)
+
     def _read_bridge(self) -> dict[str, Any]:
         if self._process is None or self._process.stdout is None:
             raise RuntimeError("safeclaw_construction_bridge_not_started")
@@ -613,7 +628,7 @@ class SafeClawSubprocessVictimDriver:
         embedding_remaining = self.embedding_request_budget - self._embedding_requests_spent
         if provider_remaining < 1:
             raise RuntimeError("safeclaw_collection_provider_request_budget_exhausted")
-        if embedding_remaining < 1:
+        if self.embedding is not None and embedding_remaining < 1:
             raise RuntimeError("safeclaw_collection_embedding_request_budget_exhausted")
         self._current_provider_requests = 0
         self._current_embedding_requests = 0
@@ -625,6 +640,8 @@ class SafeClawSubprocessVictimDriver:
             embedding=self.embedding,
             provider_request_budget=provider_remaining,
             provider_timeout_seconds=self.provider_timeout_seconds,
+            provider_context_window=self.provider_context_window,
+            provider_max_output_tokens=self.provider_max_output_tokens,
             provider_allowed_tools=self.provider_allowed_tools,
             embedding_request_budget=embedding_remaining,
             provider_evidence_policy=self.provider_evidence_policy,
@@ -1669,6 +1686,8 @@ class SafeClawSubprocessVictimDriver:
                     }
                 )
             self._checkpoints.append({"checkpoint_id": "victim-post", "state_hash": post_hash})
+            initial_public_state = dict(self._pre_state)
+            final_public_state = dict(post_state)
             self._process.wait(timeout=30)
             evidence_records = self.boundary_evidence_snapshot()
             return ConstructionVictimResult(
@@ -1730,6 +1749,10 @@ class SafeClawSubprocessVictimDriver:
                         )
                     ),
                 },
+                initial_public_state=initial_public_state,
+                final_public_state=final_public_state,
+                provider_request_records=list(self._last_provider_request_records),
+                embedding_request_records=list(self._last_embedding_request_records),
             )
         finally:
             if self._process is not None and self._process.poll() is None:

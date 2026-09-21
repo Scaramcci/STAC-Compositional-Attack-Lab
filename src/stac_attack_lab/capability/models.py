@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field, NonNegativeInt, PositiveInt, model_validator
+from pydantic import Field, NonNegativeInt, PositiveInt, field_validator, model_validator
 
 from stac_attack_lab.contracts import StrictModel
 from stac_attack_lab.hashing import stable_hash
@@ -121,6 +121,13 @@ class TaskContract(StrictModel):
     normal_utility_predicates: list[str]
     oracle: BusinessOracleSpec
 
+    @field_validator("case_id", "base_task_id", "split_group_id", "legitimate_goal")
+    @classmethod
+    def validate_nonempty_text(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("capability_task_text_empty")
+        return value
+
 
 class AttackSurface(StrictModel):
     surface_id: str
@@ -173,6 +180,37 @@ class CompositionSpec(StrictModel):
         for edge in self.edges:
             if edge.source_node_id not in ids or edge.target_node_id not in ids:
                 raise ValueError("composition_edge_node_missing")
+        edge_keys = [
+            (edge.source_node_id, edge.target_node_id, edge.relation) for edge in self.edges
+        ]
+        if len(edge_keys) != len(set(edge_keys)):
+            raise ValueError("composition_edge_duplicate")
+        return self
+
+
+class CapabilityExperimentConfig(StrictModel):
+    capability_profile: CapabilityProfile
+    task_contract: TaskContract
+    attack_surface: AttackSurface
+    composition: CompositionSpec
+    materials: dict[VariantKind, str]
+
+    @field_validator("materials", mode="before")
+    @classmethod
+    def validate_material_types(cls, value: object) -> object:
+        if not isinstance(value, dict) or any(not isinstance(item, str) for item in value.values()):
+            raise ValueError("capability_material_value_invalid")
+        return value
+
+    @model_validator(mode="after")
+    def validate_materials(self) -> CapabilityExperimentConfig:
+        if set(self.materials) != set(VariantKind):
+            raise ValueError("capability_material_variants_must_be_exact")
+        for material in self.materials.values():
+            if not isinstance(material, str) or not material.strip():
+                raise ValueError("capability_material_value_invalid")
+            if len(material) > self.attack_surface.max_characters:
+                raise ValueError("capability_material_too_long")
         return self
 
 
@@ -259,7 +297,7 @@ class RuntimeEvent(StrictModel):
         "response",
     ]
     session_label: str
-    actual_session_key: str
+    actual_session_key: str | None
     invocation_id: str | None = None
     attempt_id: str | None = None
     tool_name: str | None = None
@@ -321,8 +359,24 @@ class PrimitiveAssessment(StrictModel):
 class HarmResult(StrictModel):
     verdict: Verdict
     attempted_harm: bool
+    initial_harm: Verdict = Verdict.UNKNOWN
+    newly_harmful: Verdict = Verdict.UNKNOWN
+    behavior_attribution: Verdict = Verdict.UNKNOWN
     target_project_id: str
     evidence_event_ids: list[str]
+    reason_code: str
+
+
+class UtilityCheck(StrictModel):
+    predicate_id: str
+    verdict: Verdict
+    evidence_event_ids: list[str]
+    reason_code: str
+
+
+class UtilityResult(StrictModel):
+    overall: Verdict
+    checks: list[UtilityCheck]
     reason_code: str
 
 
@@ -346,10 +400,12 @@ class EpisodeResult(StrictModel):
     harm: HarmResult
     benign_utility: Verdict
     goal_fidelity: Verdict
+    utility: UtilityResult
     constraints: list[ConstraintCheck]
     pp_success: bool
     primitive_analysis: list[PrimitiveAssessment]
     residual_compromise: Verdict
+    residual_reason_code: str
     missing_information: list[str]
     event_count: NonNegativeInt
     report_hash: str
@@ -392,16 +448,92 @@ class CompilationManifest(StrictModel):
         return self
 
 
+class BatchUnit(StrictModel):
+    unit_id: str
+    case_id: str
+    variant: VariantKind
+    repeat_index: NonNegativeInt
+    transport: Literal["fixture", "safeclaw_live", "safeclaw_fake_http"]
+    stage: Literal["preregistered", "completed", "partial", "blocked", "error"]
+    result_ref: str
+    reason_code: str
+
+
+class BatchManifest(StrictModel):
+    schema_version: Literal["capability-batch/1.0"] = "capability-batch/1.0"
+    batch_id: str
+    source_compilation_manifest_hash: str
+    units: list[BatchUnit]
+    provider_ledger_ref: str
+    manifest_hash: str
+
+    @model_validator(mode="after")
+    def validate_manifest(self) -> BatchManifest:
+        ids = [item.unit_id for item in self.units]
+        if not ids or len(ids) != len(set(ids)):
+            raise ValueError("capability_batch_unit_ids_invalid")
+        if self.manifest_hash != stable_hash(
+            self.model_dump(mode="json", exclude={"manifest_hash"})
+        ):
+            raise ValueError("capability_batch_manifest_hash_mismatch")
+        return self
+
+
+class EvidenceBundleManifest(StrictModel):
+    schema_version: Literal["capability-evidence-bundle/1.0"] = "capability-evidence-bundle/1.0"
+    episode_id: str
+    input_hashes: dict[str, str]
+    event_count: NonNegativeInt
+    processing_version: Literal["capability-evidence-v2"] = "capability-evidence-v2"
+    bundle_hash: str
+
+    @model_validator(mode="after")
+    def validate_bundle(self) -> EvidenceBundleManifest:
+        if self.bundle_hash != stable_hash(self.model_dump(mode="json", exclude={"bundle_hash"})):
+            raise ValueError("capability_evidence_bundle_hash_mismatch")
+        return self
+
+
+class ReplayAnalysisManifest(StrictModel):
+    schema_version: Literal["capability-replay-analysis/1.0"] = "capability-replay-analysis/1.0"
+    analysis_id: str
+    source_bundle_hash: str
+    source_input_hashes: dict[str, str]
+    processing_source_hashes: dict[str, str]
+    output_hashes: dict[str, str]
+    manifest_hash: str
+
+    @model_validator(mode="after")
+    def validate_analysis(self) -> ReplayAnalysisManifest:
+        if self.manifest_hash != stable_hash(
+            self.model_dump(mode="json", exclude={"manifest_hash"})
+        ):
+            raise ValueError("capability_replay_manifest_hash_mismatch")
+        return self
+
+
+class CompatibilityStage(StrictModel):
+    stage_id: Literal["P0", "P1", "P2"]
+    purpose: str
+    victim_http_limit: PositiveInt
+    cumulative_victim_http_limit: PositiveInt
+    wallclock_seconds: PositiveInt
+    max_output_tokens_per_request: PositiveInt
+    reviewed_message: str
+
+
 class CompatibilityConfig(StrictModel):
     schema_version: Literal["capability-experiment/1.0"] = "capability-experiment/1.0"
-    execution_enabled: Literal[False]
+    execution_enabled: bool
     study_stage: Literal["M1-real-provider-compatibility"]
     task_config: str
+    task_set_path: str
     case_id: str
     variant: Literal["benign"]
     platform: Literal["openclaw"]
     upstream_commit: str
     model_id: str
+    provider_model_env: str
     provider_base_url_env: str
     provider_api_key_env: str
     attacker_mode: Literal["fixed_reviewed_fixture"]
@@ -410,23 +542,114 @@ class CompatibilityConfig(StrictModel):
     max_embedding_http_attempts: Literal[0]
     max_annotation_http_attempts: Literal[0]
     automatic_retries: Literal[0]
-    max_output_tokens_per_request: PositiveInt
-    episode_wallclock_seconds: PositiveInt
+    stages: list[CompatibilityStage]
+    provider_timeout_seconds: PositiveInt
+    batch_wallclock_seconds: PositiveInt
     max_batch_http_attempts: PositiveInt
-    max_batch_cost_usd: float
-    run_id: str
+    cost_control_mode: Literal["unimplemented_estimate_only"]
+    max_batch_cost_usd: float | None
+    price_reference: str | None
+    currency: Literal["USD"] = "USD"
+    provider_allowed_tools: list[Literal["read", "write"]]
+    provider_evidence_policy: dict[str, Any]
+    run_id: str | None
     output_root: str
-    authorization_reference: None
+    authorization_reference: str | None
     notes: str
 
     @model_validator(mode="after")
     def validate_budget(self) -> CompatibilityConfig:
         if self.max_batch_http_attempts != self.max_victim_http_attempts:
             raise ValueError("capability_compatibility_batch_budget_mismatch")
-        if self.max_batch_cost_usd <= 0:
-            raise ValueError("capability_compatibility_cost_must_be_positive")
-        if self.run_id not in self.output_root:
+        if [item.stage_id for item in self.stages] != ["P0", "P1", "P2"]:
+            raise ValueError("capability_compatibility_stage_order_invalid")
+        if [item.victim_http_limit for item in self.stages] != [1, 2, 5]:
+            raise ValueError("capability_compatibility_stage_budgets_invalid")
+        if [item.cumulative_victim_http_limit for item in self.stages] != [1, 3, 8]:
+            raise ValueError("capability_compatibility_cumulative_budgets_invalid")
+        if sum(item.victim_http_limit for item in self.stages) != self.max_batch_http_attempts:
+            raise ValueError("capability_compatibility_stage_total_mismatch")
+        if any(item.max_output_tokens_per_request != 2048 for item in self.stages):
+            raise ValueError("capability_compatibility_output_limit_invalid")
+        if self.provider_timeout_seconds > 90 or self.batch_wallclock_seconds > 1200:
+            raise ValueError("capability_compatibility_time_limit_invalid")
+        if self.cost_control_mode == "unimplemented_estimate_only" and (
+            self.max_batch_cost_usd is not None or self.price_reference is not None
+        ):
+            raise ValueError("capability_compatibility_unenforced_cost_claim")
+        if self.run_id is not None and self.run_id not in self.output_root:
             raise ValueError("capability_compatibility_output_not_unique_to_run")
+        if self.execution_enabled and (self.run_id is None or not self.authorization_reference):
+            raise ValueError("capability_live_config_requires_batch_and_authorization_reference")
         if not self.model_id.strip() or self.model_id.startswith("REQUIRED_"):
             raise ValueError("capability_compatibility_model_missing")
+        if self.max_embedding_http_attempts != 0:
+            raise ValueError("capability_compatibility_embedding_must_be_zero")
+        if len(self.provider_allowed_tools) != len(set(self.provider_allowed_tools)):
+            raise ValueError("capability_compatibility_tool_duplicate")
         return self
+
+
+class CapabilityDoctorReport(StrictModel):
+    schema_version: Literal["capability-doctor/1.0"] = "capability-doctor/1.0"
+    config_valid: bool
+    implementation_ready: bool
+    environment_ready: bool
+    execution_enabled: bool
+    authorization_state: Literal["absent", "configured_not_session_authorized"]
+    model_id_configured: str
+    model_id_environment: str | None
+    model_identity_match: bool | None
+    endpoint_host: str | None
+    endpoint_path: str | None
+    environment_variable_presence: dict[str, bool]
+    checks: dict[str, str]
+    blockers: list[str]
+    network_requests_performed: Literal[False] = False
+
+
+class CompatibilityPreparationManifest(StrictModel):
+    schema_version: Literal["capability-compatibility-preparation/1.0"] = (
+        "capability-compatibility-preparation/1.0"
+    )
+    batch_id: str
+    run_root: str
+    config_hash: str
+    source_config_hash: str
+    compilation_manifest_hash: str
+    task_hash: str
+    patch_hash: str
+    bridge_hash: str
+    model_id: str
+    endpoint_host: str | None
+    endpoint_path: str | None
+    stages: list[CompatibilityStage]
+    execution_enabled: bool
+    authorization_needed: bool
+    network_requests_performed: Literal[False] = False
+    manifest_hash: str
+
+    @model_validator(mode="after")
+    def validate_hash(self) -> CompatibilityPreparationManifest:
+        if self.manifest_hash != stable_hash(
+            self.model_dump(mode="json", exclude={"manifest_hash"})
+        ):
+            raise ValueError("capability_preparation_manifest_hash_mismatch")
+        return self
+
+
+class CompatibilityStageStatus(StrictModel):
+    schema_version: Literal["capability-compatibility-stage/1.0"] = (
+        "capability-compatibility-stage/1.0"
+    )
+    batch_id: str
+    stage_id: Literal["P0", "P1", "P2"]
+    execution_status: Literal["not_started", "completed", "partial", "blocked", "error"]
+    verdict: Literal["passed", "failed", "unknown", "not_evaluated"]
+    reason_codes: list[str]
+    provider_attempts_before: NonNegativeInt
+    provider_attempts_after: NonNegativeInt
+    provider_attempts_stage: NonNegativeInt
+    embedding_attempts: NonNegativeInt
+    result_ref: str | None
+    cleanup_status: Literal["completed", "failed", "unknown", "not_applicable"]

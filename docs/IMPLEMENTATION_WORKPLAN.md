@@ -1,4 +1,14 @@
-# 当前计划 — 2026-09-21 capability 修复与生产接入
+# 当前计划 — 2026-09-21 九原语证据修复与真实兼容性准备
+
+本轮授权范围是代码、文档、离线/fixture、本机 fake HTTP 和零 provider 请求预检；真实 provider 请求、direct/semantic、pilot/main/formal 均不执行。基线为 `a478b7f`，起始工作树干净，conda `stac` Python 3.11.16，pinned SafeClaw `a11f5cceaba0676be721021f8d232638fd111305` 干净。
+
+1. **已完成 / A+B：** 首轮 7 个误通过已修复；utility/residual、事件绑定、public/private semantic compare、pair/profile/registry、sealed replay、batch manifest 和完整分母已有 22 项专项回归。后续完整质量门仍待 F。
+2. **已完成 / C（真实外部兼容性仍待验证）：** production adapter 复用 ConstructionVictimDriver/relay/deadline/redaction/cleanup，single-session embedding 0；本机 fake HTTP 两请求闭环与 55 项受影响专项通过。真实 Docker/provider 尚未运行。
+3. **已完成 / D+E 实现：** 零 provider doctor、唯一禁用 P0/P1/P2 batch、共享累计预算门、编号 Bash/status/report 和中文手册已落盘；尚需用实际环境生成零请求产物。
+4. **已完成 / F：** 专项、完整 `make check`、schema 幂等、Bash 语法和 `git diff --check` 均通过；已生成独立 offline demo、禁用 batch 和 partial-compatible report。bridge 未修改。
+5. **阻塞 / 真实兼容性：** 唯一 prepared batch 为 `cap-compat-20260921-offline-a478b7f-v2`，但配置仍 disabled、authorization absent，当前 Docker socket/image 权限也未通过。后续先恢复并复核 Docker 环境，再由用户明确授权该 batch 的 Ark Victim P0/P1/P2；不得自动重建 batch、重发或进入 pilot/main/formal。
+
+# 历史当前计划 — 2026-09-21 capability 修复与生产接入
 
 详细实施合同见[续接任务](九原语续接任务_证据修复与真实兼容性.md)。上一轮 fixture 测试通过不能替代真实 adapter 和评价正确性验收。
 

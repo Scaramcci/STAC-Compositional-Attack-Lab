@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "BatchUnit": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "repeat_index": {
+          "minimum": 0,
+          "title": "Repeat Index",
+          "type": "integer"
+        },
+        "result_ref": {
+          "title": "Result Ref",
+          "type": "string"
+        },
+        "stage": {
+          "enum": [
+            "preregistered",
+            "completed",
+            "partial",
+            "blocked",
+            "error"
+          ],
+          "title": "Stage",
+          "type": "string"
+        },
+        "transport": {
+          "enum": [
+            "fixture",
+            "safeclaw_live",
+            "safeclaw_fake_http"
+          ],
+          "title": "Transport",
+          "type": "string"
+        },
+        "unit_id": {
+          "title": "Unit Id",
+          "type": "string"
+        },
+        "variant": {
+          "$ref": "#/$defs/VariantKind"
+        }
+      },
+      "required": [
+        "unit_id",
+        "case_id",
+        "variant",
+        "repeat_index",
+        "transport",
+        "stage",
+        "result_ref",
+        "reason_code"
+      ],
+      "title": "BatchUnit",
+      "type": "object"
+    },
+    "VariantKind": {
+      "enum": [
+        "benign",
+        "direct",
+        "semantic"
+      ],
+      "title": "VariantKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "provider_ledger_ref": {
+      "title": "Provider Ledger Ref",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-batch/1.0",
+      "default": "capability-batch/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_compilation_manifest_hash": {
+      "title": "Source Compilation Manifest Hash",
+      "type": "string"
+    },
+    "units": {
+      "items": {
+        "$ref": "#/$defs/BatchUnit"
+      },
+      "title": "Units",
+      "type": "array"
+    }
+  },
+  "required": [
+    "batch_id",
+    "source_compilation_manifest_hash",
+    "units",
+    "provider_ledger_ref",
+    "manifest_hash"
+  ],
+  "title": "BatchManifest",
+  "type": "object"
+}

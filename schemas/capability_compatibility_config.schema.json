@@ -1,4 +1,59 @@
 {
+  "$defs": {
+    "CompatibilityStage": {
+      "additionalProperties": false,
+      "properties": {
+        "cumulative_victim_http_limit": {
+          "exclusiveMinimum": 0,
+          "title": "Cumulative Victim Http Limit",
+          "type": "integer"
+        },
+        "max_output_tokens_per_request": {
+          "exclusiveMinimum": 0,
+          "title": "Max Output Tokens Per Request",
+          "type": "integer"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string"
+        },
+        "reviewed_message": {
+          "title": "Reviewed Message",
+          "type": "string"
+        },
+        "stage_id": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ],
+          "title": "Stage Id",
+          "type": "string"
+        },
+        "victim_http_limit": {
+          "exclusiveMinimum": 0,
+          "title": "Victim Http Limit",
+          "type": "integer"
+        },
+        "wallclock_seconds": {
+          "exclusiveMinimum": 0,
+          "title": "Wallclock Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stage_id",
+        "purpose",
+        "victim_http_limit",
+        "cumulative_victim_http_limit",
+        "wallclock_seconds",
+        "max_output_tokens_per_request",
+        "reviewed_message"
+      ],
+      "title": "CompatibilityStage",
+      "type": "object"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "attacker_mode": {
@@ -7,25 +62,42 @@
       "type": "string"
     },
     "authorization_reference": {
-      "title": "Authorization Reference",
-      "type": "null"
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Authorization Reference"
     },
     "automatic_retries": {
       "const": 0,
       "title": "Automatic Retries",
       "type": "integer"
     },
+    "batch_wallclock_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Batch Wallclock Seconds",
+      "type": "integer"
+    },
     "case_id": {
       "title": "Case Id",
       "type": "string"
     },
-    "episode_wallclock_seconds": {
-      "exclusiveMinimum": 0,
-      "title": "Episode Wallclock Seconds",
-      "type": "integer"
+    "cost_control_mode": {
+      "const": "unimplemented_estimate_only",
+      "title": "Cost Control Mode",
+      "type": "string"
+    },
+    "currency": {
+      "const": "USD",
+      "default": "USD",
+      "title": "Currency",
+      "type": "string"
     },
     "execution_enabled": {
-      "const": false,
       "title": "Execution Enabled",
       "type": "boolean"
     },
@@ -40,8 +112,15 @@
       "type": "integer"
     },
     "max_batch_cost_usd": {
-      "title": "Max Batch Cost Usd",
-      "type": "number"
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Max Batch Cost Usd"
     },
     "max_batch_http_attempts": {
       "exclusiveMinimum": 0,
@@ -51,11 +130,6 @@
     "max_embedding_http_attempts": {
       "const": 0,
       "title": "Max Embedding Http Attempts",
-      "type": "integer"
-    },
-    "max_output_tokens_per_request": {
-      "exclusiveMinimum": 0,
-      "title": "Max Output Tokens Per Request",
       "type": "integer"
     },
     "max_victim_http_attempts": {
@@ -80,6 +154,28 @@
       "title": "Platform",
       "type": "string"
     },
+    "price_reference": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Price Reference"
+    },
+    "provider_allowed_tools": {
+      "items": {
+        "enum": [
+          "read",
+          "write"
+        ],
+        "type": "string"
+      },
+      "title": "Provider Allowed Tools",
+      "type": "array"
+    },
     "provider_api_key_env": {
       "title": "Provider Api Key Env",
       "type": "string"
@@ -88,15 +184,43 @@
       "title": "Provider Base Url Env",
       "type": "string"
     },
-    "run_id": {
-      "title": "Run Id",
+    "provider_evidence_policy": {
+      "additionalProperties": true,
+      "title": "Provider Evidence Policy",
+      "type": "object"
+    },
+    "provider_model_env": {
+      "title": "Provider Model Env",
       "type": "string"
+    },
+    "provider_timeout_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Provider Timeout Seconds",
+      "type": "integer"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Run Id"
     },
     "schema_version": {
       "const": "capability-experiment/1.0",
       "default": "capability-experiment/1.0",
       "title": "Schema Version",
       "type": "string"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/CompatibilityStage"
+      },
+      "title": "Stages",
+      "type": "array"
     },
     "study_stage": {
       "const": "M1-real-provider-compatibility",
@@ -105,6 +229,10 @@
     },
     "task_config": {
       "title": "Task Config",
+      "type": "string"
+    },
+    "task_set_path": {
+      "title": "Task Set Path",
       "type": "string"
     },
     "upstream_commit": {
@@ -121,11 +249,13 @@
     "execution_enabled",
     "study_stage",
     "task_config",
+    "task_set_path",
     "case_id",
     "variant",
     "platform",
     "upstream_commit",
     "model_id",
+    "provider_model_env",
     "provider_base_url_env",
     "provider_api_key_env",
     "attacker_mode",
@@ -134,10 +264,15 @@
     "max_embedding_http_attempts",
     "max_annotation_http_attempts",
     "automatic_retries",
-    "max_output_tokens_per_request",
-    "episode_wallclock_seconds",
+    "stages",
+    "provider_timeout_seconds",
+    "batch_wallclock_seconds",
     "max_batch_http_attempts",
+    "cost_control_mode",
     "max_batch_cost_usd",
+    "price_reference",
+    "provider_allowed_tools",
+    "provider_evidence_policy",
     "run_id",
     "output_root",
     "authorization_reference",

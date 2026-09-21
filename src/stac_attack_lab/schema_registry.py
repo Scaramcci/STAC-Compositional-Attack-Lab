@@ -3,11 +3,17 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from stac_attack_lab.capability.models import (
+    BatchManifest,
     CapabilityCase,
+    CapabilityDoctorReport,
     CapabilityProfile,
     CompatibilityConfig,
+    CompatibilityPreparationManifest,
+    CompatibilityStageStatus,
     CompilationManifest,
     EpisodeResult,
+    EvidenceBundleManifest,
+    ReplayAnalysisManifest,
 )
 from stac_attack_lab.capability.models import (
     PrimitiveOccurrence as CapabilityPrimitiveOccurrence,
@@ -101,6 +107,12 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "capability_primitive_occurrence": CapabilityPrimitiveOccurrence,
     "capability_episode_result": EpisodeResult,
     "capability_compilation_manifest": CompilationManifest,
+    "capability_batch_manifest": BatchManifest,
+    "capability_evidence_bundle": EvidenceBundleManifest,
+    "capability_replay_analysis_manifest": ReplayAnalysisManifest,
+    "capability_doctor_report": CapabilityDoctorReport,
+    "capability_compatibility_preparation": CompatibilityPreparationManifest,
+    "capability_compatibility_stage_status": CompatibilityStageStatus,
     "core_primitive_spec": CorePrimitiveSpec,
     "attack_macro_spec": AttackMacroSpec,
     "raw_interaction_trajectory": RawInteractionTrajectory,
