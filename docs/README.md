@@ -2,7 +2,7 @@
 
 | 文档 | 职责 |
 |---|---|
-| [PROJECT_STRUCTURE_ZH.md](PROJECT_STRUCTURE_ZH.md) | 项目结构、逐模块职责、数据流与中文学习大纲 |
+| [PROJECT_STRUCTURE_ZH.md](PROJECT_STRUCTURE_ZH.md) | 双轨架构、Primitive v3、正常交互、legacy formal 与中文学习路线 |
 | [PROJECT_GUIDE_ZH.md](PROJECT_GUIDE_ZH.md) | 教师/审阅者理解 collection→sample→Planner→Attacker→evaluation 的输入、输出、证据与限制 |
 | [LINUX_TMUX_RUNBOOK_ZH.md](LINUX_TMUX_RUNBOOK_ZH.md) | 环境变量、端口、诊断、tmux、日志、停止与恢复 |
 | [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) | 本次实际实施、离线/真实验证和当前阻塞 |

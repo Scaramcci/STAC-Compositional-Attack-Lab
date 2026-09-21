@@ -1,0 +1,435 @@
+{"kind":"deck","id":"pr/p6ftdg","name":"Deck"}
+{"kind":"layout","layoutId":"9a386cbe-e721-40f3-bb9e-424624d95af9","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"ae1ebd52-cbe0-4071-8ca6-d0407673e06d","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/n5kkto","slide":1,"title":"Agent信息流分析与组合攻击","textShapes":6}
+{"kind":"shape","id":"sh/s3y18ve1","slide":1,"bbox":[910,0,370,720]}
+{"kind":"shape","id":"sh/r2pkfqdg","slide":1,"bbox":[890,0,20,720]}
+{"kind":"textbox","id":"sh/61gj6lwv","slide":1,"text":"Agent信息流分析与组合攻击","textPreview":"Agent信息流分析与组合攻击","textChars":15,"textLines":1,"bbox":[78,128,760,94]}
+{"kind":"textbox","id":"sh/18r2l0vi","slide":1,"text":"Primitive设计、代码实现与工作进展","textPreview":"Primitive设计、代码实现与工作进展","textChars":21,"textLines":1,"bbox":[80,228,720,54]}
+{"kind":"textbox","id":"sh/g7ilcvex","slide":1,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[80,362,650,40]}
+{"kind":"textbox","id":"sh/f69kjqdc","slide":1,"text":"The Chinese University of Hong Kong","textPreview":"The Chinese University of Hong Kong","textChars":35,"textLines":1,"bbox":[80,408,650,36]}
+{"kind":"textbox","id":"sh/e50jalw7","slide":1,"text":"2026年9月","textPreview":"2026年9月","textChars":7,"textLines":1,"bbox":[80,470,300,34]}
+{"kind":"textbox","id":"sh/wbe10bet","slide":1,"text":"The Chinese University\nof Hong Kong","textPreview":"The Chinese University | of Hong Kong","textChars":35,"textLines":2,"bbox":[958,592,260,60]}
+{"kind":"image","id":"im/8buxgn25","slide":1,"name":"","alt":"CUHK logo","bbox":[990,58,210,180]}
+{"kind":"notes","id":"nt/n5kkto","slide":1,"text":"开场：本次汇报介绍信息流Primitive、当前代码和下一步工作。\n来源：docs/基于文献的Primitive重构论证.md；docs/PROJECT_STRUCTURE_ZH.md。"}
+{"kind":"slide","id":"sl/dw29yb","slide":2,"title":"Primitive","textShapes":13}
+{"kind":"shape","id":"sh/zid0fuhk","slide":2,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/kjmh8zi5","slide":2,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/lkvih4zq","slide":2,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/adkz2p03","slide":2,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/bet0buho","slide":2,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/cf2h4zit","slide":2,"text":"汇报内容","textPreview":"汇报内容","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/xgbid4ze","slide":2,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/u9oze907","slide":2,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/vax0nehs","slide":2,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/3i14nal0","slide":2,"text":"2/16","textPreview":"2/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/2hsne54f","slide":2,"bbox":[70,155,350,250]}
+{"kind":"shape","id":"sh/pkjmp036","slide":2,"bbox":[70,155,8,250]}
+{"kind":"textbox","id":"sh/oja5gvml","slide":2,"text":"Primitive表示信息流","textPreview":"Primitive表示信息流","textChars":14,"textLines":1,"bbox":[94,168,310,34]}
+{"kind":"textbox","id":"sh/b614ralc","slide":2,"text":"三个底层操作与依赖关系","textPreview":"三个底层操作与依赖关系","textChars":11,"textLines":1,"bbox":[94,209,310,185]}
+{"kind":"shape","id":"sh/alsni54r","slide":2,"bbox":[465,155,350,250]}
+{"kind":"shape","id":"sh/x83mtk32","slide":2,"bbox":[465,155,8,250]}
+{"kind":"textbox","id":"sh/c7u5kfmx","slide":2,"text":"当前代码展示","textPreview":"当前代码展示","textChars":6,"textLines":1,"bbox":[489,168,310,34]}
+{"kind":"textbox","id":"sh/zal4vul8","slide":2,"text":"核心目录与分析流程","textPreview":"核心目录与分析流程","textChars":9,"textLines":1,"bbox":[489,209,310,185]}
+{"kind":"shape","id":"sh/y9cnmp4n","slide":2,"bbox":[860,155,350,250]}
+{"kind":"shape","id":"sh/uhgzads7","slide":2,"bbox":[860,155,8,250]}
+{"kind":"textbox","id":"sh/vipg3i9s","slide":2,"text":"未来工作和论文启发","textPreview":"未来工作和论文启发","textChars":9,"textLines":1,"bbox":[884,168,310,34]}
+{"kind":"textbox","id":"sh/gjyhcnad","slide":2,"text":"当前困难与后续方向","textPreview":"当前困难与后续方向","textChars":9,"textLines":1,"bbox":[884,209,310,185]}
+{"kind":"textbox","id":"sh/hkry5sry","slide":2,"text":"Primitive  ·  Code  ·  Future Work","textPreview":"Primitive  ·  Code  ·  Future Work","textChars":34,"textLines":1,"bbox":[180,485,920,62]}
+{"kind":"notes","id":"nt/dw29yb","slide":2,"text":"用三句话介绍汇报结构。代码部分只做导航，随后切换VS Code。"}
+{"kind":"slide","id":"sl/75kqxy","slide":3,"title":"Primitive","textShapes":15}
+{"kind":"shape","id":"sh/v6t4zy9g","slide":3,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/g72583q1","slide":3,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/h8vm18rm","slide":3,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/61k329sz","slide":3,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/72t4ve94","slide":3,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/832l4jqp","slide":3,"text":"研究思路","textPreview":"研究思路","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/t4bmxora","slide":3,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/yd03y9sn","slide":3,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/je94re98","slide":3,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/32tkvypw","slide":3,"text":"3/16","textPreview":"3/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/21k32tob","slide":3,"bbox":[45,218,190,88]}
+{"kind":"textbox","id":"sh/p4v2x872","slide":3,"text":"SafeClawArena\n交互轨迹","textPreview":"SafeClawArena | 交互轨迹","textChars":18,"textLines":2,"bbox":[55,226,170,72]}
+{"kind":"shape","id":"sh/432l436h","slide":3,"bbox":[290,218,190,88]}
+{"kind":"textbox","id":"sh/r6dkzip8","slide":3,"text":"信息流分析","textPreview":"信息流分析","textChars":5,"textLines":1,"bbox":[300,226,170,72]}
+{"kind":"shape","id":"sh/q5436don","slide":3,"bbox":[535,218,190,88]}
+{"kind":"textbox","id":"sh/dsv21s7y","slide":3,"text":"信息流图","textPreview":"信息流图","textChars":4,"textLines":1,"bbox":[545,226,170,72]}
+{"kind":"shape","id":"sh/crml8n6d","slide":3,"bbox":[780,218,190,88]}
+{"kind":"textbox","id":"sh/7a9knepo","slide":3,"text":"攻击规划","textPreview":"攻击规划","textChars":4,"textLines":1,"bbox":[790,226,170,72]}
+{"kind":"shape","id":"sh/690ju9o3","slide":3,"bbox":[1025,218,190,88]}
+{"kind":"textbox","id":"sh/a1sfilc3","slide":3,"text":"正式攻击","textPreview":"正式攻击","textChars":4,"textLines":1,"bbox":[1035,226,170,72]}
+{"kind":"shape","id":"sh/v21wrqdo","slide":3,"bbox":[235,262,55,0]}
+{"kind":"shape","id":"sh/w3axkvu9","slide":3,"bbox":[480,262,55,0]}
+{"kind":"shape","id":"sh/x4jet0ve","slide":3,"bbox":[725,262,55,0]}
+{"kind":"shape","id":"sh/mx8ve1cr","slide":3,"bbox":[970,262,55,0]}
+{"kind":"textbox","id":"sh/nyhwn6dc","slide":3,"text":"当前重点","textPreview":"当前重点","textChars":4,"textLines":1,"bbox":[245,380,450,44]}
+{"kind":"shape","id":"sh/8zqdgbux","slide":3,"bbox":[130,432,610,0]}
+{"kind":"textbox","id":"sh/90zepgvi","slide":3,"text":"信息流表示与分析","textPreview":"信息流表示与分析","textChars":8,"textLines":1,"bbox":[180,448,500,46]}
+{"kind":"textbox","id":"sh/y98va1cv","slide":3,"text":"待进一步明确","textPreview":"待进一步明确","textChars":6,"textLines":1,"bbox":[810,380,300,44]}
+{"kind":"textbox","id":"sh/zahwj6dg","slide":3,"text":"图如何帮助攻击","textPreview":"图如何帮助攻击","textChars":7,"textLines":1,"bbox":[785,448,350,46]}
+{"kind":"notes","id":"nt/75kqxy","slide":3,"text":"第一阶段分析交互轨迹并生成信息流图。第二阶段利用信息流辅助攻击。当前主要完成信息流表示与分析。\n来源：docs/论文阅读后关于idea的思考.md。"}
+{"kind":"slide","id":"sl/wrkwn9","slide":4,"title":"Primitive","textShapes":22}
+{"kind":"shape","id":"sh/4ru50bup","slide":4,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/jqlor6d4","slide":4,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/ipcny1cj","slide":4,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/tg36xgv6","slide":4,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/sfu54bu1","slide":4,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/relov6dg","slide":4,"text":"原有Primitive","textPreview":"原有Primitive","textChars":11,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/6dcn21cv","slide":4,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/1kn61gvi","slide":4,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/gje58vux","slide":4,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/m9ozyl0b","slide":4,"text":"4/16","textPreview":"4/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/nahgr61w","slide":4,"bbox":[90,140,200,60]}
+{"kind":"textbox","id":"sh/obqh0bi1","slide":4,"text":"Ingest","textPreview":"Ingest","textChars":6,"textLines":1,"bbox":[90,145,200,50]}
+{"kind":"shape","id":"sh/9czytgjm","slide":4,"bbox":[340,140,200,60]}
+{"kind":"textbox","id":"sh/ad8z2l07","slide":4,"text":"Adopt","textPreview":"Adopt","textChars":5,"textLines":1,"bbox":[340,145,200,50]}
+{"kind":"shape","id":"sh/beh0vqhs","slide":4,"bbox":[590,140,200,60]}
+{"kind":"textbox","id":"sh/wzqh4vid","slide":4,"text":"Persist","textPreview":"Persist","textChars":7,"textLines":1,"bbox":[590,145,200,50]}
+{"kind":"shape","id":"sh/x0zix0zy","slide":4,"bbox":[90,230,200,60]}
+{"kind":"textbox","id":"sh/qh4zq103","slide":4,"text":"Recall","textPreview":"Recall","textChars":6,"textLines":1,"bbox":[90,235,200,50]}
+{"kind":"shape","id":"sh/ridgjm1o","slide":4,"bbox":[340,230,200,60]}
+{"kind":"textbox","id":"sh/fmtwr2hg","slide":4,"text":"Select","textPreview":"Select","textChars":6,"textLines":1,"bbox":[340,235,200,50]}
+{"kind":"shape","id":"sh/ulkvyxgv","slide":4,"bbox":[590,230,200,60]}
+{"kind":"textbox","id":"sh/hobetsz6","slide":4,"text":"Bind","textPreview":"Bind","textChars":4,"textLines":1,"bbox":[590,235,200,50]}
+{"kind":"shape","id":"sh/gn2d0ny1","slide":4,"bbox":[90,320,200,60]}
+{"kind":"textbox","id":"sh/7i9wnih4","slide":4,"text":"Act","textPreview":"Act","textChars":3,"textLines":1,"bbox":[90,325,200,50]}
+{"kind":"shape","id":"sh/6h0vudgj","slide":4,"bbox":[340,320,200,60]}
+{"kind":"textbox","id":"sh/tkbepsza","slide":4,"text":"Record","textPreview":"Record","textChars":6,"textLines":1,"bbox":[340,325,200,50]}
+{"kind":"shape","id":"sh/8j2dwnyp","slide":4,"bbox":[590,320,200,60]}
+{"kind":"textbox","id":"sh/redwzmho","slide":4,"text":"Recover","textPreview":"Recover","textChars":7,"textLines":1,"bbox":[590,325,200,50]}
+{"kind":"shape","id":"sh/qd4f6hg3","slide":4,"bbox":[850,138,350,110]}
+{"kind":"shape","id":"sh/ojetkzel","slide":4,"bbox":[850,138,8,110]}
+{"kind":"textbox","id":"sh/9k7at4f6","slide":4,"text":"分类标准不同","textPreview":"分类标准不同","textChars":6,"textLines":1,"bbox":[874,151,310,34]}
+{"kind":"textbox","id":"sh/mxwbi9wf","slide":4,"text":"来源、用途和资源类型混在一起","textPreview":"来源、用途和资源类型混在一起","textChars":14,"textLines":1,"bbox":[874,192,310,45]}
+{"kind":"shape","id":"sh/ny5srex0","slide":4,"bbox":[850,268,350,110]}
+{"kind":"shape","id":"sh/wnytojeh","slide":4,"bbox":[850,268,8,110]}
+{"kind":"textbox","id":"sh/xo7uxof2","slide":4,"text":"抽象粒度不同","textPreview":"抽象粒度不同","textChars":6,"textLines":1,"bbox":[874,281,310,34]}
+{"kind":"textbox","id":"sh/algbm9wb","slide":4,"text":"单个操作和复合流程混在一起","textPreview":"单个操作和复合流程混在一起","textChars":13,"textLines":1,"bbox":[874,322,310,45]}
+{"kind":"shape","id":"sh/bmpsvexw","slide":4,"bbox":[850,398,350,110]}
+{"kind":"shape","id":"sh/krytsjet","slide":4,"bbox":[850,398,8,110]}
+{"kind":"textbox","id":"sh/lsru1ofy","slide":4,"text":"观察能力不同","textPreview":"观察能力不同","textChars":6,"textLines":1,"bbox":[874,411,310,34]}
+{"kind":"textbox","id":"sh/5of2lkf2","slide":4,"text":"部分语义无法从日志直接读取","textPreview":"部分语义无法从日志直接读取","textChars":13,"textLines":1,"bbox":[874,452,310,45]}
+{"kind":"textbox","id":"sh/kn6lsfeh","slide":4,"text":"底层表示需要统一的操作接口","textPreview":"底层表示需要统一的操作接口","textChars":13,"textLines":1,"bbox":[120,500,650,58]}
+{"kind":"notes","id":"nt/wrkwn9","slide":4,"text":"原有九项词表保留了有用的攻击叙述，但混合了来源、用途、资源和复合流程。\n来源：docs/基于文献的Primitive重构论证.md，第2节。"}
+{"kind":"slide","id":"sl/btwsk0","slide":5,"title":"Primitive","textShapes":18}
+{"kind":"shape","id":"sh/za1orq1g","slide":5,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/0ba50vi1","slide":5,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/1cj6t0jm","slide":5,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/ql8nul0z","slide":5,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/r61onq1k","slide":5,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/s7a5wbi5","slide":5,"text":"三个Primitive","textPreview":"三个Primitive","textChars":11,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/d8j6pgjq","slide":5,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/ih8nq10n","slide":5,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/3ihoj618","slide":5,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/butczipc","slide":5,"text":"5/16","textPreview":"5/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/qtkv6dor","slide":5,"bbox":[75,145,340,350]}
+{"kind":"textbox","id":"sh/dwbu187i","slide":5,"text":"TRANSFER","textPreview":"TRANSFER","textChars":8,"textLines":1,"bbox":[95,170,300,60]}
+{"kind":"textbox","id":"sh/cv2d836x","slide":5,"text":"交付已有对象","textPreview":"交付已有对象","textChars":6,"textLines":1,"bbox":[100,245,290,48]}
+{"kind":"shape","id":"sh/zidc3ipo","slide":5,"bbox":[120,310,250,0]}
+{"kind":"textbox","id":"sh/yh4vado3","slide":5,"text":"消息传递\n工具返回\nmemory读取","textPreview":"消息传递 | 工具返回 | memory读取","textChars":18,"textLines":3,"bbox":[120,330,250,125]}
+{"kind":"shape","id":"sh/lkve5sne","slide":5,"bbox":[475,145,340,350]}
+{"kind":"textbox","id":"sh/0jmdcn69","slide":5,"text":"DERIVE","textPreview":"DERIVE","textChars":6,"textLines":1,"bbox":[495,170,300,60]}
+{"kind":"textbox","id":"sh/fm9cryp4","slide":5,"text":"根据输入产生输出","textPreview":"根据输入产生输出","textChars":8,"textLines":1,"bbox":[500,245,290,48]}
+{"kind":"shape","id":"sh/u10vytoj","slide":5,"bbox":[520,310,250,0]}
+{"kind":"textbox","id":"sh/ih8f6187","slide":5,"text":"摘要\n计划\n参数绑定","textPreview":"摘要 | 计划 | 参数绑定","textChars":10,"textLines":3,"bbox":[520,330,250,125]}
+{"kind":"shape","id":"sh/jihgf6ps","slide":5,"bbox":[875,145,340,350]}
+{"kind":"textbox","id":"sh/kjqx8rqd","slide":5,"text":"UPDATE","textPreview":"UPDATE","textChars":6,"textLines":1,"bbox":[895,170,300,60]}
+{"kind":"textbox","id":"sh/5kzyhw7y","slide":5,"text":"改变资源状态","textPreview":"改变资源状态","textChars":6,"textLines":1,"bbox":[900,245,290,48]}
+{"kind":"shape","id":"sh/adof2h8b","slide":5,"bbox":[920,310,250,0]}
+{"kind":"textbox","id":"sh/vexgbm9w","slide":5,"text":"memory写入\n文件修改\n权限变化","textPreview":"memory写入 | 文件修改 | 权限变化","textChars":18,"textLines":3,"bbox":[920,330,250,125]}
+{"kind":"textbox","id":"sh/wf6x4rqh","slide":5,"text":"信息交付","textPreview":"信息交付","textChars":4,"textLines":1,"bbox":[135,530,220,40]}
+{"kind":"textbox","id":"sh/xgfydwrm","slide":5,"text":"信息产生","textPreview":"信息产生","textChars":4,"textLines":1,"bbox":[535,530,220,40]}
+{"kind":"textbox","id":"sh/mpofyh8z","slide":5,"text":"状态生效","textPreview":"状态生效","textChars":4,"textLines":1,"bbox":[935,530,220,40]}
+{"kind":"notes","id":"nt/btwsk0","slide":5,"text":"三类Primitive分别处理信息交付、信息产生和资源状态生效。它们还需要对象、依赖、版本和证据。\n来源：docs/基于文献的Primitive重构论证.md，第1、5节。"}
+{"kind":"slide","id":"sl/izhmcv","slide":6,"title":"Primitive","textShapes":13}
+{"kind":"shape","id":"sh/dknu9w3a","slide":6,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/qxcbeh4j","slide":6,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/ry5c7ml4","slide":6,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/4vutc7md","slide":6,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/5w3u5c3y","slide":6,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/itcbah4n","slide":6,"text":"TRANSFER","textPreview":"TRANSFER","textChars":8,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/3ulc32ls","slide":6,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/grut87mh","slide":6,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/hs3u1c32","slide":6,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/9gvixwnq","slide":6,"text":"6/16","textPreview":"6/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/8fmhor65","slide":6,"bbox":[75,140,440,390]}
+{"kind":"textbox","id":"sh/ned0vm5k","slide":6,"text":"TRANSFER(\n  source,\n  destination,\n  artifact,\n  channel,\n  delivery_id\n)","textPreview":"TRANSFER( |   source, |   destination, |   artifact, |   channel, |   delivery_id | )","textChars":73,"textLines":7,"bbox":[93,150,404,370]}
+{"kind":"shape","id":"sh/md4zm1oz","slide":6,"bbox":[610,157,13,13]}
+{"kind":"textbox","id":"sh/lcvitwne","slide":6,"text":"对象已经存在","textPreview":"对象已经存在","textChars":6,"textLines":1,"bbox":[638,145,512,66]}
+{"kind":"shape","id":"sh/0rmhkr69","slide":6,"bbox":[610,225,13,13]}
+{"kind":"textbox","id":"sh/zqd0rm5o","slide":6,"text":"进入新的执行域","textPreview":"进入新的执行域","textChars":7,"textLines":1,"bbox":[638,213,512,66]}
+{"kind":"shape","id":"sh/ep4ziho3","slide":6,"bbox":[610,293,13,13]}
+{"kind":"textbox","id":"sh/dobipcni","slide":6,"text":"对象身份保持不变","textPreview":"对象身份保持不变","textChars":8,"textLines":1,"bbox":[638,281,512,66]}
+{"kind":"shape","id":"sh/cn2hg76x","slide":6,"bbox":[610,361,13,13]}
+{"kind":"textbox","id":"sh/4r6hc7et","slide":6,"text":"记录来源与交付通道","textPreview":"记录来源与交付通道","textChars":9,"textLines":1,"bbox":[638,349,512,66]}
+{"kind":"shape","id":"sh/5sfi5cfe","slide":6,"bbox":[610,429,13,13]}
+{"kind":"textbox","id":"sh/i5ozahwn","slide":6,"text":"交付不等于理解或采纳","textPreview":"交付不等于理解或采纳","textChars":10,"textLines":1,"bbox":[638,417,512,66]}
+{"kind":"textbox","id":"sh/36x03mx8","slide":6,"text":"用户消息 → Agent上下文    工具结果 → Agent上下文","textPreview":"用户消息 → Agent上下文    工具结果 → Agent上下文","textChars":34,"textLines":1,"bbox":[145,574,990,42]}
+{"kind":"notes","id":"nt/izhmcv","slide":6,"text":"TRANSFER表示已有对象进入新的执行域。成功交付不代表接收者理解、相信或服从。\n来源：docs/基于文献的Primitive重构论证.md，第5.1节。"}
+{"kind":"slide","id":"sl/qtao3p","slide":7,"title":"Primitive","textShapes":13}
+{"kind":"shape","id":"sh/kv6do3u9","slide":7,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/juxwfydo","slide":7,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/ytovmtc3","slide":7,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/xsfedovy","slide":7,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/wr6dkjud","slide":7,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/bqxwbyds","slide":7,"text":"DERIVE","textPreview":"DERIVE","textChars":6,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/apovitc7","slide":7,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/hojepsv2","slide":7,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/gnqxwnuh","slide":7,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/ml0rupgf","slide":7,"text":"7/16","textPreview":"7/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/7m9snux0","slide":7,"bbox":[75,140,440,390]}
+{"kind":"textbox","id":"sh/87i9wzyl","slide":7,"text":"DERIVE(\n  executor,\n  inputs,\n  outputs,\n  operation,\n  invocation_id\n)","textPreview":"DERIVE( |   executor, |   inputs, |   outputs, |   operation, |   invocation_id | )","textChars":71,"textLines":7,"bbox":[93,150,404,370]}
+{"kind":"shape","id":"sh/98rap4f6","slide":7,"bbox":[610,157,13,13]}
+{"kind":"textbox","id":"sh/yhgrqpgj","slide":7,"text":"根据输入产生新对象","textPreview":"根据输入产生新对象","textChars":9,"textLines":1,"bbox":[638,145,512,66]}
+{"kind":"shape","id":"sh/zip8jax4","slide":7,"bbox":[610,225,13,13]}
+{"kind":"textbox","id":"sh/kjy9sfyp","slide":7,"text":"支持多个输入","textPreview":"支持多个输入","textChars":6,"textLines":1,"bbox":[638,213,512,66]}
+{"kind":"shape","id":"sh/lkrqlkfa","slide":7,"bbox":[610,293,13,13]}
+{"kind":"textbox","id":"sh/idkr29gn","slide":7,"text":"支持多个输出","textPreview":"支持多个输出","textChars":6,"textLines":1,"bbox":[638,281,512,66]}
+{"kind":"shape","id":"sh/jetsvex8","slide":7,"bbox":[610,361,13,13]}
+{"kind":"textbox","id":"sh/f61w7m9o","slide":7,"text":"不要求语义等价","textPreview":"不要求语义等价","textChars":7,"textLines":1,"bbox":[638,349,512,66]}
+{"kind":"shape","id":"sh/elsfyhs3","slide":7,"bbox":[610,429,13,13]}
+{"kind":"textbox","id":"sh/183y9cre","slide":7,"text":"不恢复隐藏推理","textPreview":"不恢复隐藏推理","textChars":7,"textLines":1,"bbox":[638,417,512,66]}
+{"kind":"textbox","id":"sh/g7ax07a9","slide":7,"text":"两个文件 → 综合摘要    任务描述 → 执行计划","textPreview":"两个文件 → 综合摘要    任务描述 → 执行计划","textChars":26,"textLines":1,"bbox":[150,574,980,42]}
+{"kind":"notes","id":"nt/qtao3p","slide":7,"text":"DERIVE表示局部处理产生新对象。没有中间证据时，一次模型调用可以保留为一个多输入、多输出效果。\n来源：docs/基于文献的Primitive重构论证.md，第5.2、9.4节。"}
+{"kind":"slide","id":"sl/aubog2","slide":8,"title":"Primitive","textShapes":13}
+{"kind":"shape","id":"sh/2lkj6hcf","slide":8,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/pob21cb6","slide":8,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/on2187ul","slide":8,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/fi9kv2to","slide":8,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/eh0j2xcj","slide":8,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/1kb2xcbu","slide":8,"text":"UPDATE","textPreview":"UPDATE","textChars":6,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/0j2147u9","slide":8,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/re9krits","slide":8,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/qt0jyxc7","slide":8,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/srypk7y9","slide":8,"text":"8/16","textPreview":"8/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/tsrqtsfu","slide":8,"bbox":[75,140,440,390]}
+{"kind":"textbox","id":"sh/6pg7ixg3","slide":8,"text":"UPDATE(\n  actor,\n  resource,\n  old_version,\n  new_version,\n  commit_id\n)","textPreview":"UPDATE( |   actor, |   resource, |   old_version, |   new_version, |   commit_id | )","textChars":72,"textLines":7,"bbox":[93,150,404,370]}
+{"kind":"shape","id":"sh/7qp8r2xo","slide":8,"bbox":[610,157,13,13]}
+{"kind":"textbox","id":"sh/knypgnyd","slide":8,"text":"资源具有稳定身份","textPreview":"资源具有稳定身份","textChars":8,"textLines":1,"bbox":[638,145,512,66]}
+{"kind":"shape","id":"sh/5o7qpsfy","slide":8,"bbox":[610,225,13,13]}
+{"kind":"textbox","id":"sh/ilg7edg7","slide":8,"text":"更新前后版本不同","textPreview":"更新前后版本不同","textChars":8,"textLines":1,"bbox":[638,213,512,66]}
+{"kind":"shape","id":"sh/jmp8nixs","slide":8,"bbox":[610,293,13,13]}
+{"kind":"textbox","id":"sh/oji9sreh","slide":8,"text":"新状态已经生效","textPreview":"新状态已经生效","textChars":7,"textLines":1,"bbox":[638,281,512,66]}
+{"kind":"shape","id":"sh/pkbqlcf2","slide":8,"bbox":[610,361,13,13]}
+{"kind":"textbox","id":"sh/xg7q5c76","slide":8,"text":"请求写入不等于完成","textPreview":"请求写入不等于完成","textChars":9,"textLines":1,"bbox":[638,349,512,66]}
+{"kind":"shape","id":"sh/cfypc76l","slide":8,"bbox":[610,429,13,13]}
+{"kind":"textbox","id":"sh/be583mp0","slide":8,"text":"成功声明不等于状态变化","textPreview":"成功声明不等于状态变化","textChars":11,"textLines":1,"bbox":[638,417,512,66]}
+{"kind":"textbox","id":"sh/adw7ahof","slide":8,"text":"memory v0 → v1    file v2 → v3    permission v0 → v1","textPreview":"memory v0 → v1    file v2 → v3    permission v0 → v1","textChars":52,"textLines":1,"bbox":[130,574,1020,42]}
+{"kind":"notes","id":"nt/aubog2","slide":8,"text":"UPDATE表示有独立身份的资源状态已经生效变化。写入请求和工具成功声明都不能替代提交证据。\n来源：docs/基于文献的Primitive重构论证.md，第5.3节。"}
+{"kind":"slide","id":"sl/vlbuzh","slide":9,"title":"Primitive","textShapes":15}
+{"kind":"shape","id":"sh/hk3q9kvq","slide":9,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/uhc7epcz","slide":9,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/fil87udk","slide":9,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/4ne9kzu1","slide":9,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/p8nqd4vm","slide":9,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/2lcripcv","slide":9,"text":"依赖与控制","textPreview":"依赖与控制","textChars":5,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/3ml8budg","slide":9,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/cbe9ozud","slide":9,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/dcnqh4vi","slide":9,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/d4r294nu","slide":9,"text":"9/16","textPreview":"9/16","textChars":4,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/c3i1gzm9","slide":9,"bbox":[80,135,520,112]}
+{"kind":"shape","id":"sh/r29k7u5o","slide":9,"bbox":[80,135,8,112]}
+{"kind":"textbox","id":"sh/q10jep43","slide":9,"text":"data_dep","textPreview":"data_dep","textChars":8,"textLines":1,"bbox":[104,148,480,34]}
+{"kind":"textbox","id":"sh/18b2d43q","slide":9,"text":"输出使用某个输入","textPreview":"输出使用某个输入","textChars":8,"textLines":1,"bbox":[104,189,480,47]}
+{"kind":"shape","id":"sh/0721kjm5","slide":9,"bbox":[670,135,520,112]}
+{"kind":"shape","id":"sh/z6tkbe5k","slide":9,"bbox":[670,135,8,112]}
+{"kind":"textbox","id":"sh/e50ji94z","slide":9,"text":"control_dep","textPreview":"control_dep","textChars":11,"textLines":1,"bbox":[694,148,480,34]}
+{"kind":"textbox","id":"sh/hc721knm","slide":9,"text":"输入影响操作是否发生","textPreview":"输入影响操作是否发生","textChars":10,"textLines":1,"bbox":[694,189,480,47]}
+{"kind":"shape","id":"sh/gby18fm1","slide":9,"bbox":[80,280,520,112]}
+{"kind":"shape","id":"sh/8v21ofux","slide":9,"bbox":[80,280,8,112]}
+{"kind":"textbox","id":"sh/tgb2hkvi","slide":9,"text":"read_from","textPreview":"read_from","textChars":9,"textLines":1,"bbox":[104,293,480,34]}
+{"kind":"textbox","id":"sh/6tkjm5cr","slide":9,"text":"读取指定资源版本","textPreview":"读取指定资源版本","textChars":8,"textLines":1,"bbox":[104,334,480,47]}
+{"kind":"shape","id":"sh/7utkfadc","slide":9,"bbox":[670,280,520,112]}
+{"kind":"shape","id":"sh/gj21szut","slide":9,"bbox":[670,280,8,112]}
+{"kind":"textbox","id":"sh/hkv2l4ve","slide":9,"text":"happens_before","textPreview":"happens_before","textChars":14,"textLines":1,"bbox":[694,293,480,34]}
+{"kind":"textbox","id":"sh/uhkjqpcn","slide":9,"text":"可观察的先后顺序","textPreview":"可观察的先后顺序","textChars":8,"textLines":1,"bbox":[694,334,480,47]}
+{"kind":"shape","id":"sh/vitkjud8","slide":9,"bbox":[145,465,990,95]}
+{"kind":"textbox","id":"sh/4nmlwzu5","slide":9,"text":"时间相邻不能证明数据依赖\n实际控制状态变化才记录为 UPDATE","textPreview":"时间相邻不能证明数据依赖 | 实际控制状态变化才记录为 UPDATE","textChars":32,"textLines":2,"bbox":[185,478,910,68]}
+{"kind":"notes","id":"nt/vlbuzh","slide":9,"text":"Primitive描述发生的效果，依赖关系解释效果之间的联系。旧CONTROL中的控制影响由control_dep保留。\n来源：docs/基于文献的Primitive重构论证.md，第6节。"}
+{"kind":"slide","id":"sl/lct1tl","slide":10,"title":"Primitive","textShapes":23}
+{"kind":"shape","id":"sh/gv2p8zmd","slide":10,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/fut8zu5s","slide":10,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/utk76p47","slide":10,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/p0vq54na","slide":10,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/4zm9czmp","slide":10,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/3yt83u54","slide":10,"text":"跨会话传播","textPreview":"跨会话传播","textChars":5,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/2xkrap4j","slide":10,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/dovq9on6","slide":10,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/c3m9gjml","slide":10,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/y5ojatgv","slide":10,"text":"10/16","textPreview":"10/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"textbox","id":"sh/z6xkjyhg","slide":10,"text":"Session A","textPreview":"Session A","textChars":9,"textLines":1,"bbox":[95,125,450,40]}
+{"kind":"textbox","id":"sh/k761c3y1","slide":10,"text":"Session B","textPreview":"Session B","textChars":9,"textLines":1,"bbox":[735,125,450,40]}
+{"kind":"shape","id":"sh/l8f2l8z6","slide":10,"bbox":[105,190,180,65]}
+{"kind":"textbox","id":"sh/m98jedgr","slide":10,"text":"用户消息","textPreview":"用户消息","textChars":4,"textLines":1,"bbox":[115,198,160,49]}
+{"kind":"shape","id":"sh/7ahknihc","slide":10,"bbox":[365,190,180,65]}
+{"kind":"textbox","id":"sh/8bq1g3yx","slide":10,"text":"Agent上下文","textPreview":"Agent上下文","textChars":8,"textLines":1,"bbox":[375,198,160,49]}
+{"kind":"shape","id":"sh/9cz2p8zi","slide":10,"bbox":[235,335,220,72]}
+{"kind":"textbox","id":"sh/2d4j290n","slide":10,"text":"memory v0 → v1","textPreview":"memory v0 → v1","textChars":14,"textLines":1,"bbox":[245,343,200,56]}
+{"kind":"shape","id":"sh/ned0beh8","slide":10,"bbox":[285,222.5,80,0]}
+{"kind":"shape","id":"sh/ritgjax0","slide":10,"bbox":[345,255,110,80]}
+{"kind":"textbox","id":"sh/6h0fa5gf","slide":10,"text":"TRANSFER","textPreview":"TRANSFER","textChars":8,"textLines":1,"bbox":[275,185,100,28]}
+{"kind":"textbox","id":"sh/tkbylkf6","slide":10,"text":"DERIVE + UPDATE","textPreview":"DERIVE + UPDATE","textChars":15,"textLines":1,"bbox":[387,277,170,28]}
+{"kind":"shape","id":"sh/sj2hcfyl","slide":10,"bbox":[745,190,180,65]}
+{"kind":"textbox","id":"sh/ju9gfaxo","slide":10,"text":"memory v1","textPreview":"memory v1","textChars":9,"textLines":1,"bbox":[755,198,160,49]}
+{"kind":"shape","id":"sh/it0f65gj","slide":10,"bbox":[1005,190,180,65]}
+{"kind":"textbox","id":"sh/5gryh0fu","slide":10,"text":"Agent上下文","textPreview":"Agent上下文","textChars":8,"textLines":1,"bbox":[1015,198,160,49]}
+{"kind":"shape","id":"sh/4fix8vy9","slide":10,"bbox":[875,335,220,72]}
+{"kind":"textbox","id":"sh/3adgrux8","slide":10,"text":"回答或工具决策","textPreview":"回答或工具决策","textChars":7,"textLines":1,"bbox":[885,343,200,56]}
+{"kind":"shape","id":"sh/2pkzipwn","slide":10,"bbox":[925,222.5,80,0]}
+{"kind":"shape","id":"sh/0ju5wnat","slide":10,"bbox":[985,255,110,80]}
+{"kind":"textbox","id":"sh/lk3mpsre","slide":10,"text":"TRANSFER","textPreview":"TRANSFER","textChars":8,"textLines":1,"bbox":[915,185,100,28]}
+{"kind":"textbox","id":"sh/yhc3uxsn","slide":10,"text":"DERIVE","textPreview":"DERIVE","textChars":6,"textLines":1,"bbox":[1035,277,100,28]}
+{"kind":"shape","id":"sh/zil4n298","slide":10,"bbox":[455,372,420,0]}
+{"kind":"textbox","id":"sh/8ne507ap","slide":10,"text":"read_from + session boundary","textPreview":"read_from + session boundary","textChars":28,"textLines":1,"bbox":[510,378,320,28]}
+{"kind":"shape","id":"sh/9onmtcra","slide":10,"bbox":[205,517,13,13]}
+{"kind":"textbox","id":"sh/mlcnyxsz","slide":10,"text":"实际会话身份","textPreview":"实际会话身份","textChars":6,"textLines":1,"bbox":[233,505,872,34]}
+{"kind":"shape","id":"sh/nm54r29k","slide":10,"bbox":[205,553,13,13]}
+{"kind":"textbox","id":"sh/wbe54rq1","slide":10,"text":"持久资源范围","textPreview":"持久资源范围","textChars":6,"textLines":1,"bbox":[233,541,872,34]}
+{"kind":"shape","id":"sh/xcnmxcrm","slide":10,"bbox":[205,589,13,13]}
+{"kind":"textbox","id":"sh/hkfmdcvm","slide":10,"text":"写入与读取版本","textPreview":"写入与读取版本","textChars":7,"textLines":1,"bbox":[233,577,872,34]}
+{"kind":"shape","id":"sh/gj65k7e1","slide":10,"bbox":[205,625,13,13]}
+{"kind":"textbox","id":"sh/vix4b2dw","slide":10,"text":"读取内容的后续使用","textPreview":"读取内容的后续使用","textChars":9,"textLines":1,"bbox":[233,613,872,34]}
+{"kind":"notes","id":"nt/lct1tl","slide":10,"text":"跨会话传播由UPDATE、版本读取和后续DERIVE组成。需要实际会话身份、持久范围、版本和后续使用证据。\n来源：docs/基于文献的Primitive重构论证.md，第8.3节；docs/PROJECT_STRUCTURE_ZH.md，第2、7节。"}
+{"kind":"slide","id":"sl/hlj3vw","slide":11,"title":"Primitive","textShapes":14}
+{"kind":"shape","id":"sh/i58bupcf","slide":11,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/58ja5kv6","slide":11,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/k7atwful","slide":11,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/7a1s7udc","slide":11,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/69sbypcr","slide":11,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/tcju94v2","slide":11,"text":"适用范围","textPreview":"适用范围","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/sbat0zux","slide":11,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/nexsvqds","slide":11,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/mdorm5c7","slide":11,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/sjutk325","slide":11,"text":"11/16","textPreview":"11/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/tknad8jq","slide":11,"bbox":[90,145,500,185]}
+{"kind":"shape","id":"sh/6hcbitkf","slide":11,"bbox":[90,145,8,185]}
+{"kind":"textbox","id":"sh/7ilsby10","slide":11,"text":"能够表达","textPreview":"能够表达","textChars":4,"textLines":1,"bbox":[114,158,460,34]}
+{"kind":"textbox","id":"sh/gneto32h","slide":11,"text":"已记录的交付、输出、资源变化、依赖与版本","textPreview":"已记录的交付、输出、资源变化、依赖与版本","textChars":20,"textLines":1,"bbox":[114,199,460,120]}
+{"kind":"shape","id":"sh/honah8j2","slide":11,"bbox":[690,145,500,185]}
+{"kind":"shape","id":"sh/ulwbmtkb","slide":11,"bbox":[690,145,8,185]}
+{"kind":"textbox","id":"sh/fm5sfy1w","slide":11,"text":"能够比较","textPreview":"能够比较","textChars":4,"textLines":1,"bbox":[714,158,460,34]}
+{"kind":"textbox","id":"sh/wra9cj2d","slide":11,"text":"不同操作接口的事实保留与重复计数","textPreview":"不同操作接口的事实保留与重复计数","textChars":16,"textLines":1,"bbox":[714,199,460,120]}
+{"kind":"shape","id":"sh/xs3a5oji","slide":11,"bbox":[90,365,500,185]}
+{"kind":"shape","id":"sh/x8vq90vm","slide":11,"bbox":[90,365,8,185]}
+{"kind":"textbox","id":"sh/cn29gvu1","slide":11,"text":"需要固定","textPreview":"需要固定","textChars":4,"textLines":1,"bbox":[114,378,460,34]}
+{"kind":"textbox","id":"sh/bmt87qdg","slide":11,"text":"观察范围、对象粒度、资源语义和证据来源","textPreview":"观察范围、对象粒度、资源语义和证据来源","textChars":19,"textLines":1,"bbox":[114,419,460,120]}
+{"kind":"shape","id":"sh/alkre5cv","slide":11,"bbox":[690,365,500,185]}
+{"kind":"shape","id":"sh/lcvqdkbi","slide":11,"bbox":[690,365,8,185]}
+{"kind":"textbox","id":"sh/kbm9kfux","slide":11,"text":"不能声称","textPreview":"不能声称","textChars":4,"textLines":1,"bbox":[714,378,460,34]}
+{"kind":"textbox","id":"sh/zad8badc","slide":11,"text":"唯一分解、普适最小基和自动真实重放","textPreview":"唯一分解、普适最小基和自动真实重放","textChars":17,"textLines":1,"bbox":[714,419,460,120]}
+{"kind":"notes","id":"nt/hlj3vw","slide":11,"text":"结论限定在固定观察范围和对象粒度内。三类接口不可简单互相替代，但不构成普适最小性定理。\n来源：docs/基于文献的Primitive重构论证.md，第9、12、13节。"}
+{"kind":"slide","id":"sl/zwkox7","slide":12,"title":"Primitive","textShapes":10}
+{"kind":"shape","id":"sh/650ri50r","slide":12,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/tsratkzi","slide":12,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/s7i9kfyx","slide":12,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/fu9svuh8","slide":12,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/et0rmpg3","slide":12,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/1wbaxkze","slide":12,"text":"代码结构","textPreview":"代码结构","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/gvi9ofyt","slide":12,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/vyp8jqh4","slide":12,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/axgral0j","slide":12,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/ofah4zet","slide":12,"text":"12/16","textPreview":"12/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/pg3ixkfe","slide":12,"bbox":[70,125,650,450]}
+{"kind":"textbox","id":"sh/2dsz2pw3","slide":12,"text":"src/stac_attack_lab/\n├── flow/            v3数据模型\n├── interactions/    轨迹与信息流图\n├── extraction/      图切片\n├── verification/    依赖验证\n├── execution/       分析流程\n├── environments/    SafeClaw环境\n└── reporting/       结果报告","textPreview":"src/stac_attack_lab/ | ├── flow/            v3数据模型 | ├── interactions/    轨迹与信息流图 | ├── extraction/      图切片 | ├── verification/    依赖验证 ...","textChars":212,"textLines":8,"bbox":[88,135,614,430]}
+{"kind":"shape","id":"sh/ne10vux8","slide":12,"bbox":[790,155,400,320]}
+{"kind":"shape","id":"sh/c3u18ze5","slide":12,"bbox":[790,155,8,320]}
+{"kind":"textbox","id":"sh/x43i14fq","slide":12,"text":"VS Code展示","textPreview":"VS Code展示","textChars":9,"textLines":1,"bbox":[814,168,360,34]}
+{"kind":"textbox","id":"sh/ahcz6pwz","slide":12,"text":"flow/models.py\ninteractions/flow_v3.py\nverification/flow_v3.py\nexecution/flow_reanalysis.py","textPreview":"flow/models.py | interactions/flow_v3.py | verification/flow_v3.py | execution/flow_reanalysis.py","textChars":91,"textLines":4,"bbox":[814,209,360,255]}
+{"kind":"textbox","id":"sh/bil0zuxk","slide":12,"text":"PPT讲结构，IDE讲实现","textPreview":"PPT讲结构，IDE讲实现","textChars":13,"textLines":1,"bbox":[800,515,380,42]}
+{"kind":"notes","id":"nt/zwkox7","slide":12,"text":"本页只做VS Code导航。重点展示v3数据模型、投影、验证和离线分析入口。\n来源：docs/PROJECT_STRUCTURE_ZH.md。"}
+{"kind":"slide","id":"sl/y7unpg","slide":13,"title":"Primitive","textShapes":15}
+{"kind":"shape","id":"sh/8r6507mp","slide":13,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/7qxo72lk","slide":13,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/mponyx4z","slide":13,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/hgz6dc3m","slide":13,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/wfq54rm1","slide":13,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/vehobmlg","slide":13,"text":"分析流程","textPreview":"分析流程","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/ut8n2h4v","slide":13,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/xkfm1s32","slide":13,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/cjm5snmx","slide":13,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/2tovmp83","slide":13,"text":"13/16","textPreview":"13/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/3uxcva98","slide":13,"bbox":[45,225,160,78]}
+{"kind":"textbox","id":"sh/ovqdofqt","slide":13,"text":"交互事件","textPreview":"交互事件","textChars":4,"textLines":1,"bbox":[55,233,140,62]}
+{"kind":"shape","id":"sh/pwzuxkre","slide":13,"bbox":[247,225,160,78]}
+{"kind":"textbox","id":"sh/qx8vqp8z","slide":13,"text":"规范化轨迹","textPreview":"规范化轨迹","textChars":5,"textLines":1,"bbox":[257,233,140,62]}
+{"kind":"shape","id":"sh/byhwzu9k","slide":13,"bbox":[449,225,160,78]}
+{"kind":"textbox","id":"sh/czqdszq5","slide":13,"text":"Effect Graph","textPreview":"Effect Graph","textChars":12,"textLines":1,"bbox":[459,233,140,62]}
+{"kind":"shape","id":"sh/d0ze14rq","slide":13,"bbox":[651,225,160,78]}
+{"kind":"textbox","id":"sh/y18vu98v","slide":13,"text":"依赖验证","textPreview":"依赖验证","textChars":4,"textLines":1,"bbox":[661,233,140,62]}
+{"kind":"shape","id":"sh/z21w3e9g","slide":13,"bbox":[853,225,160,78]}
+{"kind":"textbox","id":"sh/vq1cre5o","slide":13,"text":"图切片","textPreview":"图切片","textChars":3,"textLines":1,"bbox":[863,233,140,62]}
+{"kind":"shape","id":"sh/apsbi9o3","slide":13,"bbox":[1055,225,160,78]}
+{"kind":"textbox","id":"sh/xsjut4nu","slide":13,"text":"分析结果","textPreview":"分析结果","textChars":4,"textLines":1,"bbox":[1065,233,140,62]}
+{"kind":"shape","id":"sh/wradkj69","slide":13,"bbox":[205,264,42,0]}
+{"kind":"shape","id":"sh/n21cnu5s","slide":13,"bbox":[407,264,42,0]}
+{"kind":"shape","id":"sh/m18bepo7","slide":13,"bbox":[609,264,42,0]}
+{"kind":"shape","id":"sh/94jup4ni","slide":13,"bbox":[811,264,42,0]}
+{"kind":"shape","id":"sh/83atgz6x","slide":13,"bbox":[1013,264,42,0]}
+{"kind":"textbox","id":"sh/zyhcju5g","slide":13,"text":"Projector提出claim","textPreview":"Projector提出claim","textChars":16,"textLines":1,"bbox":[400,355,280,44]}
+{"kind":"textbox","id":"sh/yx8bapov","slide":13,"text":"Verifier独立裁决","textPreview":"Verifier独立裁决","textChars":12,"textLines":1,"bbox":[655,420,280,44]}
+{"kind":"textbox","id":"sh/o369kvmt","slide":13,"text":"未观察内容保留为 unknown","textPreview":"未观察内容保留为 unknown","textChars":16,"textLines":1,"bbox":[405,500,470,48]}
+{"kind":"notes","id":"nt/y7unpg","slide":13,"text":"轨迹先进入统一规范化表示，再投影成Effect Graph。Verifier独立裁决依赖，Slice保留与目标相关的结构。\n来源：docs/PROJECT_STRUCTURE_ZH.md，第6至8节。"}
+{"kind":"slide","id":"sl/3hu8dp","slide":14,"title":"Primitive","textShapes":10}
+{"kind":"shape","id":"sh/onyt4nmx","slide":14,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/nm5cv2ls","slide":14,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/2lwb2x47","slide":14,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/10nuts3m","slide":14,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/0zet0nm1","slide":14,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/fy5crilg","slide":14,"text":"当前进展","textPreview":"当前进展","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/exwbyd4v","slide":14,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/lwru5c3q","slide":14,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/kvidc7m5","slide":14,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/u1ovu1k3","slide":14,"text":"14/16","textPreview":"14/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/v2xw3m1o","slide":14,"bbox":[75,130,530,430]}
+{"kind":"shape","id":"sh/w36dwr29","slide":14,"bbox":[75,130,8,430]}
+{"kind":"textbox","id":"sh/h4fe5wju","slide":14,"text":"目前已经完成","textPreview":"目前已经完成","textChars":6,"textLines":1,"bbox":[99,143,490,34]}
+{"kind":"textbox","id":"sh/md4vqhk7","slide":14,"text":"Primitive v3数据结构\nEffect Graph与多效果投影\n依赖验证与图切片\n跨会话版本关系\n正常交互轨迹分析\nSafeClaw环境适配","textPreview":"Primitive v3数据结构 | Effect Graph与多效果投影 | 依赖验证与图切片 | 跨会话版本关系 | 正常交互轨迹分析 | SafeClaw环境适配","textChars":74,"textLines":6,"bbox":[99,184,490,365]}
+{"kind":"shape","id":"sh/7ydwzmls","slide":14,"bbox":[675,130,530,430]}
+{"kind":"shape","id":"sh/8zmdsr2x","slide":14,"bbox":[675,130,8,430]}
+{"kind":"textbox","id":"sh/90ve1w3i","slide":14,"text":"目前仍在进行","textPreview":"目前仍在进行","textChars":6,"textLines":1,"bbox":[699,143,490,34]}
+{"kind":"textbox","id":"sh/698f2lkb","slide":14,"text":"正常传播样本库\n更多交互场景\nPlanner接入\n正式攻击实验\n对照与消融实验","textPreview":"正常传播样本库 | 更多交互场景 | Planner接入 | 正式攻击实验 | 对照与消融实验","textChars":39,"textLines":5,"bbox":[699,184,490,365]}
+{"kind":"notes","id":"nt/3hu8dp","slide":14,"text":"这一页只区分当前实现和后续工作，不把离线工程验证描述成真实实验结果。\n来源：docs/PROJECT_STRUCTURE_ZH.md，第18节；docs/IMPLEMENTATION_PROGRESS.md顶部。"}
+{"kind":"slide","id":"sl/mid8y7","slide":15,"title":"Primitive","textShapes":11}
+{"kind":"shape","id":"sh/cnitwnq9","slide":15,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/rm9c3ipo","slide":15,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/ql0bud83","slide":15,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/1cbu9c7q","slide":15,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/0b2t07q5","slide":15,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/zatc72pk","slide":15,"text":"当前困难","textPreview":"当前困难","textChars":4,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/e90byx8f","slide":15,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/hg7ux87m","slide":15,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/gfyto3q1","slide":15,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/i1cji5k7","slide":15,"text":"15/16","textPreview":"15/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/j2lkrals","slide":15,"bbox":[75,135,535,335]}
+{"kind":"shape","id":"sh/43u1kf2d","slide":15,"bbox":[75,135,8,335]}
+{"kind":"textbox","id":"sh/5432tkjy","slide":15,"text":"信息流分析","textPreview":"信息流分析","textChars":5,"textLines":1,"bbox":[99,148,495,34]}
+{"kind":"textbox","id":"sh/qpwjmpkj","slide":15,"text":"图中的关系是否准确\n未观察步骤如何处理\n语义依赖如何验证\n不同轨迹如何统一表示","textPreview":"图中的关系是否准确 | 未观察步骤如何处理 | 语义依赖如何验证 | 不同轨迹如何统一表示","textChars":39,"textLines":4,"bbox":[99,189,495,270]}
+{"kind":"shape","id":"sh/rq5kvu1o","slide":15,"bbox":[670,135,535,335]}
+{"kind":"shape","id":"sh/sre1oz29","slide":15,"bbox":[670,135,8,335]}
+{"kind":"textbox","id":"sh/dsn2xkju","slide":15,"text":"攻击过程","textPreview":"攻击过程","textChars":4,"textLines":1,"bbox":[694,148,495,34]}
+{"kind":"textbox","id":"sh/etwjqpkf","slide":15,"text":"信息流图如何帮助攻击\nPlanner应该关注哪些信息\nPrompt需要怎样组织\nLong-horizon状态如何处理\n攻击提升如何解释","textPreview":"信息流图如何帮助攻击 | Planner应该关注哪些信息 | Prompt需要怎样组织 | Long-horizon状态如何处理 | 攻击提升如何解释","textChars":67,"textLines":5,"bbox":[694,189,495,270]}
+{"kind":"shape","id":"sh/fu5kzu10","slide":15,"bbox":[210,515,860,64]}
+{"kind":"textbox","id":"sh/byp0nuh8","slide":15,"text":"图到攻击的转换仍需明确","textPreview":"图到攻击的转换仍需明确","textChars":11,"textLines":1,"bbox":[250,524,780,46]}
+{"kind":"notes","id":"nt/mid8y7","slide":15,"text":"信息流表示本身已经较清晰。更大的开放问题是图如何参与攻击，以及如何验证攻击提升来自图结构。\n来源：docs/论文阅读后关于idea的思考.md。"}
+{"kind":"slide","id":"sl/gzuj2l","slide":16,"title":"Primitive","textShapes":11}
+{"kind":"shape","id":"sh/q9wfehsb","slide":16,"bbox":[0,0,1280,24]}
+{"kind":"textbox","id":"sh/dcnypwbm","slide":16,"text":"Primitive","textPreview":"Primitive","textChars":9,"textLines":1,"bbox":[25,0,140,22]}
+{"kind":"textbox","id":"sh/cbexgrah","slide":16,"text":"代码","textPreview":"代码","textChars":2,"textLines":1,"bbox":[590,0,140,22]}
+{"kind":"textbox","id":"sh/zepgr6ts","slide":16,"text":"进展","textPreview":"进展","textChars":2,"textLines":1,"bbox":[1110,0,140,22]}
+{"kind":"shape","id":"sh/ydgfi1s7","slide":16,"bbox":[0,24,1280,64]}
+{"kind":"textbox","id":"sh/lg7ytgby","slide":16,"text":"论文启发与未来工作","textPreview":"论文启发与未来工作","textChars":9,"textLines":1,"bbox":[34,26,1150,58]}
+{"kind":"shape","id":"sh/0fyxkbad","slide":16,"bbox":[1238,38,7,27]}
+{"kind":"shape","id":"sh/nipgv6t4","slide":16,"bbox":[0,688,1280,32]}
+{"kind":"textbox","id":"sh/mhgfm1sj","slide":16,"text":"STAC Compositional Attack Lab","textPreview":"STAC Compositional Attack Lab","textChars":29,"textLines":1,"bbox":[28,691,620,24]}
+{"kind":"textbox","id":"sh/4vax47y1","slide":16,"text":"16/16","textPreview":"16/16","textChars":5,"textLines":1,"bbox":[1140,691,100,24]}
+{"kind":"shape","id":"sh/5wjedcfm","slide":16,"bbox":[70,125,545,400]}
+{"kind":"shape","id":"sh/it8f2xgv","slide":16,"bbox":[70,125,8,400]}
+{"kind":"textbox","id":"sh/juhwb2xg","slide":16,"text":"论文启发","textPreview":"论文启发","textChars":4,"textLines":1,"bbox":[94,138,505,34]}
+{"kind":"textbox","id":"sh/sjax8rex","slide":16,"text":"系统整理Agent设计组件\n总结攻击维度和攻击向量\n可能帮助组织攻击Prompt\n可能帮助比较不同攻击方式\n具体方法仍需讨论和实验","textPreview":"系统整理Agent设计组件 | 总结攻击维度和攻击向量 | 可能帮助组织攻击Prompt | 可能帮助比较不同攻击方式 | 具体方法仍需讨论和实验","textChars":65,"textLines":5,"bbox":[94,179,505,335]}
+{"kind":"shape","id":"sh/tkjehwfi","slide":16,"bbox":[665,125,545,400]}
+{"kind":"shape","id":"sh/6hsf6hwr","slide":16,"bbox":[665,125,8,400]}
+{"kind":"textbox","id":"sh/ri1wfmxc","slide":16,"text":"未来工作","textPreview":"未来工作","textChars":4,"textLines":1,"bbox":[689,138,505,34]}
+{"kind":"textbox","id":"sh/gnuxcre9","slide":16,"text":"完善正常传播样本\n检查信息流图准确性\n明确信息流图在攻击中的作用\n设计合理的Planner输入\n比较有无信息流图的结果\n分析Long-horizon攻击过程","textPreview":"完善正常传播样本 | 检查信息流图准确性 | 明确信息流图在攻击中的作用 | 设计合理的Planner输入 | 比较有无信息流图的结果 | 分析Long-horizon攻击过程","textChars":78,"textLines":6,"bbox":[689,179,505,335]}
+{"kind":"shape","id":"sh/1o3elwfe","slide":16,"bbox":[145,565,990,62]}
+{"kind":"textbox","id":"sh/p4ze5w7y","slide":16,"text":"研究重点逐步转向信息流的攻击利用","textPreview":"研究重点逐步转向信息流的攻击利用","textChars":16,"textLines":1,"bbox":[190,573,900,46]}
+{"kind":"notes","id":"nt/gzuj2l","slide":16,"text":"Survey启发只作为可能方向。当前阅读笔记没有提出具体利用机制，因此不在这里扩展攻击规划框架。\n来源：docs/论文阅读后关于idea的思考.md；The Attack and Defense Landscape of Agentic AI: A Comprehensive Survey。"}
