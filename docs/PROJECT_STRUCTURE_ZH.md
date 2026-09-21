@@ -1,6 +1,6 @@
 # STAC Compositional Attack Lab：项目结构与逐部分讲解大纲
 
-> 更新基准：2026-09-21，提交 `aa62925`。本文依据当前源码、配置、测试与顶部权威进度编写，是源码导航和学习大纲，不是实验验收报告。本次更新没有调用真实模型、启动容器或执行实验。
+> 更新基准：2026-09-21。本文依据当前源码、配置、测试与顶部权威进度编写，是源码导航和学习大纲，不是实验验收报告。九原语 M0/M1 只完成离线/fake 工程闭环，没有调用真实模型或启动容器。
 
 ## 0. 先建立正确的项目全景
 
@@ -13,10 +13,11 @@
 - 某种机制结论由什么证据支持，哪些部分仍然 unknown；
 - 正常传播先验能否帮助之后的安全评测，而不从攻击结果倒推样本。
 
-当前仓库不是一条单线流水线，而是两套明确隔离、逐步迁移的研究表示：
+当前仓库包含新的九原语主线与两条历史复现路径：
 
 | 路径 | 当前职责 | 当前边界 |
 |---|---|---|
+| **Nine-primitive capability** | 当前主线；九原语独立合同、F1 三条件编译、SafeClaw fake adapter、状态 oracle、constraints 和离线报告 | M0/M1 仅有 synthetic/fake 证据；真实 provider、人工 D10、M2+ 尚未执行 |
 | **Primitive v3 / observable flow** | 新研究表示；使用 `TRANSFER / DERIVE / UPDATE`、effect graph、显式 dependency claim、分层准入和正常交互采集 | 尚无 v3 library freeze、Planner/formal 执行和真实 intervention；不能压缩为 legacy chain |
 | **Legacy chain v2** | 旧的四类 core primitive、宏链、样本库、Planner、正式配对评测和历史复验 | 继续可读、可复现；不应把旧 verdict 自动继承给 v3 |
 
@@ -104,6 +105,7 @@
 STAC-Compositional-Attack-Lab/
 ├── src/stac_attack_lab/
 │   ├── flow/                    v3 合同、profile、registry 和纯分析
+│   ├── capability/              九原语合同、compiler、oracle、分析、runner 和报告
 │   ├── interactions/            采集、规范化、benign 与 v3 投影适配
 │   ├── extraction/              legacy chain 与 v3 slice/macro 抽取
 │   ├── verification/            legacy 与 v3 的独立验证和准入
@@ -117,6 +119,7 @@ STAC-Compositional-Attack-Lab/
 │   └── cli.py                   所有命令的薄入口
 ├── configs/
 │   ├── flow/                    v3 observation profile 与 registry
+│   ├── capability/              F1 合同与默认禁用真实兼容性模板
 │   ├── benign_collection/       正常交互采集配置，模板默认禁用
 │   ├── benign_scenarios/        正常交互场景
 │   ├── benign_runtime_tasks/    脱敏正常运行任务
@@ -154,13 +157,20 @@ STAC-Compositional-Attack-Lab/
 | `schema_registry.py` | Pydantic 模型和生成 schema 的登记与一致性检查 |
 | `cli.py` | 解析命令，调用 execution 层；不应承载复杂研究规则 |
 
-CLI 当前分为五组：
+CLI 当前主要分为六组：
 
+- `capability`：九原语 inventory、compile、validate、fake demo、replay 和 report；
 - `doctor`：离线检查 workflow readiness；
 - `benign`：正常交互 validate、prepare、fixture/live collection；
 - `flow`：v3 profile、reanalyze、validate、slice、inspect；
 - `sample` / `revalidation`：legacy 采集、mining、审计、冻结与复验；
 - `safeclaw`：legacy formal inventory、preflight、run、audit、report。
+
+### 4.1 九原语 capability 主线
+
+`capability/models.py` 将九原语、task/surface/composition、public/runtime view、runtime event、checkpoint、constraint、harm 与 episode result 分开建模。`compiler.py` 只允许 F1 三条件修改登记的低信任材料并密封 runtime task；`environments/safeclaw/capability_adapter.py` 是中性 reviewed-session adapter，fake transport 不调用 provider。`evaluation.py` 从状态 checkpoint 独立判断业务危害，`analysis.py` 只从实际事件产生 occurrence，`runner.py`/`reporting.py` 支持离线 replay 与完整分母报告。
+
+当前 F1 配置是 `configs/capability/f1_status_acceptance.json`。真实兼容性模板 `configs/capability/provider_compatibility.disabled.json` 固定 benign case、模型、三次 Victim HTTP 上限、零重试、300 秒墙钟与唯一输出，但 `execution_enabled=false` 且没有授权引用。
 
 ---
 

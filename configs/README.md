@@ -2,6 +2,8 @@
 
 | 路径 | 用途 |
 |---|---|
+| `capability/f1_status_acceptance.json` | 九原语 F1 extension task、三条件材料、可信规则、surface 与 composition；纯离线 compiler 输入 |
+| `capability/provider_compatibility.disabled.json` | M1 真实 provider 兼容性禁用模板；benign-only、Victim 最多 3 次 HTTP、其他角色 0、零重试、300 秒 |
 | `environments/safeclaw.yaml` | 唯一 Ark Victim、pinned upstream、Docker、端口和 embedding preflight |
 | `experiments/formal_evaluation.yaml` | Formal matrix、budget、library 和输出路径 |
 | `models/formal_attacker.yaml` | Construction/Formal Attacker 模型 |

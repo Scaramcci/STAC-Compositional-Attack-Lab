@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "AttributionState": {
+      "enum": [
+        "supported",
+        "contradicted",
+        "unresolved"
+      ],
+      "title": "AttributionState",
+      "type": "string"
+    },
+    "EvidenceSupport": {
+      "enum": [
+        "direct",
+        "behavioral_annotation",
+        "intervention_supported",
+        "insufficient"
+      ],
+      "title": "EvidenceSupport",
+      "type": "string"
+    },
+    "ExecutionState": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "observed",
+        "committed",
+        "blocked",
+        "error",
+        "unknown"
+      ],
+      "title": "ExecutionState",
+      "type": "string"
+    },
+    "PrimitiveKind": {
+      "enum": [
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    },
+    "SemanticAlignment": {
+      "enum": [
+        "aligned",
+        "deviated",
+        "ambiguous",
+        "not_applicable"
+      ],
+      "title": "SemanticAlignment",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attribution": {
+      "$ref": "#/$defs/AttributionState"
+    },
+    "event_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Event Ids",
+      "type": "array"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionState"
+    },
+    "occurrence_id": {
+      "title": "Occurrence Id",
+      "type": "string"
+    },
+    "planned_node_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Planned Node Id"
+    },
+    "primitive": {
+      "$ref": "#/$defs/PrimitiveKind"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "semantic_alignment": {
+      "$ref": "#/$defs/SemanticAlignment"
+    },
+    "support": {
+      "$ref": "#/$defs/EvidenceSupport"
+    }
+  },
+  "required": [
+    "occurrence_id",
+    "planned_node_id",
+    "primitive",
+    "event_ids",
+    "execution",
+    "semantic_alignment",
+    "support",
+    "attribution",
+    "reason_codes"
+  ],
+  "title": "PrimitiveOccurrence",
+  "type": "object"
+}

@@ -1,0 +1,80 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "case_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Case Hashes",
+      "type": "object"
+    },
+    "case_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Case Refs",
+      "type": "array"
+    },
+    "compilation_id": {
+      "title": "Compilation Id",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    },
+    "network_requests_performed": {
+      "const": false,
+      "default": false,
+      "title": "Network Requests Performed",
+      "type": "boolean"
+    },
+    "profile_hash": {
+      "title": "Profile Hash",
+      "type": "string"
+    },
+    "registry_hash": {
+      "title": "Registry Hash",
+      "type": "string"
+    },
+    "runtime_task_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Runtime Task Hashes",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "capability-compilation/1.0",
+      "default": "capability-compilation/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_config_hash": {
+      "title": "Source Config Hash",
+      "type": "string"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    }
+  },
+  "required": [
+    "compilation_id",
+    "created_at",
+    "upstream_commit",
+    "profile_hash",
+    "registry_hash",
+    "source_config_hash",
+    "case_refs",
+    "case_hashes",
+    "runtime_task_hashes",
+    "manifest_hash"
+  ],
+  "title": "CompilationManifest",
+  "type": "object"
+}

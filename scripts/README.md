@@ -2,6 +2,8 @@
 
 | 命令 | 用途与退出语义 |
 |---|---|
+| `python -m stac_attack_lab.cli capability demo --config configs/capability/f1_status_acceptance.json --output experiments/runs/capability/<unique-id>` | 九原语 M0/M1 离线完整闭环；fake transport，零真实请求。 |
+| `python -m stac_attack_lab.cli capability inventory/compile/validate/replay/report ...` | 九原语固定 upstream 核对、确定性编译、密封校验、只读重分析和报告。 |
 | `bash scripts/run_cross_session_revalidation.sh prepare` | 创建唯一、默认禁用真实执行的复验目录，写入新 provenance/configuration review；不访问 provider。成功 0。 |
 | `bash scripts/run_cross_session_revalidation.sh offline --run-root PATH --collection COLLECTION` | collection reanalysis：读取已有 collection，重新 normalize/mine/audit/admission；不叫 bridge replay。 |
 | `bash scripts/run_cross_session_revalidation.sh offline --run-root PATH --bridge-responses RESPONSES.jsonl` | true bridge replay：要求 initialize/pre-state、每个 action/response/post-state 和 finish，经 live 共用 driver mapper 生成新 source events 后再 mine/audit/admission。缺字段或坏行返回 blocked，不猜 action。 |

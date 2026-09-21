@@ -1,0 +1,490 @@
+{
+  "$defs": {
+    "AttackSurface": {
+      "additionalProperties": false,
+      "properties": {
+        "editable_json_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Editable Json Pointers",
+          "type": "array"
+        },
+        "exposure_time": {
+          "const": "episode_start",
+          "default": "episode_start",
+          "title": "Exposure Time",
+          "type": "string"
+        },
+        "immutable_json_pointers": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Immutable Json Pointers",
+          "type": "array"
+        },
+        "max_characters": {
+          "exclusiveMinimum": 0,
+          "title": "Max Characters",
+          "type": "integer"
+        },
+        "prohibited_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prohibited Fields",
+          "type": "array"
+        },
+        "source_trust": {
+          "const": "low",
+          "default": "low",
+          "title": "Source Trust",
+          "type": "string"
+        },
+        "surface_id": {
+          "title": "Surface Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surface_id",
+        "editable_json_pointers",
+        "immutable_json_pointers",
+        "max_characters",
+        "prohibited_fields"
+      ],
+      "title": "AttackSurface",
+      "type": "object"
+    },
+    "BusinessOracleSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "harmful_status": {
+          "title": "Harmful Status",
+          "type": "string"
+        },
+        "legal_status_without_proof": {
+          "title": "Legal Status Without Proof",
+          "type": "string"
+        },
+        "oracle_id": {
+          "title": "Oracle Id",
+          "type": "string"
+        },
+        "status_field": {
+          "title": "Status Field",
+          "type": "string"
+        },
+        "target_project_id": {
+          "title": "Target Project Id",
+          "type": "string"
+        },
+        "trusted_proof_field": {
+          "title": "Trusted Proof Field",
+          "type": "string"
+        },
+        "version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "oracle_id",
+        "target_project_id",
+        "trusted_proof_field",
+        "status_field",
+        "harmful_status",
+        "legal_status_without_proof"
+      ],
+      "title": "BusinessOracleSpec",
+      "type": "object"
+    },
+    "CapabilityCase": {
+      "additionalProperties": false,
+      "properties": {
+        "attack_surface": {
+          "$ref": "#/$defs/AttackSurface"
+        },
+        "case_hash": {
+          "title": "Case Hash",
+          "type": "string"
+        },
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "composition": {
+          "$ref": "#/$defs/CompositionSpec"
+        },
+        "contract_hash": {
+          "title": "Contract Hash",
+          "type": "string"
+        },
+        "low_trust_material": {
+          "title": "Low Trust Material",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "capability-case/1.0",
+          "default": "capability-case/1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "task_contract": {
+          "$ref": "#/$defs/TaskContract"
+        },
+        "variant": {
+          "$ref": "#/$defs/VariantKind"
+        }
+      },
+      "required": [
+        "case_id",
+        "variant",
+        "task_contract",
+        "attack_surface",
+        "composition",
+        "low_trust_material",
+        "contract_hash",
+        "case_hash"
+      ],
+      "title": "CapabilityCase",
+      "type": "object"
+    },
+    "CompositionEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "relation": {
+          "enum": [
+            "precedes",
+            "content_available",
+            "resource_read_from",
+            "argument_binding",
+            "decision_support",
+            "triggered_recovery"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "source_node_id": {
+          "title": "Source Node Id",
+          "type": "string"
+        },
+        "target_node_id": {
+          "title": "Target Node Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_node_id",
+        "target_node_id",
+        "relation"
+      ],
+      "title": "CompositionEdge",
+      "type": "object"
+    },
+    "CompositionNode": {
+      "additionalProperties": false,
+      "properties": {
+        "external_preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "External Preconditions",
+          "type": "array"
+        },
+        "node_id": {
+          "title": "Node Id",
+          "type": "string"
+        },
+        "primitive": {
+          "$ref": "#/$defs/PrimitiveKind"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node_id",
+        "primitive"
+      ],
+      "title": "CompositionNode",
+      "type": "object"
+    },
+    "CompositionSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "composition_id": {
+          "title": "Composition Id",
+          "type": "string"
+        },
+        "edges": {
+          "items": {
+            "$ref": "#/$defs/CompositionEdge"
+          },
+          "title": "Edges",
+          "type": "array"
+        },
+        "family": {
+          "const": "F1",
+          "title": "Family",
+          "type": "string"
+        },
+        "max_recovery_transitions": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Max Recovery Transitions",
+          "type": "integer"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/CompositionNode"
+          },
+          "title": "Nodes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "composition_id",
+        "family",
+        "nodes",
+        "edges"
+      ],
+      "title": "CompositionSpec",
+      "type": "object"
+    },
+    "PrimitiveKind": {
+      "enum": [
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    },
+    "TaskContract": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_operations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Operations",
+          "type": "array"
+        },
+        "base_task_id": {
+          "title": "Base Task Id",
+          "type": "string"
+        },
+        "business_authorizations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Business Authorizations",
+          "type": "array"
+        },
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "family": {
+          "const": "F1",
+          "title": "Family",
+          "type": "string"
+        },
+        "legitimate_goal": {
+          "title": "Legitimate Goal",
+          "type": "string"
+        },
+        "normal_utility_predicates": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Normal Utility Predicates",
+          "type": "array"
+        },
+        "oracle": {
+          "$ref": "#/$defs/BusinessOracleSpec"
+        },
+        "schema_version": {
+          "const": "capability-task/1.0",
+          "default": "capability-task/1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "split": {
+          "enum": [
+            "synthetic",
+            "dev",
+            "validation",
+            "test"
+          ],
+          "title": "Split",
+          "type": "string"
+        },
+        "split_group_id": {
+          "title": "Split Group Id",
+          "type": "string"
+        },
+        "track": {
+          "const": "safeclaw_derived_extension",
+          "title": "Track",
+          "type": "string"
+        },
+        "trusted_ledger": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Trusted Ledger",
+          "type": "object"
+        },
+        "trusted_rules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trusted Rules",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "family",
+        "track",
+        "base_task_id",
+        "split",
+        "split_group_id",
+        "legitimate_goal",
+        "trusted_rules",
+        "trusted_ledger",
+        "allowed_operations",
+        "business_authorizations",
+        "normal_utility_predicates",
+        "oracle"
+      ],
+      "title": "TaskContract",
+      "type": "object"
+    },
+    "VariantKind": {
+      "enum": [
+        "benign",
+        "direct",
+        "semantic"
+      ],
+      "title": "VariantKind",
+      "type": "string"
+    },
+    "VictimPublicView": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_operations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Operations",
+          "type": "array"
+        },
+        "low_trust_material": {
+          "title": "Low Trust Material",
+          "type": "string"
+        },
+        "low_trust_material_path": {
+          "title": "Low Trust Material Path",
+          "type": "string"
+        },
+        "public_view_hash": {
+          "title": "Public View Hash",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "capability-public-view/1.0",
+          "default": "capability-public-view/1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "trusted_ledger_path": {
+          "title": "Trusted Ledger Path",
+          "type": "string"
+        },
+        "trusted_rules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trusted Rules",
+          "type": "array"
+        },
+        "user_goal": {
+          "title": "User Goal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "user_goal",
+        "trusted_rules",
+        "trusted_ledger_path",
+        "low_trust_material_path",
+        "low_trust_material",
+        "allowed_operations",
+        "public_view_hash"
+      ],
+      "title": "VictimPublicView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "case": {
+      "$ref": "#/$defs/CapabilityCase"
+    },
+    "initial_state": {
+      "additionalProperties": true,
+      "title": "Initial State",
+      "type": "object"
+    },
+    "private_oracle": {
+      "$ref": "#/$defs/BusinessOracleSpec"
+    },
+    "public_view": {
+      "$ref": "#/$defs/VictimPublicView"
+    },
+    "runtime_task_hash": {
+      "title": "Runtime Task Hash",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-runtime-task/1.0",
+      "default": "capability-runtime-task/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "upstream_schema_compatible": {
+      "const": false,
+      "default": false,
+      "title": "Upstream Schema Compatible",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "case",
+    "public_view",
+    "initial_state",
+    "private_oracle",
+    "runtime_task_hash"
+  ],
+  "title": "RuntimeTask",
+  "type": "object"
+}

@@ -1,0 +1,148 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "attacker_mode": {
+      "const": "fixed_reviewed_fixture",
+      "title": "Attacker Mode",
+      "type": "string"
+    },
+    "authorization_reference": {
+      "title": "Authorization Reference",
+      "type": "null"
+    },
+    "automatic_retries": {
+      "const": 0,
+      "title": "Automatic Retries",
+      "type": "integer"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "episode_wallclock_seconds": {
+      "exclusiveMinimum": 0,
+      "title": "Episode Wallclock Seconds",
+      "type": "integer"
+    },
+    "execution_enabled": {
+      "const": false,
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "max_annotation_http_attempts": {
+      "const": 0,
+      "title": "Max Annotation Http Attempts",
+      "type": "integer"
+    },
+    "max_attacker_http_attempts": {
+      "const": 0,
+      "title": "Max Attacker Http Attempts",
+      "type": "integer"
+    },
+    "max_batch_cost_usd": {
+      "title": "Max Batch Cost Usd",
+      "type": "number"
+    },
+    "max_batch_http_attempts": {
+      "exclusiveMinimum": 0,
+      "title": "Max Batch Http Attempts",
+      "type": "integer"
+    },
+    "max_embedding_http_attempts": {
+      "const": 0,
+      "title": "Max Embedding Http Attempts",
+      "type": "integer"
+    },
+    "max_output_tokens_per_request": {
+      "exclusiveMinimum": 0,
+      "title": "Max Output Tokens Per Request",
+      "type": "integer"
+    },
+    "max_victim_http_attempts": {
+      "exclusiveMinimum": 0,
+      "title": "Max Victim Http Attempts",
+      "type": "integer"
+    },
+    "model_id": {
+      "title": "Model Id",
+      "type": "string"
+    },
+    "notes": {
+      "title": "Notes",
+      "type": "string"
+    },
+    "output_root": {
+      "title": "Output Root",
+      "type": "string"
+    },
+    "platform": {
+      "const": "openclaw",
+      "title": "Platform",
+      "type": "string"
+    },
+    "provider_api_key_env": {
+      "title": "Provider Api Key Env",
+      "type": "string"
+    },
+    "provider_base_url_env": {
+      "title": "Provider Base Url Env",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-experiment/1.0",
+      "default": "capability-experiment/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "study_stage": {
+      "const": "M1-real-provider-compatibility",
+      "title": "Study Stage",
+      "type": "string"
+    },
+    "task_config": {
+      "title": "Task Config",
+      "type": "string"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    },
+    "variant": {
+      "const": "benign",
+      "title": "Variant",
+      "type": "string"
+    }
+  },
+  "required": [
+    "execution_enabled",
+    "study_stage",
+    "task_config",
+    "case_id",
+    "variant",
+    "platform",
+    "upstream_commit",
+    "model_id",
+    "provider_base_url_env",
+    "provider_api_key_env",
+    "attacker_mode",
+    "max_attacker_http_attempts",
+    "max_victim_http_attempts",
+    "max_embedding_http_attempts",
+    "max_annotation_http_attempts",
+    "automatic_retries",
+    "max_output_tokens_per_request",
+    "episode_wallclock_seconds",
+    "max_batch_http_attempts",
+    "max_batch_cost_usd",
+    "run_id",
+    "output_root",
+    "authorization_reference",
+    "notes"
+  ],
+  "title": "CompatibilityConfig",
+  "type": "object"
+}

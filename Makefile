@@ -1,4 +1,4 @@
-.PHONY: help check lint typecheck test schemas doctor-benign benign-prepare \
+.PHONY: help check lint typecheck test schemas capability-demo doctor-benign benign-prepare \
 	legacy-sample-preflight legacy-sample-collection sample-preflight sample-collection \
 	formal-preflight formal-evaluation formal-report
 
@@ -15,6 +15,7 @@ help:
 		'  make schemas                 Regenerate current JSON schemas.' \
 		'' \
 		'SafeClaw workflow:' \
+		'  make capability-demo RUN_ID=<id>  Run the nine-primitive fake/offline loop.' \
 		'  make doctor-benign           Offline diagnosis of the disabled benign pilot.' \
 		'  make benign-prepare          Create a disabled benign preparation snapshot.' \
 		'  make legacy-sample-preflight Check the legacy adversarial pilot.' \
@@ -37,6 +38,12 @@ test:
 
 schemas:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli schemas build
+
+capability-demo:
+	@test -n "$(RUN_ID)" || (printf '%s\n' 'RUN_ID is required.' >&2; exit 2)
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli capability demo \
+		--config configs/capability/f1_status_acceptance.json \
+		--output experiments/runs/capability/$(RUN_ID)
 
 doctor-benign:
 	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -m stac_attack_lab.cli doctor --workflow-kind benign_collection --config configs/benign_collection/live_pilot.disabled.json

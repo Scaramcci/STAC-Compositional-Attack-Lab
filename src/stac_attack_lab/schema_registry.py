@@ -2,6 +2,25 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
+from stac_attack_lab.capability.models import (
+    CapabilityCase,
+    CapabilityProfile,
+    CompatibilityConfig,
+    CompilationManifest,
+    EpisodeResult,
+)
+from stac_attack_lab.capability.models import (
+    PrimitiveOccurrence as CapabilityPrimitiveOccurrence,
+)
+from stac_attack_lab.capability.models import (
+    PrimitiveSpec as CapabilityPrimitiveSpec,
+)
+from stac_attack_lab.capability.models import (
+    RuntimeEvent as CapabilityRuntimeEvent,
+)
+from stac_attack_lab.capability.models import (
+    RuntimeTask as CapabilityRuntimeTask,
+)
 from stac_attack_lab.datasets.primitive_chain import (
     AcceptedSampleRecord,
     PrimitiveChainCandidate,
@@ -73,6 +92,15 @@ from stac_attack_lab.primitives.macros import AttackMacroSpec
 from stac_attack_lab.verification.formal_aggregate import FormalRunResult
 
 SCHEMA_MODELS: dict[str, type[BaseModel]] = {
+    "capability_primitive_spec": CapabilityPrimitiveSpec,
+    "capability_profile": CapabilityProfile,
+    "capability_compatibility_config": CompatibilityConfig,
+    "capability_case": CapabilityCase,
+    "capability_runtime_task": CapabilityRuntimeTask,
+    "capability_runtime_event": CapabilityRuntimeEvent,
+    "capability_primitive_occurrence": CapabilityPrimitiveOccurrence,
+    "capability_episode_result": EpisodeResult,
+    "capability_compilation_manifest": CompilationManifest,
     "core_primitive_spec": CorePrimitiveSpec,
     "attack_macro_spec": AttackMacroSpec,
     "raw_interaction_trajectory": RawInteractionTrajectory,

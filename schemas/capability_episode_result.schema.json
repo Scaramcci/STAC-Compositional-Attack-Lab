@@ -1,0 +1,376 @@
+{
+  "$defs": {
+    "AttributionState": {
+      "enum": [
+        "supported",
+        "contradicted",
+        "unresolved"
+      ],
+      "title": "AttributionState",
+      "type": "string"
+    },
+    "ConstraintCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "applicable": {
+          "title": "Applicable",
+          "type": "boolean"
+        },
+        "check_version": {
+          "title": "Check Version",
+          "type": "string"
+        },
+        "constraint_id": {
+          "title": "Constraint Id",
+          "type": "string"
+        },
+        "coverage": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Coverage",
+          "type": "array"
+        },
+        "evidence_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Event Ids",
+          "type": "array"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ConstraintStatus"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "applicable",
+        "status",
+        "check_version",
+        "coverage",
+        "evidence_event_ids",
+        "reason_code"
+      ],
+      "title": "ConstraintCheck",
+      "type": "object"
+    },
+    "ConstraintStatus": {
+      "enum": [
+        "satisfied",
+        "violated",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "ConstraintStatus",
+      "type": "string"
+    },
+    "EvidenceSupport": {
+      "enum": [
+        "direct",
+        "behavioral_annotation",
+        "intervention_supported",
+        "insufficient"
+      ],
+      "title": "EvidenceSupport",
+      "type": "string"
+    },
+    "ExecutionState": {
+      "enum": [
+        "not_reached",
+        "attempted",
+        "observed",
+        "committed",
+        "blocked",
+        "error",
+        "unknown"
+      ],
+      "title": "ExecutionState",
+      "type": "string"
+    },
+    "HarmResult": {
+      "additionalProperties": false,
+      "properties": {
+        "attempted_harm": {
+          "title": "Attempted Harm",
+          "type": "boolean"
+        },
+        "evidence_event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Event Ids",
+          "type": "array"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "target_project_id": {
+          "title": "Target Project Id",
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/$defs/Verdict"
+        }
+      },
+      "required": [
+        "verdict",
+        "attempted_harm",
+        "target_project_id",
+        "evidence_event_ids",
+        "reason_code"
+      ],
+      "title": "HarmResult",
+      "type": "object"
+    },
+    "PrimitiveAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "occurrences": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveOccurrence"
+          },
+          "title": "Occurrences",
+          "type": "array"
+        },
+        "overall_execution": {
+          "$ref": "#/$defs/ExecutionState"
+        },
+        "planned_node_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Planned Node Ids",
+          "type": "array"
+        },
+        "primitive": {
+          "$ref": "#/$defs/PrimitiveKind"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "primitive",
+        "planned_node_ids",
+        "occurrences",
+        "overall_execution",
+        "reason_codes"
+      ],
+      "title": "PrimitiveAssessment",
+      "type": "object"
+    },
+    "PrimitiveKind": {
+      "enum": [
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    },
+    "PrimitiveOccurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "attribution": {
+          "$ref": "#/$defs/AttributionState"
+        },
+        "event_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Event Ids",
+          "type": "array"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionState"
+        },
+        "occurrence_id": {
+          "title": "Occurrence Id",
+          "type": "string"
+        },
+        "planned_node_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Planned Node Id"
+        },
+        "primitive": {
+          "$ref": "#/$defs/PrimitiveKind"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "semantic_alignment": {
+          "$ref": "#/$defs/SemanticAlignment"
+        },
+        "support": {
+          "$ref": "#/$defs/EvidenceSupport"
+        }
+      },
+      "required": [
+        "occurrence_id",
+        "planned_node_id",
+        "primitive",
+        "event_ids",
+        "execution",
+        "semantic_alignment",
+        "support",
+        "attribution",
+        "reason_codes"
+      ],
+      "title": "PrimitiveOccurrence",
+      "type": "object"
+    },
+    "SemanticAlignment": {
+      "enum": [
+        "aligned",
+        "deviated",
+        "ambiguous",
+        "not_applicable"
+      ],
+      "title": "SemanticAlignment",
+      "type": "string"
+    },
+    "VariantKind": {
+      "enum": [
+        "benign",
+        "direct",
+        "semantic"
+      ],
+      "title": "VariantKind",
+      "type": "string"
+    },
+    "Verdict": {
+      "enum": [
+        "true",
+        "false",
+        "unknown",
+        "not_applicable"
+      ],
+      "title": "Verdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "benign_utility": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/ConstraintCheck"
+      },
+      "title": "Constraints",
+      "type": "array"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "event_count": {
+      "minimum": 0,
+      "title": "Event Count",
+      "type": "integer"
+    },
+    "execution_status": {
+      "enum": [
+        "completed",
+        "partial",
+        "blocked",
+        "error"
+      ],
+      "title": "Execution Status",
+      "type": "string"
+    },
+    "goal_fidelity": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "harm": {
+      "$ref": "#/$defs/HarmResult"
+    },
+    "missing_information": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Missing Information",
+      "type": "array"
+    },
+    "official_verdict": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "pp_success": {
+      "title": "Pp Success",
+      "type": "boolean"
+    },
+    "primitive_analysis": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveAssessment"
+      },
+      "title": "Primitive Analysis",
+      "type": "array"
+    },
+    "report_hash": {
+      "title": "Report Hash",
+      "type": "string"
+    },
+    "residual_compromise": {
+      "$ref": "#/$defs/Verdict"
+    },
+    "schema_version": {
+      "const": "capability-episode-result/1.0",
+      "default": "capability-episode-result/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "variant": {
+      "$ref": "#/$defs/VariantKind"
+    }
+  },
+  "required": [
+    "episode_id",
+    "case_id",
+    "variant",
+    "execution_status",
+    "official_verdict",
+    "harm",
+    "benign_utility",
+    "goal_fidelity",
+    "constraints",
+    "pp_success",
+    "primitive_analysis",
+    "residual_compromise",
+    "missing_information",
+    "event_count",
+    "report_hash"
+  ],
+  "title": "EpisodeResult",
+  "type": "object"
+}

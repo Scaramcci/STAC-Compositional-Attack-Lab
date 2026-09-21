@@ -1,4 +1,12 @@
-# 当前计划 — 2026-09-21 九原语 capability 实验
+# 当前计划 — 2026-09-21 九原语 capability 下一阶段
+
+- **已完成：M0 与 M1 离线/fake。** 九原语合同/registry、F1 三条件 compiler、视图隔离、pinned upstream inventory、官方 PSE smoke、runtime events/checkpoints、独立 harm/constraints/primitive analysis、CLI replay/report、schema 和离线集成演示已通过质量门。事实与命令见 `IMPLEMENTATION_PROGRESS.md`。
+- **待授权：M1 真实兼容性。** 使用 `configs/capability/provider_compatibility.disabled.json`，先审查实际 endpoint、API key 环境变量、模型可用性、Docker image digest、端口/外网隔离、现有 relay 账本和清理所有权。获得覆盖该唯一 run 的授权后，依次验证一次可解析响应、一次合法读取往返、一次正常业务状态提交；失败/不确定请求均消费 3 次总 HTTP 上限，不追加重试。
+- **待做：M2 F1 真实三元组。** 兼容性通过后，从三个干净初始世界分别运行 benign/direct/semantic，冻结任务/可信规则/oracle，补“错误事实但保留低信任来源”的内容中和条件、G-bind 对照和独立 D10 人工审核。保存所有结果，不按攻击成功筛选。
+- **待做：M3+。** 仅在 benign 效用、状态 oracle、证据覆盖和清理可靠后扩展 F2–F6、guard 干预及更大矩阵；每阶段另定预算与授权。旧 library/Planner 路线不重新成为前置条件。
+- **持续边界。** Fake/synthetic 结果只证明工程闭环；当前没有真实 provider payload、Docker runtime、人工审核、official extension verdict 或攻击成功率证据。九原语 occurrence、危害、约束、效用和 official outcome 继续独立报告。
+
+# 历史计划 — 2026-09-21 九原语 capability 实验方案
 
 规范来源：[老师九原语方案](老师九原语_SafeClawArena自下向上实验重构方案.md)。实际完成情况见 [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md)。下方旧路线仅供历史复现，不作为当前任务列表。
 

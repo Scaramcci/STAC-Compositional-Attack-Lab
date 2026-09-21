@@ -6,6 +6,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from stac_attack_lab.capability.compiler import (
+    compile_cases,
+    inventory_upstream,
+    validate_compatibility_config,
+    validate_compilation,
+)
+from stac_attack_lab.capability.reporting import build_capability_report
+from stac_attack_lab.capability.runner import replay_episode, run_fake_pipeline
 from stac_attack_lab.env_loader import load_project_env
 from stac_attack_lab.environments.safeclaw.preflight import (
     load_safeclaw_preflight_config,
@@ -109,6 +117,31 @@ def _build_parser() -> argparse.ArgumentParser:
 
     schemas = sub.add_parser("schemas")
     schemas.add_subparsers(dest="schemas_command", required=True).add_parser("build")
+
+    capability = sub.add_parser("capability", help="nine-primitive offline experiment")
+    capability_sub = capability.add_subparsers(dest="capability_command", required=True)
+    capability_inventory = capability_sub.add_parser("inventory")
+    capability_inventory.add_argument(
+        "--upstream", default="integrations/safeclaw/upstream/SafeClawArena"
+    )
+    capability_compile = capability_sub.add_parser("compile")
+    capability_compile.add_argument("--config", required=True)
+    capability_compile.add_argument("--output", required=True)
+    capability_validate = capability_sub.add_parser("validate")
+    capability_validate.add_argument("--manifest", required=True)
+    compatibility_validate = capability_sub.add_parser("compatibility-validate")
+    compatibility_validate.add_argument(
+        "--config", default="configs/capability/provider_compatibility.disabled.json"
+    )
+    capability_replay = capability_sub.add_parser("replay")
+    capability_replay.add_argument("--episode", required=True)
+    capability_replay.add_argument("--output", required=True)
+    capability_report = capability_sub.add_parser("report")
+    capability_report.add_argument("--manifest", required=True)
+    capability_report.add_argument("--output", required=True)
+    capability_demo = capability_sub.add_parser("demo")
+    capability_demo.add_argument("--config", required=True)
+    capability_demo.add_argument("--output", required=True)
 
     benign = sub.add_parser("benign", help="benign pre-evaluation collection")
     benign_sub = benign.add_subparsers(dest="benign_command", required=True)
@@ -226,6 +259,67 @@ def _main(argv: list[str] | None = None) -> int:
         print("schemas built")
         return 0
 
+    if args.command == "capability":
+        if args.capability_command == "inventory":
+            report = inventory_upstream(_project_scoped_path(root, args.upstream))
+            print(json.dumps(report, indent=2, sort_keys=True))
+            return 0
+        if args.capability_command == "compile":
+            compiled_path = compile_cases(
+                _project_scoped_path(root, args.config),
+                _project_scoped_path(root, args.output),
+            )
+            print(compiled_path)
+            return 0
+        if args.capability_command == "validate":
+            manifest_path = _project_scoped_path(root, args.manifest)
+            compilation_root = manifest_path.parent if manifest_path.is_file() else manifest_path
+            capability_manifest = validate_compilation(compilation_root)
+            print(capability_manifest.model_dump_json(indent=2))
+            return 0
+        if args.capability_command == "compatibility-validate":
+            compatibility_config = validate_compatibility_config(
+                _project_scoped_path(root, args.config)
+            )
+            print(compatibility_config.model_dump_json(indent=2))
+            return 0
+        if args.capability_command == "replay":
+            replay_result = replay_episode(
+                _project_scoped_path(root, args.episode),
+                _project_scoped_path(root, args.output),
+            )
+            print(replay_result.model_dump_json(indent=2))
+            return 0
+        if args.capability_command == "report":
+            report_path = build_capability_report(
+                _project_scoped_path(root, args.manifest),
+                _project_scoped_path(root, args.output),
+            )
+            print(report_path)
+            return 0
+        compilation = _project_scoped_path(root, args.output) / "compiled"
+        episodes = _project_scoped_path(root, args.output) / "episodes"
+        reports = _project_scoped_path(root, args.output) / "report"
+        upstream = root / "integrations/safeclaw/upstream/SafeClawArena"
+        compile_cases(_project_scoped_path(root, args.config), compilation)
+        validate_compilation(compilation)
+        run_fake_pipeline(compilation, episodes)
+        compatibility_report = {
+            "inventory": inventory_upstream(upstream),
+            "official_pse_smoke": smoke_official_pse_evaluator(
+                upstream / "scripts/judge.py",
+                upstream / "tasks/pse/pse-2.1-002.json",
+            ).model_dump(mode="json"),
+            "network_requests_performed": False,
+        }
+        output_root = _project_scoped_path(root, args.output)
+        (output_root / "compatibility_report.json").write_text(
+            json.dumps(compatibility_report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(build_capability_report(episodes, reports))
+        return 0
+
     if args.command == "doctor":
         readiness_report = diagnose_workflow(
             root,
@@ -314,23 +408,23 @@ def _main(argv: list[str] | None = None) -> int:
                 return 0 if matched is not None and matched.status.value == "passed" else 10
             return 0
         if args.flow_command == "analysis-validate":
-            manifest = validate_flow_analysis(_project_scoped_path(root, args.analysis))
-            print(manifest.model_dump_json(indent=2))
+            flow_manifest = validate_flow_analysis(_project_scoped_path(root, args.analysis))
+            print(flow_manifest.model_dump_json(indent=2))
             return 0
         if args.flow_command == "slice":
             graph = EffectGraph.model_validate_json(
                 _project_scoped_path(root, args.graph).read_text(encoding="utf-8")
             )
-            result = slice_dependency_graph(
+            slice_result = slice_dependency_graph(
                 graph,
                 sink_port_ids=args.sink_port,
                 budget=SliceBudget(max_nodes=args.max_nodes, max_edges=args.max_edges),
             )
             output = _project_scoped_path(root, args.output)
             output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+            output.write_text(slice_result.model_dump_json(indent=2) + "\n", encoding="utf-8")
             print(output)
-            return 10 if result.truncated else 0
+            return 10 if slice_result.truncated else 0
         analysis_root = _project_scoped_path(root, args.analysis)
         flow_report = FlowAnalysisReport.model_validate_json(
             (analysis_root / "report.json").read_text(encoding="utf-8")

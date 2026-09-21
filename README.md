@@ -1,6 +1,6 @@
 # STAC Compositional Attack Lab
 
-用于授权、隔离的 SafeClaw/OpenClaw 组合攻击研究。项目从真实 collection 轨迹提取带因果证据的 primitive chain，审计并冻结 sample library，再用配对条件评测 Planner、独立 Attacker、机制判定和 SafeClaw 官方判定。它不面向真实账号、生产系统或公网目标。
+用于授权、隔离的 SafeClaw/OpenClaw Agent 安全研究。当前新主线以九个 capability-transition primitives（Ingest、Adopt、Persist、Recall、Select、Bind、Act、Record、Recover）为一等研究对象，从局部合同和受约束组合编译 SafeClawArena-derived extension task，再分别评估实际业务危害、硬约束、原语证据和官方结果。历史 collection → chain/library → Planner 路线保留复现，但不是九原语实验的前置条件。项目不面向真实账号、生产系统或公网目标。
 
 当前审查 HEAD 始终以 `git rev-parse HEAD` 和 run provenance 为准；不要在多处复制易失效的 commit 值。复验默认入口为版本化 `revalidation prepare/offline`，默认 `execution_enabled=false`；不要从历史 run 复制配置或审核结论。Victim 主线是 Ark endpoint `ep-20260909180104-hmx9m`，API root 是 `https://ark.cn-beijing.volces.com/api/v3`；Planner 与 Attacker 使用 `gpt-5.6-sol`，embedding 使用独立 `SAFECLAW_EMBEDDING_*` 配置。
 
@@ -35,6 +35,20 @@ make check PYTHON=python
 - mode-0600 `.env` 中的真实凭证，不写入配置或日志。
 
 ## 最短上手
+
+九原语 M0/M1 的完整离线演示不会访问 provider、Docker 或 embedding：
+
+```bash
+python -m stac_attack_lab.cli capability inventory
+python -m stac_attack_lab.cli capability compatibility-validate
+python -m stac_attack_lab.cli capability demo \
+  --config configs/capability/f1_status_acceptance.json \
+  --output experiments/runs/capability/<unique-offline-run-id>
+```
+
+演示实际经过 compiler → fake SafeClaw adapter → runtime events/checkpoints → 独立 harm oracle → D1–D11 constraints → 九原语分析 → report。Fake/synthetic 结果仅是工程证据；`provider_compatibility.disabled.json` 保持禁用，也不构成真实请求授权。研究定义见[九原语重构方案](docs/老师九原语_SafeClawArena自下向上实验重构方案.md)。
+
+历史正常交互/graph-prior 工具仍可复现：
 
 ```bash
 make doctor-benign PYTHON=python

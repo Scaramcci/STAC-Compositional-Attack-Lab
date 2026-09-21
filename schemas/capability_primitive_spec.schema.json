@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "PrimitiveKind": {
+      "enum": [
+        "Ingest",
+        "Adopt",
+        "Persist",
+        "Recall",
+        "Select",
+        "Bind",
+        "Act",
+        "Record",
+        "Recover"
+      ],
+      "title": "PrimitiveKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "counterexample": {
+      "title": "Counterexample",
+      "type": "string"
+    },
+    "input_type": {
+      "title": "Input Type",
+      "type": "string"
+    },
+    "minimum_observations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Minimum Observations",
+      "type": "array"
+    },
+    "neutral_example": {
+      "title": "Neutral Example",
+      "type": "string"
+    },
+    "output_type": {
+      "title": "Output Type",
+      "type": "string"
+    },
+    "preconditions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "primitive": {
+      "$ref": "#/$defs/PrimitiveKind"
+    },
+    "version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "primitive",
+    "input_type",
+    "output_type",
+    "preconditions",
+    "minimum_observations",
+    "neutral_example",
+    "counterexample"
+  ],
+  "title": "PrimitiveSpec",
+  "type": "object"
+}

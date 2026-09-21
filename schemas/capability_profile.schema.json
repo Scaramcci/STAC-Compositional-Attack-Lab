@@ -1,0 +1,76 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "available_tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Available Tools",
+      "type": "array"
+    },
+    "evaluator_source_hash": {
+      "title": "Evaluator Source Hash",
+      "type": "string"
+    },
+    "memory_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Memory Capabilities",
+      "type": "array"
+    },
+    "observation_channels": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Observation Channels",
+      "type": "array"
+    },
+    "observation_gaps": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Observation Gaps",
+      "type": "array"
+    },
+    "platform": {
+      "const": "openclaw",
+      "default": "openclaw",
+      "title": "Platform",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "capability-profile/1.0",
+      "default": "capability-profile/1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Session Capabilities",
+      "type": "array"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    },
+    "upstream_schema_hash": {
+      "title": "Upstream Schema Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "upstream_commit",
+    "upstream_schema_hash",
+    "evaluator_source_hash",
+    "available_tools",
+    "session_capabilities",
+    "memory_capabilities",
+    "observation_channels",
+    "observation_gaps"
+  ],
+  "title": "CapabilityProfile",
+  "type": "object"
+}
