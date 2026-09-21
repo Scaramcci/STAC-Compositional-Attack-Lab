@@ -286,6 +286,29 @@ def test_container_cleanup_targets_only_owned_names(monkeypatch: pytest.MonkeyPa
     ]
 
 
+def test_container_cleanup_removes_owned_volume_only_when_archived(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_docker(
+        *args: str, check: bool = True, input_data: bytes | None = None
+    ) -> subprocess.CompletedProcess[bytes]:
+        del check, input_data
+        calls.append(args)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(ContainerProviderRelay, "_docker", staticmethod(fake_docker))
+    relay = ContainerProviderRelay(image="image", victim_container="victim-owned", runtime={})
+    relay.container = "relay-owned"
+    relay.network = "network-owned"
+    relay.volume = "volume-owned"
+    relay.stop(remove_volume=True)
+
+    assert calls[-1] == ("volume", "rm", "volume-owned")
+    assert all("unrelated" not in value for call in calls for value in call)
+
+
 def test_container_relay_removes_victim_egress_and_keeps_relay_egress(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

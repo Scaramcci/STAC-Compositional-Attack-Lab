@@ -1,5 +1,9 @@
 # 当前计划 — 2026-09-21 M1 兼容性验收与运行状态闭合
 
+本轮续接基线为 `fb471a1`，起始工作树仅有用户提供的任务文档；真实 Ark 请求未授权。① **已完成：** upstream 字符串错位反例、版本化 allowlist 初末快照、缺失/截断/失败/路径安全、异常账本归档与 owned volume 清理代码；真实 runtime + local fake 独立入口、Bash/手册和静态隔离审查。② **已验证：** 无 socket 专项 70 passed；format/ruff、mypy 102 项目源码（另含 local runner 为 103）、schema 两次幂等、bridge compile、Bash、diff 通过；完整 pytest 370 passed/13 个 socket 环境失败。③ **环境阻塞：** loopback 与 Docker 动态验证均被当前 sandbox/socket 权限阻止，提权审批服务 404；没有容器或 HTTP 启动。④ **待授权且先待环境恢复：** 唯一禁用候选 `cap-compat-m1-20260921-fb471a1-v6` 已准备且 0 请求；先运行 local fake real-runtime 并审查动态隔离/清理，通过后才可就该候选一次性授权 Ark P0→P1→P2。上一轮 v4 与本轮 v5 及历史证据只读；M2、F2–F6、direct/semantic live、pilot/main/formal 不在范围内。
+
+本轮 local v5 已在真实容器和本机 fake provider 上运行，但 P0/P1/P2 的正常响应均为空/缺少可接受 response，阶段门未通过；按授权停止，不存在当前可执行 Ark 候选。后续需先离线修复 fake/OpenClaw response compatibility 并重新准备新 batch，再另行请求授权；不得沿用 v6。
+
 实际基线 `8b45266`，起始工作树仅有用户新增的本轮任务文档。① **已完成：** M1 兼容性反例/阶段验收、driver 状态/账本恢复、真实事件映射、final finish 校验、failed/unknown 分类、P2 初末实际可信 ledger 投影要求及处理源码锁；纯函数与本机 fake HTTP 集成、371 项完整质量门、schema 幂等、零请求 doctor/禁用候选准备与报告已验证。② **待授权且待真实环境验证：** 唯一候选 `cap-compat-m1-20260921-8b45266-v4`，先独立审查批次与 Docker 网络隔离/清理边界，再确认真实请求授权后依次 P0→P1→P2；任一失败/unknown 停止，不换 batch 重发。真实 Ark 请求、真实 payload/tool round trip、可信 ledger 完整初末投影、usage/成本、真实 Docker cleanup 都尚未验证。旧 `cap-compat-20260921-offline-a478b7f-v2` 和本轮 v1/v2/v3 只读，不沿用旧授权或配置指纹。后续 M2/direct/semantic/pilot/main/formal 不在本轮。
 
 # 历史计划 — 2026-09-21 九原语证据修复与真实兼容性准备

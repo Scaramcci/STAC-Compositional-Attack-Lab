@@ -20,15 +20,43 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, cast
 
-from stac_attack_lab.environments.safeclaw.evidence_policy import (
-    DEFAULT_MAX_PROJECTION_BYTES,
-    UTF8_STRING_PROJECTION,
-    provider_evidence_policy_hash,
-    validate_provider_evidence_policy,
-)
-from stac_attack_lab.environments.safeclaw.evidence_policy import (
-    EXACT_DERIVATION_RULE as EXACT_DERIVATION_RULE,
-)
+try:
+    from stac_attack_lab.environments.safeclaw.evidence_policy import (
+        DEFAULT_MAX_PROJECTION_BYTES,
+        UTF8_STRING_PROJECTION,
+        provider_evidence_policy_hash,
+        validate_provider_evidence_policy,
+    )
+    from stac_attack_lab.environments.safeclaw.evidence_policy import (
+        EXACT_DERIVATION_RULE as EXACT_DERIVATION_RULE,
+    )
+except ModuleNotFoundError:  # standalone relay source executed inside the relay container
+    DEFAULT_MAX_PROJECTION_BYTES = 16_384
+    UTF8_STRING_PROJECTION = "utf8-string-v1"
+    EXACT_DERIVATION_RULE = "stac.experimental.exact_tool_result_to_argument.v1"
+
+    def validate_provider_evidence_policy(value: object | None) -> dict[str, Any]:
+        if value is None:
+            return {
+                "policy_id": "stac.provider-evidence.disabled",
+                "policy_version": "1.0",
+                "mode": "disabled",
+                "enabled": False,
+                "rule_id": None,
+                "target_selectors": [],
+                "projection_kind": UTF8_STRING_PROJECTION,
+                "applicability": "synthetic_only",
+                "max_projection_bytes": DEFAULT_MAX_PROJECTION_BYTES,
+            }
+        if not isinstance(value, dict):
+            raise ValueError("provider_evidence_policy_not_object")
+        return dict(value)
+
+    def provider_evidence_policy_hash(policy: dict[str, Any]) -> str:
+        return hashlib.sha256(
+            json.dumps(policy, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+
 
 REQUEST_EVIDENCE_VERSION = "provider-request-boundary-v1"
 MAX_EVIDENCE_PROJECTION_BYTES = DEFAULT_MAX_PROJECTION_BYTES
@@ -1179,14 +1207,11 @@ class ContainerProviderRelay:
                 "exec",
                 "-d",
                 self.container,
-                "python3",
-                "/tmp/stac_provider_relay.py",
-                "--config",
-                "/tmp/stac_provider_relay.json",
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "18791",
+                "sh",
+                "-c",
+                "python3 /tmp/stac_provider_relay.py "
+                "--config /tmp/stac_provider_relay.json --host 0.0.0.0 --port 18791 "
+                ">/tmp/stac-provider-relay.log 2>&1",
             )
             if embedding_config is not None:
                 self._docker(
@@ -1260,7 +1285,22 @@ class ContainerProviderRelay:
                         )
                     return result
                 time.sleep(0.1)
-            raise RuntimeError("provider_relay_health_timeout")
+            diagnostic = self._docker(
+                "exec",
+                self.container,
+                "sh",
+                "-c",
+                "tail -20 /tmp/stac-provider-relay.log 2>/dev/null",
+                check=False,
+            ).stdout.decode("utf-8", errors="replace")[-4000:]
+            digest = hashlib.sha256(diagnostic.encode()).hexdigest()
+            last_line = diagnostic.strip().splitlines()[-1] if diagnostic.strip() else "unavailable"
+            if SENSITIVE_PROJECTION.search(last_line):
+                last_line = "redacted_sensitive_diagnostic"
+            raise RuntimeError(
+                f"provider_relay_health_timeout:diagnostic_sha256={digest}:"
+                f"last_line={last_line[:500]}"
+            )
         except Exception:
             self.stop()
             raise
@@ -1437,12 +1477,14 @@ class ContainerProviderRelay:
             },
         )
 
-    def stop(self) -> None:
-        # The named ledger volume is intentionally retained across container
-        # rebuilds; callers may remove it only after archiving its evidence.
+    def stop(self, *, remove_volume: bool = False) -> None:
+        # Callers may remove this relay-owned random volume only after archiving
+        # its evidence. Legacy callers retain the prior preservation default.
         self._docker("rm", "-f", self.container, check=False)
         self._docker("network", "disconnect", self.network, self.victim_container, check=False)
         self._docker("network", "rm", self.network, check=False)
+        if remove_volume:
+            self._docker("volume", "rm", self.volume, check=False)
         self.started = False
         self.embedding_started = False
 

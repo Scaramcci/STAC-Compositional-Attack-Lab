@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -40,6 +41,7 @@ class CapturedRequest:
 @dataclass
 class MockProviderState:
     responses: list[MockResponse]
+    responder: Callable[[dict[str, Any] | None, int], MockResponse] | None = None
     max_requests: int = 5
     requests: list[CapturedRequest] = field(default_factory=list)
     attempts: list[CapturedRequest] = field(default_factory=list)
@@ -51,8 +53,10 @@ class MockProviderState:
         """Number of HTTP attempts that reached the provider boundary."""
         return len(self.attempts)
 
-    def next_response(self) -> MockResponse:
+    def next_response(self, body: dict[str, Any] | None = None) -> MockResponse:
         index = len(self.requests) - 1
+        if self.responder is not None:
+            return self.responder(body, index)
         if index >= len(self.responses):
             return MockResponse.json(
                 {"error": {"message": "response replay exhausted"}}, status=500
@@ -114,7 +118,7 @@ class _MockHandler(BaseHTTPRequestHandler):
                 )
                 state.requests.append(captured)
                 state.attempts.append(captured)
-                response = state.next_response()
+                response = state.next_response(body if isinstance(body, dict) else None)
         if response.delay_seconds:
             time.sleep(response.delay_seconds)
         self.send_response(response.status)
@@ -139,14 +143,25 @@ class _MockHTTPServer(ThreadingHTTPServer):
 class MockProviderServer:
     """Local-only provider replay server with a hard request budget."""
 
-    def __init__(self, responses: list[MockResponse], *, max_requests: int = 5) -> None:
-        self.state = MockProviderState(responses=list(responses), max_requests=max_requests)
-        self._server = _MockHTTPServer(("127.0.0.1", 0), self.state)
+    def __init__(
+        self,
+        responses: list[MockResponse],
+        *,
+        max_requests: int = 5,
+        bind_host: str = "127.0.0.1",
+        advertised_host: str | None = None,
+        responder: Callable[[dict[str, Any] | None, int], MockResponse] | None = None,
+    ) -> None:
+        self.state = MockProviderState(
+            responses=list(responses), max_requests=max_requests, responder=responder
+        )
+        self._server = _MockHTTPServer((bind_host, 0), self.state)
+        self._advertised_host = advertised_host or bind_host
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
     @property
     def url(self) -> str:
-        return f"http://127.0.0.1:{self._server.server_port}/v1"
+        return f"http://{self._advertised_host}:{self._server.server_port}/v1"
 
     def __enter__(self) -> MockProviderServer:
         self._thread.start()

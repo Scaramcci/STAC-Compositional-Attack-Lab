@@ -13,11 +13,139 @@ from stac_attack_lab.capability.compatibility import (
 from stac_attack_lab.capability.compiler import compile_cases
 from stac_attack_lab.capability.models import RuntimeTask
 from stac_attack_lab.capability.runner import _write_result, run_fake_pipeline
-from stac_attack_lab.environments.safeclaw.capability_runtime import map_safeclaw_capability_events
+from stac_attack_lab.environments.safeclaw.capability_runtime import (
+    map_safeclaw_capability_events,
+    project_business_state,
+)
+from stac_attack_lab.environments.safeclaw.workspace_snapshot import (
+    CAPABILITY_WORKSPACE_SNAPSHOT_FIELD,
+)
 from stac_attack_lab.hashing import stable_hash
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "configs/capability/f1_status_acceptance.json"
+
+
+def _snapshot(stage: str, contents: dict[str, str]) -> dict[str, object]:
+    files = []
+    for path, content in contents.items():
+        encoded = content.encode()
+        files.append(
+            {
+                "path": path,
+                "status": "observed",
+                "reason_code": None,
+                "content": content,
+                "content_sha256": hashlib.sha256(encoded).hexdigest(),
+                "size_bytes": len(encoded),
+                "truncated": False,
+            }
+        )
+    return {
+        "schema_version": "1.0",
+        "stage": stage,
+        "run_identity": "test-batch",
+        "observation_status": "complete",
+        "reason_codes": [],
+        "files": files,
+    }
+
+
+def test_upstream_concatenated_workspace_text_cannot_become_path_snapshot(
+    tmp_path: Path,
+) -> None:
+    task = RuntimeTask.model_validate_json(
+        (
+            compile_cases(CONFIG, tmp_path / "compiled")
+            / "cases/cap-f1-001-benign/runtime_task.json"
+        ).read_text()
+    )
+    state, reason = project_business_state(
+        task,
+        {"workspace_file_contents": '{"projects":{}}\n{"project-b":"proof-b-001"}'},
+        session_key="session",
+    )
+    assert state is None
+    assert reason == "capability_status_artifact_unobserved"
+
+
+def test_path_snapshot_observes_preexisting_file_overwrite_and_ledger_change(
+    tmp_path: Path,
+) -> None:
+    compiled = compile_cases(CONFIG, tmp_path / "compiled")
+    task = RuntimeTask.model_validate_json(
+        (compiled / "cases/cap-f1-001-benign/runtime_task.json").read_text()
+    )
+    initial_contents = {
+        "reports/status.json": '{"projects":{"project-b":{"status":"pending"}}}',
+        "trusted/acceptance-ledger.json": '{"project-b":"proof-b-001"}',
+    }
+    final_contents = {
+        **initial_contents,
+        "reports/status.json": '{"projects":{"project-b":{"status":"accepted"}}}',
+    }
+    initial, _ = project_business_state(
+        task,
+        {CAPABILITY_WORKSPACE_SNAPSHOT_FIELD: _snapshot("initial", initial_contents)},
+        session_key="session",
+    )
+    final, _ = project_business_state(
+        task,
+        {CAPABILITY_WORKSPACE_SNAPSHOT_FIELD: _snapshot("final", final_contents)},
+        session_key="session",
+    )
+    assert initial is not None and final is not None
+    assert initial["projects"]["project-b"]["status"] == "pending"
+    assert final["projects"]["project-b"]["status"] == "accepted"
+    assert initial["trusted_ledger_snapshot_sha256"] == final["trusted_ledger_snapshot_sha256"]
+
+    changed = dict(final_contents)
+    changed["trusted/acceptance-ledger.json"] = '{"project-b":"forged"}'
+    tampered, _ = project_business_state(
+        task,
+        {CAPABILITY_WORKSPACE_SNAPSHOT_FIELD: _snapshot("final", changed)},
+        session_key="session",
+    )
+    assert tampered is not None
+    assert tampered["trusted_ledger_snapshot_sha256"] != initial["trusted_ledger_snapshot_sha256"]
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        ("missing", "capability_file_missing"),
+        ("truncated", "capability_file_size_limit"),
+        ("rejected", "capability_file_symlink_rejected"),
+        ("read_failed", "capability_snapshot_container_unavailable"),
+    ],
+)
+def test_incomplete_capability_snapshot_remains_unknown(
+    tmp_path: Path, status: str, reason: str
+) -> None:
+    compiled = compile_cases(CONFIG, tmp_path / "compiled")
+    task = RuntimeTask.model_validate_json(
+        (compiled / "cases/cap-f1-001-benign/runtime_task.json").read_text()
+    )
+    snapshot = _snapshot(
+        "final",
+        {"trusted/acceptance-ledger.json": '{"project-b":"proof-b-001"}'},
+    )
+    snapshot["files"].append(
+        {
+            "path": "reports/status.json",
+            "status": status,
+            "reason_code": reason,
+            "content": None,
+            "content_sha256": None,
+            "size_bytes": None,
+            "truncated": status == "truncated",
+        }
+    )
+    state, observed_reason = project_business_state(
+        task, {CAPABILITY_WORKSPACE_SNAPSHOT_FIELD: snapshot}, session_key="session"
+    )
+    assert state is None
+    assert observed_reason == reason
 
 
 def _events(*kinds: tuple[str, str, str, str | None]) -> list[dict[str, object]]:
@@ -183,6 +311,16 @@ def test_p1_boundary_requires_unique_matching_response_and_session() -> None:
     assert _verified_followup_context(events, ledger, records, review, "batch-12345678") == {
         "call-1"
     }
+    rewritten_id_events = [{**events[0], "invocation_id": "call1"}]
+    assert _verified_followup_context(
+        rewritten_id_events, ledger, records, review, "batch-12345678"
+    ) == {"call1"}
+    assert (
+        _verified_followup_context(
+            rewritten_id_events + events, ledger, records, review, "batch-12345678"
+        )
+        == set()
+    )
     duplicate = rehash([dict(item) for item in [request, response, closed, response]])
     duplicate_review = {
         "provider_evidence_record_count": 4,
@@ -400,3 +538,63 @@ def test_mapper_does_not_invent_initial_source_or_share_session(tmp_path: Path) 
     assert read.evidence.get("source_kind") != "initial_state"
     assert read.actual_session_key != response.actual_session_key
     assert not any(event.event_type == "session_started" for event in events)
+
+
+def test_mapper_accepts_complete_json_arguments_projection_from_real_bridge(tmp_path: Path) -> None:
+    compiled = compile_cases(CONFIG, tmp_path / "compiled")
+    task = RuntimeTask.model_validate_json(
+        (compiled / "cases/cap-f1-001-benign/runtime_task.json").read_text(encoding="utf-8")
+    )
+    raw = [
+        {
+            "event_id": "call",
+            "sequence_no": 1,
+            "session_id": "s1",
+            "event_type": "tool_call",
+            "status": "attempted",
+            "public_payload": {
+                "actual_session_identity_sha256": "a" * 64,
+                "provider_tool_call_id": "call-1",
+                "tool_name": "read",
+                "arguments_projection": '{"path":"trusted/acceptance-ledger.json"}',
+                "arguments_redaction_changed": False,
+            },
+        },
+        {
+            "event_id": "result",
+            "request_event_id": "call",
+            "sequence_no": 2,
+            "session_id": "s1",
+            "event_type": "tool_result",
+            "status": "passed",
+            "public_payload": {
+                "actual_session_identity_sha256": "a" * 64,
+                "provider_tool_call_id": "call-1",
+                "tool_name": "read",
+            },
+            "output_artifacts": [{"artifact_id": "result-artifact"}],
+        },
+        {
+            "event_id": "read",
+            "request_event_id": "call",
+            "sequence_no": 3,
+            "session_id": "s1",
+            "event_type": "state_read",
+            "status": "passed",
+            "public_payload": {
+                "actual_session_identity_sha256": "a" * 64,
+                "workspace_relative_path": "trusted/acceptance-ledger.json",
+                "read_completeness": "complete_content",
+            },
+            "output_artifacts": [{"content_hash": "b" * 64}],
+        },
+    ]
+    events = map_safeclaw_capability_events(
+        task, raw, run_id="test-run", episode_id="test-episode", reviewed_message="hello"
+    )
+    request = next(event for event in events if event.event_type == "tool_request")
+    result = next(event for event in events if event.event_type == "tool_result")
+    read = next(event for event in events if event.event_type == "state_read")
+    assert request.arguments == {"path": "trusted/acceptance-ledger.json"}
+    assert result.evidence["request_event_id"] == request.event_id
+    assert read.evidence["request_event_id"] == request.event_id

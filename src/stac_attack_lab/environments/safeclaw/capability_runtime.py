@@ -4,10 +4,14 @@ import json
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from stac_attack_lab.capability.evidence import seal_episode_evidence, write_private_json
 from stac_attack_lab.capability.models import RuntimeEvent, RuntimeTask, StateCheckpoint
+from stac_attack_lab.environments.safeclaw.workspace_snapshot import (
+    CAPABILITY_WORKSPACE_SNAPSHOT_FIELD,
+    validate_workspace_snapshot,
+)
 from stac_attack_lab.execution.deadline import wall_clock_deadline
 from stac_attack_lab.hashing import stable_hash
 from stac_attack_lab.interactions.base import CollectionBudget
@@ -22,6 +26,10 @@ from stac_attack_lab.recording.events import append_jsonl
 def _workspace_contents(value: Mapping[str, Any] | None) -> dict[str, str]:
     if not isinstance(value, Mapping):
         return {}
+    snapshot = value.get(CAPABILITY_WORKSPACE_SNAPSHOT_FIELD)
+    if snapshot is not None:
+        contents, _ = validate_workspace_snapshot(snapshot)
+        return contents
     raw = value.get("workspace_file_contents")
     if isinstance(raw, dict):
         return {str(key): item for key, item in raw.items() if isinstance(item, str)}
@@ -39,9 +47,25 @@ def _workspace_contents(value: Mapping[str, Any] | None) -> dict[str, str]:
 
 
 def project_business_state(
-    task: RuntimeTask, public_state: Mapping[str, Any] | None, *, session_key: str | None
+    task: RuntimeTask,
+    public_state: Mapping[str, Any] | None,
+    *,
+    session_key: str | None,
+    expected_stage: str | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
-    contents = _workspace_contents(public_state)
+    if isinstance(public_state, Mapping) and public_state.get(CAPABILITY_WORKSPACE_SNAPSHOT_FIELD):
+        stage = (
+            cast(Literal["initial", "final"], expected_stage)
+            if expected_stage in {"initial", "final"}
+            else None
+        )
+        contents, snapshot_reasons = validate_workspace_snapshot(
+            public_state[CAPABILITY_WORKSPACE_SNAPSHOT_FIELD], expected_stage=stage
+        )
+        if snapshot_reasons:
+            return None, snapshot_reasons[0]
+    else:
+        contents = _workspace_contents(public_state)
     text = contents.get("reports/status.json")
     if text is None:
         return None, "capability_status_artifact_unobserved"
@@ -162,6 +186,15 @@ def map_safeclaw_capability_events(
         if raw_type == "tool_call":
             tool = payload.get("tool_name")
             arguments = payload.get("arguments_projection")
+            if (
+                isinstance(arguments, str)
+                and payload.get("arguments_redaction_changed") is False
+            ):
+                try:
+                    decoded_arguments = json.loads(arguments)
+                except json.JSONDecodeError:
+                    decoded_arguments = None
+                arguments = decoded_arguments if isinstance(decoded_arguments, dict) else None
             if not isinstance(tool, str) or not isinstance(arguments, dict):
                 continue
             add(
@@ -352,6 +385,9 @@ class SafeClawCapabilityRuntimeAdapter:
             failure = f"{type(exc).__name__}:{str(exc)[:500]}"
             partial, _ = self.driver.observed_snapshot()
             source_events.extend(item for item in partial if item not in source_events)
+            partial_public = self.driver.public_state_snapshot()
+            if partial_public:
+                final_public = partial_public
             try:
                 self.driver.abort()
             except Exception as cleanup_exc:
@@ -386,10 +422,10 @@ class SafeClawCapabilityRuntimeAdapter:
             failure = failure or "capability_multiple_actual_sessions_unsupported"
         actual_session = next(iter(identities)) if len(identities) == 1 else None
         initial_state, initial_reason = project_business_state(
-            task, initial_public, session_key=actual_session
+            task, initial_public, session_key=actual_session, expected_stage="initial"
         )
         final_state, final_reason = project_business_state(
-            task, final_public, session_key=actual_session
+            task, final_public, session_key=actual_session, expected_stage="final"
         )
         initial = StateCheckpoint(
             checkpoint_id="initial",
@@ -411,6 +447,8 @@ class SafeClawCapabilityRuntimeAdapter:
         event_path = output_root / "runtime_events.jsonl"
         for event in events:
             append_jsonl(event_path, event.model_dump(mode="json"))
+        if not event_path.exists():
+            event_path.touch(mode=0o600)
         raw_path = output_root / "safeclaw_source_events.jsonl"
         for source_event in source_events:
             append_jsonl(raw_path, source_event)

@@ -732,6 +732,50 @@ def test_construction_bridge_transcript_provenance_counts_without_retaining_text
     assert "secret-provider-token-123" not in str(provenance)
 
 
+def test_bridge_upgrades_read_only_on_exact_allowlisted_snapshot_match() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    raw = {
+        "session_transcript_raw": "\n".join(
+            [
+                json.dumps(
+                    {
+                        "id": "call-entry",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "read-1",
+                                    "name": "read",
+                                    "arguments": {"path": "trusted/acceptance-ledger.json"},
+                                }
+                            ],
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "id": "result-entry",
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": "read-1",
+                            "toolName": "read",
+                            "content": [{"type": "text", "text": '{"proof":"p1"}'}],
+                        },
+                    }
+                ),
+            ]
+        )
+    }
+    exact, _ = project(raw, set(), [], {"trusted/acceptance-ledger.json": '{"proof":"p1"}'})
+    wrapped, _ = project(raw, set(), [], {"trusted/acceptance-ledger.json": '1: {"proof":"p1"}'})
+    assert exact[0]["complete_file_content_hash_scope"] == "complete_file_utf8"
+    assert "complete_file_content_hash" not in wrapped[0]
+
+
 @pytest.mark.parametrize(
     ("detail", "expected"),
     [

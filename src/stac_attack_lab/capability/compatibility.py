@@ -49,6 +49,7 @@ COMPATIBILITY_SOURCE_FILES = (
     "src/stac_attack_lab/capability/evidence.py",
     "src/stac_attack_lab/environments/safeclaw/capability_runtime.py",
     "src/stac_attack_lab/environments/safeclaw/provider_relay.py",
+    "src/stac_attack_lab/environments/safeclaw/workspace_snapshot.py",
     "src/stac_attack_lab/interactions/safeclaw_collection.py",
     "src/stac_attack_lab/execution/provider_evidence.py",
 )
@@ -519,23 +520,22 @@ def _verified_followup_context(
         for source in request.get("source_tool_results", []):
             if not isinstance(source, dict) or source.get("projection_complete") is not True:
                 continue
-            call_id = source.get("tool_result_call_id")
             tool_results = [
                 item
                 for item in events
                 if item.get("event_type") == "tool_result"
-                and item.get("invocation_id") == call_id
                 and item.get("status") == "observed"
-            ]
-            if (
-                len(tool_results) == 1
-                and tool_results[0].get("evidence", {}).get("raw_result_projection_sha256")
+                and item.get("evidence", {}).get("raw_result_projection_sha256")
                 == source.get("projection_sha256")
-                and tool_results[0].get("actual_session_key")
+                and item.get("actual_session_key")
                 == context.get("actual_session_identity_sha256")
                 and context.get("actual_session_identity_sha256")
-            ):
-                matches.add(str(call_id))
+            ]
+            # OpenClaw may rewrite a provider call id before returning the tool
+            # result upstream. Bind by the unique sealed result projection and
+            # actual session instead of accepting a lossy string normalization.
+            if len(tool_results) == 1 and tool_results[0].get("invocation_id"):
+                matches.add(str(tool_results[0]["invocation_id"]))
     return matches
 
 

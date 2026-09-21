@@ -31,6 +31,11 @@ from stac_attack_lab.environments.safeclaw.provider_relay import (
     relay_runtime_from_model_config,
 )
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
+from stac_attack_lab.environments.safeclaw.workspace_snapshot import (
+    CAPABILITY_WORKSPACE_SNAPSHOT_FIELD,
+    CONTAINER_CAPTURE_SCRIPT,
+    failed_workspace_snapshot,
+)
 
 SUPPORTED_DELIVERY_SURFACES = frozenset({"safeclaw_user_message"})
 MEMORY_RETRIEVAL_TOOLS = frozenset({"memory_search", "memory_get"})
@@ -116,7 +121,9 @@ def _emit(value: dict[str, Any]) -> None:
 
 
 def _observable_state(
-    raw: dict[str, Any], exact_secrets: list[str] | None = None
+    raw: dict[str, Any],
+    exact_secrets: list[str] | None = None,
+    capability_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Project bounded state evidence without provider credentials or raw logs."""
     keys = (
@@ -129,8 +136,67 @@ def _observable_state(
         "workspace_file_contents",
     )
     projected = {key: raw.get(key) for key in keys}
+    if capability_snapshot is not None:
+        projected[CAPABILITY_WORKSPACE_SNAPSHOT_FIELD] = capability_snapshot
     projected["gateway_log_provenance"] = observable_gateway_diagnostics(raw, exact_secrets or [])
     return projected
+
+
+def _capture_capability_workspace_snapshot(
+    judge: ModuleType,
+    *,
+    stage: str,
+    run_identity: str,
+    timeout_seconds: int = 5,
+) -> dict[str, Any]:
+    if stage not in {"initial", "final"}:
+        raise ValueError("capability_workspace_snapshot_stage_invalid")
+    command = [
+        "docker",
+        "exec",
+        str(judge.CONTAINER),
+        "python3",
+        "-c",
+        CONTAINER_CAPTURE_SCRIPT,
+        str(judge.WORKSPACE),
+        stage,
+        run_identity,
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return failed_workspace_snapshot(
+            stage=stage, run_identity=run_identity, reason_code="capability_snapshot_read_timeout"
+        )
+    if completed.returncode != 0:
+        reason = (
+            "capability_snapshot_container_unavailable"
+            if completed.returncode in {1, 125}
+            else "capability_snapshot_read_failed"
+        )
+        return failed_workspace_snapshot(stage=stage, run_identity=run_identity, reason_code=reason)
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return failed_workspace_snapshot(
+            stage=stage,
+            run_identity=run_identity,
+            reason_code="capability_snapshot_response_invalid",
+        )
+    if not isinstance(value, dict):
+        return failed_workspace_snapshot(
+            stage=stage,
+            run_identity=run_identity,
+            reason_code="capability_snapshot_response_invalid",
+        )
+    value["container_identity_sha256"] = _session_identity(str(judge.CONTAINER))
+    return value
 
 
 def _nonnegative_int(value: Any) -> int | None:
@@ -170,6 +236,7 @@ def _structured_tool_observations(
     raw_state: dict[str, Any],
     seen_entry_ids: set[str],
     exact_secrets: list[str] | None = None,
+    workspace_exact_contents: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], set[str]]:
     """Project new, paired tool facts from pinned OpenClaw session JSONL."""
     calls: dict[str, dict[str, Any]] = {}
@@ -295,6 +362,7 @@ def _structured_tool_observations(
                 "result_redaction_changed": raw_result_text != result_text,
                 "result_excerpt": result_text[:2000],
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
+                "_exact_match_text": result_text,
             }
     projected = []
     for call_id, call in sorted(
@@ -342,6 +410,18 @@ def _structured_tool_observations(
             "correlation_contract": "unsupported_unverified_field",
             "use_evidence_kind": None,
         }
+        path = call.get("workspace_relative_path")
+        expected = (workspace_exact_contents or {}).get(str(path))
+        if (
+            call.get("tool_name") == "read"
+            and result is not None
+            and result.get("result_observation") == "observed"
+            and result.get("result_redaction_changed") is False
+            and isinstance(expected, str)
+            and result.get("_exact_match_text") == expected
+        ):
+            item["complete_file_content_hash"] = hashlib.sha256(expected.encode()).hexdigest()
+            item["complete_file_content_hash_scope"] = "complete_file_utf8"
         projected.append(item)
     return projected, observed_ids
 
@@ -484,6 +564,7 @@ def main() -> int:
     task_path = Path(args.task).resolve()
     task = json.loads(task_path.read_text(encoding="utf-8"))
     model_runtime = json.loads(Path(args.model_config).read_text(encoding="utf-8"))
+    run_identity = str(model_runtime.get("batch_id") or "unbound")
     exact_secrets = [
         str(model_runtime.get(key) or "")
         for key in ("api_key", "embedding_api_key")
@@ -547,7 +628,20 @@ def main() -> int:
                 raise RuntimeError("safeclaw_gateway_unhealthy")
             phase = "capture_pre_state"
             runner.pre_state = runner.capture_pre_state()
-            pre_state = _observable_state(runner.capture_post_state(), exact_secrets)
+            initial_snapshot = _capture_capability_workspace_snapshot(
+                judge, stage="initial", run_identity=run_identity
+            )
+            initial_exact_contents = {
+                str(item["path"]): str(item["content"])
+                for item in initial_snapshot.get("files", [])
+                if isinstance(item, dict)
+                and item.get("status") == "observed"
+                and isinstance(item.get("path"), str)
+                and isinstance(item.get("content"), str)
+            }
+            pre_state = _observable_state(
+                runner.capture_post_state(), exact_secrets, initial_snapshot
+            )
         _emit({"kind": "ready", "pre_state": pre_state})
         for raw in sys.stdin:
             command = json.loads(raw)
@@ -577,10 +671,13 @@ def main() -> int:
             if kind == "finish":
                 with contextlib.redirect_stdout(sys.stderr):
                     post_state = runner.capture_post_state()
+                    final_snapshot = _capture_capability_workspace_snapshot(
+                        judge, stage="final", run_identity=run_identity
+                    )
                 _emit(
                     {
                         "kind": "finished",
-                        "post_state": post_state,
+                        "post_state": _observable_state(post_state, exact_secrets, final_snapshot),
                         "provider_request_ledger": relay.records() if relay else [],
                         "embedding_request_ledger": _embedding_ledger(judge, relay),
                     }
@@ -661,7 +758,10 @@ def main() -> int:
             provider_evidence_cursor = len(relay_evidence)
             relay_usage = _aggregate_relay_usage(action_relay_records)
             tool_observations, newly_seen = _structured_tool_observations(
-                raw_post_state, seen_transcript_entry_ids, exact_secrets
+                raw_post_state,
+                seen_transcript_entry_ids,
+                exact_secrets,
+                initial_exact_contents,
             )
             seen_transcript_entry_ids.update(newly_seen)
             classification = _classify_response(
@@ -754,12 +854,17 @@ def main() -> int:
                     "classification": item.get("observation_class"),
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "read_scope": "tool_result_text" if item.get("result_hash") else None,
-                    # OpenClaw's read tool result is display text and may include
-                    # wrappers, line numbers, offset/limit truncation, or encoding
-                    # transformations. It is not a complete file-byte identity.
-                    "read_completeness": "unknown_display_text",
-                    "content_hash": item.get("result_hash"),
-                    "content_hash_scope": item.get("result_hash_scope"),
+                    # Exactness is upgraded only when the observed tool result
+                    # equals the independently captured allowlisted file.
+                    "read_completeness": (
+                        "complete_content"
+                        if item.get("complete_file_content_hash")
+                        else "unknown_display_text"
+                    ),
+                    "content_hash": item.get("complete_file_content_hash")
+                    or item.get("result_hash"),
+                    "content_hash_scope": item.get("complete_file_content_hash_scope")
+                    or item.get("result_hash_scope"),
                     "result_observation": item.get("result_observation"),
                     "result_empty": bool(item.get("result_empty")),
                     "result_order_valid": bool(item.get("result_order_valid")),
@@ -825,19 +930,40 @@ def main() -> int:
                     detail_parts.append(f"{label}={value}")
             detail_parts.append(f"returncode={exc.returncode}")
         detail = str(redact_value(" | ".join(detail_parts)).sanitized)[:2000]
-        _emit(
-            {
-                "kind": "error",
-                "error_category": classify_explicit_error(exc, type(exc).__name__),
-                "phase": phase,
-                "detail": detail or "no_exception_message",
-            }
-        )
+        error_provider_records: list[dict[str, Any]] = []
+        error_boundary_records: list[dict[str, Any]] = []
+        error_embedding_records: list[dict[str, Any]] = []
+        if relay is not None:
+            with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
+                error_provider_records = relay.records()
+            with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
+                error_boundary_records = relay.evidence_records()
+            with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
+                error_embedding_records = _embedding_ledger(judge, relay)
+        error_payload: dict[str, Any] = {
+            "kind": "error",
+            "error_category": classify_explicit_error(exc, type(exc).__name__),
+            "phase": phase,
+            "detail": detail or "no_exception_message",
+            "provider_request_ledger": error_provider_records,
+            "provider_boundary_evidence": error_boundary_records,
+            "embedding_request_ledger": error_embedding_records,
+        }
+        if runner is not None and container_started:
+            with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
+                partial_raw = runner.capture_post_state()
+                partial_snapshot = _capture_capability_workspace_snapshot(
+                    judge, stage="final", run_identity=run_identity
+                )
+                error_payload["partial_state"] = _observable_state(
+                    partial_raw, exact_secrets, partial_snapshot
+                )
+        _emit(error_payload)
         return 2
     finally:
         if relay is not None:
             with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
-                relay.stop()
+                relay.stop(remove_volume=True)
         if container_started:
             with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
                 judge.remove_container()

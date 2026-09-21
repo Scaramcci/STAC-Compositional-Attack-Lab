@@ -608,6 +608,11 @@ class SafeClawSubprocessVictimDriver:
         if not isinstance(value, dict):
             raise RuntimeError("safeclaw_construction_bridge_invalid_response")
         if value.get("kind") == "error":
+            self._observe_request_ledgers(value)
+            self._ingest_boundary_evidence(value)
+            partial_state = value.get("partial_state")
+            if isinstance(partial_state, dict):
+                self._last_state = cast(dict[str, Any], partial_state)
             category = str(value.get("error_category", "bridge_error"))
             phase = str(value.get("phase", "unknown"))
             detail = str(value.get("detail", ""))[:1000]
