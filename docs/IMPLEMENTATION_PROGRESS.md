@@ -1,4 +1,12 @@
-# 当前进度 — 2026-09-21 九原语 capability M0/M1 离线闭环完成
+# 当前进度 — 2026-09-21 capability 续接审查与任务交接
+
+- 本次仅审查和编写服务器实施任务；基线 `2195593`，起始工作树干净，未改实现、未运行模型/API 或实验。
+- 纠正上一轮完成结论：已有可执行 fixture 闭环，但 `CapabilitySafeClawAdapter` 仍直接改 Python state，未连接真实 SafeClaw/relay；constraints 有无证据默认 satisfied、utility 由 harm 取反、report 以已有文件充当完整分母等缺陷。因此不能称生产接入只差环境授权。
+- 新任务文件：[九原语续接任务：证据修复与真实兼容性](九原语续接任务_证据修复与真实兼容性.md)，包含修复、真实 adapter、反例测试、编号 Bash 与分阶段禁用探针合同。
+- 现有新模板 gpt-5.6-sol/STAC_VICTIM_* 与旧 Ark Victim/SAFECLAW_* 不一致；endpoint 恢复仍待服务器核对，不自动换模型。建议 1/2/5 次三阶段请求上限属于待授权建议，不是本次调用授权。
+- 本次验证仅文档差异检查；没有复跑历史测试。下一步由服务器按任务文件先修复科学语义和生产路径，再完成离线与本机预检，按实际批次授权决定是否发起真实 benign 兼容性请求。
+
+# 历史进度 — 2026-09-21 九原语 capability M0/M1 fixture 闭环
 
 - **检查点（2026-09-21，M0 与 M1 离线/fake 范围完成）：** 新增独立 `capability/` 合同、九原语 registry、F1 task/surface/composition、benign/direct/semantic compiler 与 public/private view；新流程不依赖旧 graph/library/planner。
 - 新增薄 SafeClaw capability adapter 和确定性 fake transport，实际落盘 runtime task、events、initial/final checkpoint、空 provider ledger 与 runtime review；独立 harm oracle、D1–D11 约束、九原语 occurrence 分析及聚合报告均从落盘产物复算。

@@ -1,4 +1,14 @@
-# 当前计划 — 2026-09-21 九原语 capability 下一阶段
+# 当前计划 — 2026-09-21 capability 修复与生产接入
+
+详细实施合同见[续接任务](九原语续接任务_证据修复与真实兼容性.md)。上一轮 fixture 测试通过不能替代真实 adapter 和评价正确性验收。
+
+1. 待做：先写反例，修复 constraints 默认满足、harm/utility 混淆、primitive 证据、编译配对/视图校验和完整分母。
+2. 待做：中性 SafeClaw runtime adapter，复用 relay/预算/deadline/脱敏/清理；fake HTTP 验证生产映射与状态 oracle。
+3. 待做：零 provider doctor、禁用 prepare、P0/P1/P2 分阶段 probe、编号 Bash/status/report 与中文手册；核对 Ark 与新模型模板冲突。
+4. 待做：完整离线质量门与示例。真实兼容性仅在模型/endpoint/任务/预算/唯一批次授权确定后执行，成本字段未执行时不得称硬上限。
+5. 后续：兼容性通过后另定 M2 真实三条件及独立人工审核；本轮不扩量到 pilot/main/formal。
+
+# 历史计划 — 2026-09-21 九原语 capability 下一阶段
 
 - **已完成：M0 与 M1 离线/fake。** 九原语合同/registry、F1 三条件 compiler、视图隔离、pinned upstream inventory、官方 PSE smoke、runtime events/checkpoints、独立 harm/constraints/primitive analysis、CLI replay/report、schema 和离线集成演示已通过质量门。事实与命令见 `IMPLEMENTATION_PROGRESS.md`。
 - **待授权：M1 真实兼容性。** 使用 `configs/capability/provider_compatibility.disabled.json`，先审查实际 endpoint、API key 环境变量、模型可用性、Docker image digest、端口/外网隔离、现有 relay 账本和清理所有权。获得覆盖该唯一 run 的授权后，依次验证一次可解析响应、一次合法读取往返、一次正常业务状态提交；失败/不确定请求均消费 3 次总 HTTP 上限，不追加重试。
