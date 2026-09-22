@@ -1,6 +1,6 @@
-# 当前计划 — 2026-09-22 M2 本机验收后续
+# 当前计划 — 2026-09-22 M2 真实批次准备与逐单元查收
 
-实际基线 `b6da0cd`，现有工作树修改全部保留。**已完成：** 最终源码完整质量门 403 passed；最终 `v3-final` 八单元真实 OpenClaw + 本机 fake HTTP 矩阵 8/8 completed、40 次 fake attempts、八个 seal/ledger/cleanup 和四组配对查收通过；独立验收清单已保存。唯一新 `m2-f1-candidate-20260922-b6da0cd-final-v1` 已按禁用模板 prepare/validate/report/盲化标注导出，manifest/source/config/task/guard 指纹闭合，0 binding/launch/ledger、0 真实请求。**剩余：** 本轮不再执行本机矩阵或 09；真实 M2 运行需要该唯一批次的明确授权依据，并在普通终端复核 Docker/image、网络隔离、成本控制和最终配置；当前 doctor 在本会话沙箱因 Docker 权限返回环境 blocker，不能误称生产环境 ready。获准后仍须按单元查收再继续，不继承 M1 额度，不自动 bind/live、pilot/main/formal；人工标注、研究因果结论和 official outcome 继续 not_evaluated。
+实际 HEAD `7232928e`。**已完成：** 最终源码 403 项质量门、本机 fake/OpenClaw 八单元矩阵、唯一候选源码/config/task/guard 锁和零请求环境预检；唯一 Ark M2 批次八单元由用户普通终端各运行一次，完整分母 **8/8 completed**、Victim **28/40** HTTP、其他角色/embedding 0。新派生目录 `experiments/runs/capability/m2-f1-real-review-20260922-7232928-v1/` 的报告、盲化标注导出与独立 review 重验全部 episode seal、ledger/evidence、配对输入约束和初末业务状态；用户终端最后 Docker 集合/无活跃容器核对通过，终端侧旁证另存 `final_cleanup_attestation.json`，不冒充助手沙箱直接观测。八项 new harm false/utility true，G-bind 与 sham 的实际 precommit 均 allow、无策略阻断观测，不能声称干预有效。**当前剩余研究工作：** 按 rubric 独立人工填写/导入八项盲化标注；保留 Adopt/D10 unknown、干预因果与 official outcome not_evaluated，并在后续另定任务讨论外部账单和网络审计。该单任务单模型批次已结束，**不再执行本批任何真实请求**，未消耗的 12 次预算不转用、不因零危害重跑或进入 pilot/main/formal。历史 M1 余额不继承。
 
 # 历史计划 — 2026-09-22 M2 F1 离线对照与干预
 
