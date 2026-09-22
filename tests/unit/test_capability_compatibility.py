@@ -158,10 +158,60 @@ def test_binding_is_single_use_and_invalid_hash_fails_before_launch(tmp_path: Pa
         {**payload, "manifest_hash": stable_hash(payload)}
     )
     (run_root / "preparation_manifest.json").write_text(manifest.model_dump_json())
+    with pytest.raises(ValueError, match="capability_authorization_reference_placeholder"):
+        bind_compatibility_execution(run_root, "AUTHORIZATION_REFERENCE")
+    assert not (run_root / "execution_binding.json").exists()
     bound = bind_compatibility_execution(run_root, "synthetic-test-reference")
+    (run_root / "stage_status").mkdir()
+    for stage in ("P0", "P1", "P2"):
+        (run_root / f"stage_status/{stage}.json").write_text(
+            json.dumps(
+                {
+                    "batch_id": run_root.name,
+                    "stage_id": stage,
+                    "execution_status": "not_started",
+                    "verdict": "not_evaluated",
+                    "reason_codes": ["not_started"],
+                    "provider_attempts_before": 0,
+                    "provider_attempts_after": 0,
+                    "provider_attempts_stage": 0,
+                    "embedding_attempts": 0,
+                    "result_ref": None,
+                    "cleanup_status": "not_applicable",
+                }
+            )
+        )
+    status = read_compatibility_status(run_root)
+    assert status["execution_enabled"] is True
+    assert status["execution_binding_status"] == "valid"
+    assert status["authorization_reference_state"] == "recorded_unverified"
+    original_snapshot = bound.read_bytes()
+    binding_path = run_root / "execution_binding.json"
+    original_binding = binding_path.read_bytes()
+    legacy = json.loads(original_snapshot)
+    legacy["authorization_reference"] = "AUTHORIZATION_REFERENCE"
+    bound.write_text(json.dumps(legacy), encoding="utf-8")
+    legacy_binding = json.loads(original_binding)
+    legacy_binding["execution_config_hash"] = file_hash(bound)
+    legacy_binding["binding_hash"] = stable_hash(
+        {key: value for key, value in legacy_binding.items() if key != "binding_hash"}
+    )
+    binding_path.write_text(json.dumps(legacy_binding), encoding="utf-8")
+    legacy_status = read_compatibility_status(run_root)
+    assert legacy_status["execution_enabled"] is True
+    assert legacy_status["authorization_reference_state"] == "placeholder"
+    assert legacy_status["authorization_needed"] is True
+    with pytest.raises(PermissionError, match="capability_live_authorization_missing"):
+        run_compatibility_stage(ROOT, run_root, "P0", authorized=True)
+    assert not (run_root / "launch-P0.reserved").exists()
+    bound.write_bytes(original_snapshot)
+    binding_path.write_bytes(original_binding)
     with pytest.raises(FileExistsError):
         bind_compatibility_execution(run_root, "second-reference")
     bound.write_text(bound.read_text() + " ")
+    invalid_status = read_compatibility_status(run_root)
+    assert invalid_status["execution_enabled"] is None
+    assert invalid_status["execution_binding_status"] == "invalid"
     with pytest.raises(ValueError, match="capability_execution_binding_invalid"):
         run_compatibility_stage(ROOT, run_root, "P0", authorized=True)
     assert not (run_root / "launch-P0.reserved").exists()

@@ -186,10 +186,7 @@ def map_safeclaw_capability_events(
         if raw_type == "tool_call":
             tool = payload.get("tool_name")
             arguments = payload.get("arguments_projection")
-            if (
-                isinstance(arguments, str)
-                and payload.get("arguments_redaction_changed") is False
-            ):
+            if isinstance(arguments, str) and payload.get("arguments_redaction_changed") is False:
                 try:
                     decoded_arguments = json.loads(arguments)
                 except json.JSONDecodeError:

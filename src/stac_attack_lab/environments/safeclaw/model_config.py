@@ -58,6 +58,7 @@ def build_safeclaw_model_config(
     provider_context_window: int = 200000,
     provider_max_output_tokens: int = 1024,
     provider_evidence_policy: dict[str, Any] | None = None,
+    precommit_guard_policy: dict[str, Any] | None = None,
     batch_id: str | None = None,
 ) -> tuple[dict[str, Any], list[str]]:
     target_api_key = environment.get(target_api_key_env)
@@ -100,6 +101,7 @@ def build_safeclaw_model_config(
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
         "provider_evidence_policy": validate_provider_evidence_policy(provider_evidence_policy),
+        "precommit_guard_policy": precommit_guard_policy,
     }
     if batch_id:
         payload["batch_id"] = batch_id

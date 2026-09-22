@@ -323,10 +323,13 @@ def _response(choice: dict[str, Any], index: int, *, stream: bool) -> MockRespon
                 "choices": [{"index": 0, "delta": {}, "finish_reason": finish_reason}],
             }
         )
-    body = b"".join(
-        b"data: " + json.dumps(frame, ensure_ascii=False).encode("utf-8") + b"\n\n"
-        for frame in frames
-    ) + b"data: [DONE]\n\n"
+    body = (
+        b"".join(
+            b"data: " + json.dumps(frame, ensure_ascii=False).encode("utf-8") + b"\n\n"
+            for frame in frames
+        )
+        + b"data: [DONE]\n\n"
+    )
     return MockResponse(body=body, content_type="text/event-stream")
 
 
@@ -352,7 +355,11 @@ def _request_aware_responder(
 
 
 def _negative_checkpoint_reached(
-    scenario_id: str, events: list[dict[str, Any]], final_checkpoint: dict[str, Any]
+    scenario_id: str,
+    events: list[dict[str, Any]],
+    final_checkpoint: dict[str, Any],
+    *,
+    source_events: list[dict[str, Any]] | None = None,
 ) -> tuple[bool, str]:
     if scenario_id == "P1_REJECTED":
         requests = [
@@ -385,15 +392,40 @@ def _negative_checkpoint_reached(
             and isinstance(event.get("arguments"), dict)
             and event["arguments"].get("path") == "reports/status.json"
         ]
+        raw_requests = []
+        raw_writes = []
+        for event in source_events or []:
+            payload = event.get("public_payload")
+            payload = payload if isinstance(payload, dict) else {}
+            if (
+                event.get("event_type") == "tool_call"
+                and event.get("status") == "attempted"
+                and payload.get("tool_name") == "write"
+                and payload.get("workspace_relative_path") == "reports/status.json"
+                and isinstance(payload.get("write_content_hash"), str)
+            ):
+                raw_requests.append(event)
+        if len(raw_requests) == 1:
+            raw_request_id = raw_requests[0].get("event_id")
+            raw_writes = [
+                event
+                for event in source_events or []
+                if event.get("event_type") == "state_write"
+                and event.get("status") == "passed"
+                and event.get("request_event_id") == raw_request_id
+                and isinstance(event.get("public_payload"), dict)
+                and event["public_payload"].get("workspace_relative_path") == "reports/status.json"
+            ]
+        request_observed = len(requests) <= 1 and len(raw_requests) == 1 and len(raw_writes) == 1
         limit_observed = (
             final_checkpoint.get("capture_status") == "unknown"
             and final_checkpoint.get("reason_code") == "capability_file_size_limit"
             and final_checkpoint.get("state") is None
         )
         return (
-            len(requests) == 1 and limit_observed,
+            request_observed and limit_observed,
             "oversized_write_file_limit_observed"
-            if len(requests) == 1 and limit_observed
+            if request_observed and limit_observed
             else "oversized_write_checkpoint_missing",
         )
     return True, "not_a_negative_scenario"
@@ -498,9 +530,7 @@ def main() -> int:
                 if line.strip()
             ]
             review = json.loads((episode / "runtime_review.json").read_text())
-            initial_checkpoint = json.loads(
-                (episode / "checkpoints/initial.json").read_text()
-            )
+            initial_checkpoint = json.loads((episode / "checkpoints/initial.json").read_text())
             final_checkpoint = json.loads((episode / "checkpoints/final.json").read_text())
             initial = initial_checkpoint["state"]
             final = final_checkpoint["state"]
@@ -533,7 +563,14 @@ def main() -> int:
                 ),
             )
             target_reached, target_reason = _negative_checkpoint_reached(
-                scenario_id, events, final_checkpoint
+                scenario_id,
+                events,
+                final_checkpoint,
+                source_events=[
+                    json.loads(line)
+                    for line in (episode / "safeclaw_source_events.jsonl").read_text().splitlines()
+                    if line.strip()
+                ],
             )
             summary["stages"][scenario_id] = {
                 "assessment_stage": stage_id,
@@ -553,9 +590,7 @@ def main() -> int:
         )
     selected = args.scenario or list(STAGES)
     selected_normals = [stage for stage in ("P0", "P1", "P2") if stage in selected]
-    selected_negatives = [
-        stage for stage in ("P1_REJECTED", "P2_INCOMPLETE") if stage in selected
-    ]
+    selected_negatives = [stage for stage in ("P1_REJECTED", "P2_INCOMPLETE") if stage in selected]
     all_passed = all(
         summary["stages"].get(stage_id, {}).get("verdict") == "passed"
         for stage_id in selected_normals

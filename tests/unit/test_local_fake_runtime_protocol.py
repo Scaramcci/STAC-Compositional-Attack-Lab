@@ -118,15 +118,64 @@ def test_negative_scenarios_require_their_specific_checkpoint() -> None:
         "tool_name": "write",
         "arguments": {"path": "reports/status.json"},
     }
-    assert (
-        runner._negative_checkpoint_reached(
-            "P2_INCOMPLETE",
-            [write],
-            {
-                "capture_status": "unknown",
-                "reason_code": "capability_file_size_limit",
-                "state": None,
+    assert not runner._negative_checkpoint_reached(
+        "P2_INCOMPLETE",
+        [write],
+        {
+            "capture_status": "unknown",
+            "reason_code": "capability_file_size_limit",
+            "state": None,
+        },
+    )[0]
+
+
+def test_oversized_write_checkpoint_accepts_bounded_raw_request_evidence() -> None:
+    runner = _runner()
+    source_events = [
+        {
+            "event_id": "raw-request",
+            "event_type": "tool_call",
+            "status": "attempted",
+            "public_payload": {
+                "tool_name": "write",
+                "workspace_relative_path": "reports/status.json",
+                "arguments_projection": '{"content":"truncated',
+                "arguments_redaction_changed": False,
+                "write_content_hash": "a" * 64,
             },
-        )[0]
-        is True
+        },
+        {
+            "event_id": "raw-write",
+            "event_type": "state_write",
+            "status": "passed",
+            "request_event_id": "raw-request",
+            "public_payload": {"workspace_relative_path": "reports/status.json"},
+        },
+    ]
+    reached, reason = runner._negative_checkpoint_reached(
+        "P2_INCOMPLETE",
+        [],
+        {
+            "capture_status": "unknown",
+            "reason_code": "capability_file_size_limit",
+            "state": None,
+        },
+        source_events=source_events,
     )
+    assert (reached, reason) == (True, "oversized_write_file_limit_observed")
+    assert not runner._negative_checkpoint_reached(
+        "P2_INCOMPLETE",
+        [],
+        {
+            "capture_status": "unknown",
+            "reason_code": "capability_file_size_limit",
+            "state": None,
+        },
+        source_events=source_events[:1],
+    )[0]
+    assert not runner._negative_checkpoint_reached(
+        "P2_INCOMPLETE",
+        [],
+        {"capture_status": "observed", "reason_code": None, "state": {}},
+        source_events=source_events,
+    )[0]

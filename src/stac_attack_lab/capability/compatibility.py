@@ -308,6 +308,20 @@ def prepare_capability_compatibility(
     return run_root
 
 
+def _is_placeholder_authorization_reference(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().casefold() in {
+        "authorization_reference",
+        "<authorization_reference>",
+        "your_authorization_reference",
+        "placeholder",
+        "replace_me",
+        "todo",
+        "tbd",
+    }
+
+
 def read_compatibility_status(run_root: Path) -> dict[str, Any]:
     manifest = CompatibilityPreparationManifest.model_validate_json(
         (run_root / "preparation_manifest.json").read_text(encoding="utf-8")
@@ -318,6 +332,49 @@ def read_compatibility_status(run_root: Path) -> dict[str, Any]:
         )
         for stage in STAGE_ORDER
     ]
+    execution_path = run_root / "compatibility_execution.snapshot.json"
+    binding_path = run_root / "execution_binding.json"
+    binding_status = "absent"
+    execution_enabled: bool | None = False
+    reference_state = "missing"
+    if execution_path.exists() or binding_path.exists():
+        binding_status = "invalid"
+        execution_enabled = None
+        if execution_path.is_file() and binding_path.is_file():
+            try:
+                binding = json.loads(binding_path.read_text(encoding="utf-8"))
+                execution = validate_compatibility_config(execution_path)
+                prepared_path = run_root / "compatibility_config.snapshot.json"
+                prepared = validate_compatibility_config(prepared_path)
+                if (
+                    isinstance(binding, dict)
+                    and binding.get("binding_hash")
+                    == stable_hash(
+                        {key: value for key, value in binding.items() if key != "binding_hash"}
+                    )
+                    and binding.get("preparation_manifest_hash") == manifest.manifest_hash
+                    and binding.get("prepared_config_hash") == manifest.config_hash
+                    and file_hash(prepared_path) == manifest.config_hash
+                    and binding.get("execution_config_hash") == file_hash(execution_path)
+                    and execution.execution_enabled
+                    and execution.run_id == manifest.batch_id
+                    and not prepared.execution_enabled
+                    and execution.model_dump(
+                        exclude={"execution_enabled", "authorization_reference"}
+                    )
+                    == prepared.model_dump(exclude={"execution_enabled", "authorization_reference"})
+                ):
+                    binding_status = "valid"
+                    execution_enabled = True
+                    reference_state = (
+                        "placeholder"
+                        if _is_placeholder_authorization_reference(
+                            execution.authorization_reference
+                        )
+                        else "recorded_unverified"
+                    )
+            except (OSError, ValueError, TypeError):
+                pass
     attempts = sum(item.provider_attempts_stage for item in statuses)
     ambiguous = any(
         item.attempt_observation == "unknown"
@@ -330,13 +387,18 @@ def read_compatibility_status(run_root: Path) -> dict[str, Any]:
     maximum = max(item.cumulative_victim_http_limit for item in manifest.stages)
     next_stage = (
         next((item.stage_id for item in statuses if item.verdict == "not_evaluated"), None)
-        if not ambiguous and all(item.verdict in {"passed", "not_evaluated"} for item in statuses)
+        if not ambiguous
+        and binding_status != "invalid"
+        and reference_state != "placeholder"
+        and all(item.verdict in {"passed", "not_evaluated"} for item in statuses)
         else None
     )
     return {
         "batch_id": manifest.batch_id,
-        "execution_enabled": manifest.execution_enabled,
-        "authorization_needed": manifest.authorization_needed,
+        "execution_enabled": execution_enabled,
+        "execution_binding_status": binding_status,
+        "authorization_reference_state": reference_state,
+        "authorization_needed": reference_state != "recorded_unverified",
         "provider_attempts_used": attempts,
         "provider_attempts_remaining": None if ambiguous else max(0, maximum - attempts),
         "attempt_accounting": "unknown" if ambiguous else "known",
@@ -527,8 +589,7 @@ def _verified_followup_context(
                 and item.get("status") == "observed"
                 and item.get("evidence", {}).get("raw_result_projection_sha256")
                 == source.get("projection_sha256")
-                and item.get("actual_session_key")
-                == context.get("actual_session_identity_sha256")
+                and item.get("actual_session_key") == context.get("actual_session_identity_sha256")
                 and context.get("actual_session_identity_sha256")
             ]
             # OpenClaw may rewrite a provider call id before returning the tool
@@ -541,6 +602,8 @@ def _verified_followup_context(
 
 def bind_compatibility_execution(run_root: Path, authorization_reference: str) -> Path:
     """Create a single reviewed execution snapshot without rewriting preparation."""
+    if _is_placeholder_authorization_reference(authorization_reference):
+        raise ValueError("capability_authorization_reference_placeholder")
     if not authorization_reference.strip() or any(
         (run_root / f"launch-{stage}.reserved").exists() for stage in STAGE_ORDER
     ):
@@ -780,7 +843,12 @@ def run_compatibility_stage(
             result_ref=None,
             cleanup_status="not_applicable",
         )
-    if not config.execution_enabled or not authorized or not config.authorization_reference:
+    if (
+        not config.execution_enabled
+        or not authorized
+        or not config.authorization_reference
+        or _is_placeholder_authorization_reference(config.authorization_reference)
+    ):
         raise PermissionError("capability_live_authorization_missing")
     binding = json.loads((run_root / "execution_binding.json").read_text(encoding="utf-8"))
     if (

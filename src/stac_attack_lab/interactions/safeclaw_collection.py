@@ -479,6 +479,7 @@ class SafeClawSubprocessVictimDriver:
         provider_allowed_tools: list[str] | None = None,
         embedding_request_budget: int = 0,
         provider_evidence_policy: dict[str, Any] | None = None,
+        precommit_guard_policy: dict[str, Any] | None = None,
         environment: Mapping[str, str] | None = None,
         batch_id: str | None = None,
     ) -> None:
@@ -498,6 +499,7 @@ class SafeClawSubprocessVictimDriver:
         self.provider_allowed_tools = provider_allowed_tools
         self.embedding_request_budget = embedding_request_budget
         self.provider_evidence_policy = validate_provider_evidence_policy(provider_evidence_policy)
+        self.precommit_guard_policy = precommit_guard_policy
         self.environment = environment if environment is not None else os.environ
         self.batch_id = batch_id
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
@@ -656,6 +658,7 @@ class SafeClawSubprocessVictimDriver:
             provider_allowed_tools=self.provider_allowed_tools,
             embedding_request_budget=embedding_remaining,
             provider_evidence_policy=self.provider_evidence_policy,
+            precommit_guard_policy=self.precommit_guard_policy,
             batch_id=self.batch_id,
         )
         self._started_at = monotonic()

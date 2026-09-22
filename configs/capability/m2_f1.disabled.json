@@ -1,0 +1,23 @@
+{
+  "schema_version": "capability-m2-config/1.0",
+  "execution_enabled": false,
+  "task_config": "configs/capability/f1_status_acceptance.json",
+  "task_set_path": "configs/task_sets/capability_compatibility_tasks_v1.json",
+  "template_path": "configs/capability/runtime/f1_benign_task.json",
+  "model_id": "ep-20260909180104-hmx9m",
+  "provider_model_env": "SAFECLAW_MODEL",
+  "provider_base_url_env": "SAFECLAW_BASE_URL",
+  "provider_api_key_env": "SAFECLAW_API_KEY",
+  "max_victim_http_attempts": 40,
+  "max_http_per_unit": 5,
+  "automatic_retries": 0,
+  "max_attacker_http_attempts": 0,
+  "max_embedding_http_attempts": 0,
+  "max_planner_http_attempts": 0,
+  "max_annotation_http_attempts": 0,
+  "wallclock_seconds_per_unit": 600,
+  "batch_wallclock_seconds": 5400,
+  "provider_timeout_seconds": 90,
+  "max_output_tokens_per_request": 2048,
+  "notes": "Disabled M2 engineering matrix. No production execution path or true precommit G-bind hook is yet connected. M1 authorization and remaining attempts do not transfer. Cash is estimate-only."
+}

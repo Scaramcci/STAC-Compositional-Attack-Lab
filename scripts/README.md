@@ -4,13 +4,17 @@
 |---|---|
 | `bash scripts/capability/00_doctor.sh` | 九原语兼容性零 provider 诊断；只报告模型/endpoint 的非秘密身份及 blocker。 |
 | `bash scripts/capability/01_offline_demo.sh OUTPUT` | 新目录中的 fixture compiler→runtime→oracle→report 闭环。 |
-| `bash scripts/capability/local_fake_runtime.sh OUTPUT` | 真实 SafeClaw/OpenClaw 容器与本机 fake provider 的显式 M1 P0/P1/P2 检查；不读取真实 provider 凭证，需本机 Docker/socket。 |
+| `bash scripts/capability/local_fake_runtime.sh OUTPUT [--scenario P0|P1|P2|P1_REJECTED|P2_INCOMPLETE]...` | 真实 SafeClaw/OpenClaw 容器与本机 fake provider 的显式 M1 检查；可用新目录顺序单测场景，不读取真实 provider 凭证，需本机 Docker/socket。 |
 | `bash scripts/capability/02_prepare_compatibility.sh [RUN_ID]` | 冻结默认禁用的唯一 P0/P1/P2 batch，0 请求。 |
-| `bash scripts/capability/02_prepare_compatibility.sh bind RUN_ROOT AUTHORIZATION_REFERENCE --authorize-live` | **仅在唯一 batch 的真实请求另获明确授权后**绑定独立执行快照；命令本身 0 请求，不修改禁用快照。 |
+| `bash scripts/capability/02_prepare_compatibility.sh bind RUN_ROOT "$STAC_APPROVAL_REF" --authorize-live` | **仅在唯一 batch 的真实请求另获明确授权后**输入实际审计引用并绑定独立执行快照；字面占位符会被拒绝，命令本身 0 请求，不修改禁用快照。 |
 | `bash scripts/capability/03_probe_text.sh RUN_ROOT --dry-run` | P0 参数预演；`--authorize-live` 仍要求已启用快照和明确授权。 |
 | `bash scripts/capability/04_probe_tool.sh RUN_ROOT --dry-run` | P1 参数预演；真实执行要求 P0 passed。 |
 | `bash scripts/capability/05_probe_benign.sh RUN_ROOT --dry-run` | P2 参数预演；真实执行要求 P0/P1 passed。 |
 | `bash scripts/capability/status.sh RUN_ROOT` / `06_report.sh RUN_ROOT OUTPUT` | 只读状态和 partial/error 报告；见 `docs/CAPABILITY_RUNBOOK_ZH.md`。 |
+| `07_m2_prepare.sh OUTPUT` | 以禁用模板生成 M2 F1 八单元 materialized SafeClaw tasks、guard policy 和不可变 manifest；0 请求。 |
+| `08_m2_offline_check.sh RUN_ROOT REPORT_ROOT` | 重验输入/hash/配对并生成完整分母报告和盲化人工审核表；0 请求。 |
+| `09_m2_fake_http.sh OUTPUT` | 本机 loopback fake provider 验证生产 relay 的 G-bind 阻断与 sham 放行；无真实 provider，需 socket。 |
+| `10_m2_live_unit.sh bind|run ...` | **待唯一 M2 batch 另获明确授权后**绑定实际审计引用并逐单元执行；不会继承 M1 授权/额度，禁止放入本机一键测试。 |
 | `python -m stac_attack_lab.cli capability demo --config configs/capability/f1_status_acceptance.json --output experiments/runs/capability/<unique-id>` | 九原语 M0/M1 离线完整闭环；fake transport，零真实请求。 |
 | `python -m stac_attack_lab.cli capability inventory/compile/validate/replay/report ...` | 九原语固定 upstream 核对、确定性编译、密封校验、只读重分析和报告。 |
 | `bash scripts/run_cross_session_revalidation.sh prepare` | 创建唯一、默认禁用真实执行的复验目录，写入新 provenance/configuration review；不访问 provider。成功 0。 |

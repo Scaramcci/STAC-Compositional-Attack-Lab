@@ -20,6 +20,15 @@ from stac_attack_lab.capability.compiler import (
     validate_compatibility_config,
     validate_compilation,
 )
+from stac_attack_lab.capability.m2 import (
+    bind_m2_execution,
+    export_annotation_review,
+    import_annotation_review,
+    prepare_m2,
+    report_m2,
+    run_m2_unit,
+    validate_m2,
+)
 from stac_attack_lab.capability.reporting import build_capability_report
 from stac_attack_lab.capability.runner import replay_episode, run_fake_pipeline
 from stac_attack_lab.env_loader import load_project_env
@@ -173,6 +182,24 @@ def _build_parser() -> argparse.ArgumentParser:
     capability_demo = capability_sub.add_parser("demo")
     capability_demo.add_argument("--config", required=True)
     capability_demo.add_argument("--output", required=True)
+    m2_prepare = capability_sub.add_parser("m2-prepare")
+    m2_prepare.add_argument("--config", default="configs/capability/m2_f1.disabled.json")
+    m2_prepare.add_argument("--output", required=True)
+    for name in ("m2-validate", "m2-report", "m2-annotation-export", "m2-annotation-import"):
+        m2_parser = capability_sub.add_parser(name)
+        m2_parser.add_argument("--run-root", required=True)
+        if name != "m2-validate":
+            m2_parser.add_argument("--output", required=True)
+        if name == "m2-annotation-import":
+            m2_parser.add_argument("--input", required=True)
+    m2_bind = capability_sub.add_parser("m2-bind")
+    m2_bind.add_argument("--run-root", required=True)
+    m2_bind.add_argument("--authorization-reference", required=True)
+    m2_bind.add_argument("--authorize-live", action="store_true")
+    m2_run = capability_sub.add_parser("m2-run-unit")
+    m2_run.add_argument("--run-root", required=True)
+    m2_run.add_argument("--unit", required=True)
+    m2_run.add_argument("--authorize-live", action="store_true")
 
     benign = sub.add_parser("benign", help="benign pre-evaluation collection")
     benign_sub = benign.add_subparsers(dest="benign_command", required=True)
@@ -291,6 +318,69 @@ def _main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "capability":
+        if args.capability_command == "m2-prepare":
+            print(
+                prepare_m2(
+                    root,
+                    _project_scoped_path(root, args.config),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-validate":
+            print(
+                json.dumps(
+                    validate_m2(_project_scoped_path(root, args.run_root)), indent=2, sort_keys=True
+                )
+            )
+            return 0
+        if args.capability_command == "m2-report":
+            print(
+                json.dumps(
+                    report_m2(
+                        _project_scoped_path(root, args.run_root),
+                        _project_scoped_path(root, args.output),
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m2-annotation-export":
+            print(
+                export_annotation_review(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-annotation-import":
+            print(
+                import_annotation_review(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.input),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-bind":
+            if not args.authorize_live:
+                raise ValueError("m2_execution_authorization_missing")
+            print(
+                bind_m2_execution(
+                    _project_scoped_path(root, args.run_root), args.authorization_reference
+                )
+            )
+            return 0
+        if args.capability_command == "m2-run-unit":
+            result = run_m2_unit(
+                root,
+                _project_scoped_path(root, args.run_root),
+                args.unit,
+                authorized=args.authorize_live,
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.execution_status == "completed" else 10
         if args.capability_command == "inventory":
             report = inventory_upstream(_project_scoped_path(root, args.upstream))
             print(json.dumps(report, indent=2, sort_keys=True))
