@@ -236,6 +236,9 @@ class _AfterSendFailureDriver(_RelayBackedDriver):
         )
         raise RuntimeError("synthetic_failure_after_provider_attempt")
 
+    def diagnostic_snapshot(self) -> str | None:
+        return "synthetic-redacted-driver-diagnostic"
+
 
 def test_sent_request_survives_failure_without_retry(tmp_path: Path) -> None:
     compiled = compile_cases(CONFIG, tmp_path / "compiled")
@@ -297,6 +300,7 @@ def test_sent_request_survives_failure_without_retry(tmp_path: Path) -> None:
     assert review["provider_attempts"] == 1
     assert review["network_requests_performed"] is True
     assert "synthetic_failure_after_provider_attempt" in review["failure_category"]
+    assert review["diagnostic_tail"] == "synthetic-redacted-driver-diagnostic"
     assert result.execution_status != "completed"
     assert len((episode / "provider_attempt_ledger.jsonl").read_text().splitlines()) == 1
 

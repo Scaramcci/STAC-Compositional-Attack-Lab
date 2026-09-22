@@ -105,5 +105,6 @@ def test_compiled_material_reaches_production_precommit_guard_boundary(tmp_path:
                 assert exc.code == 409
             else:
                 raise AssertionError("G-bind did not stop the tool call before execution")
-    assert len(upstream.requests) == 1
+    assert upstream.state.request_count == 1
+    assert len(upstream.state.requests) == 1
     assert relay.state.records[0]["precommit_guard"]["decision"] == "block"

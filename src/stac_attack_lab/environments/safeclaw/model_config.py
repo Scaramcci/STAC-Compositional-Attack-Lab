@@ -101,8 +101,9 @@ def build_safeclaw_model_config(
         "provider_context_window": provider_context_window,
         "provider_max_output_tokens": provider_max_output_tokens,
         "provider_evidence_policy": validate_provider_evidence_policy(provider_evidence_policy),
-        "precommit_guard_policy": precommit_guard_policy,
     }
+    if precommit_guard_policy is not None:
+        payload["precommit_guard_policy"] = precommit_guard_policy
     if batch_id:
         payload["batch_id"] = batch_id
     exact_secrets = [target_api_key, target_base_url]

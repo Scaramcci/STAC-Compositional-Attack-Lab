@@ -1,4 +1,10 @@
-# 当前计划 — 2026-09-22 M2 F1 离线对照与干预
+# 当前计划 — 2026-09-22 M2 本机验收后续
+
+实际基线 `b6da0cd`，现有工作树修改全部保留。**已完成：** 最终源码完整质量门 403 passed；最终 `v3-final` 八单元真实 OpenClaw + 本机 fake HTTP 矩阵 8/8 completed、40 次 fake attempts、八个 seal/ledger/cleanup 和四组配对查收通过；独立验收清单已保存。唯一新 `m2-f1-candidate-20260922-b6da0cd-final-v1` 已按禁用模板 prepare/validate/report/盲化标注导出，manifest/source/config/task/guard 指纹闭合，0 binding/launch/ledger、0 真实请求。**剩余：** 本轮不再执行本机矩阵或 09；真实 M2 运行需要该唯一批次的明确授权依据，并在普通终端复核 Docker/image、网络隔离、成本控制和最终配置；当前 doctor 在本会话沙箱因 Docker 权限返回环境 blocker，不能误称生产环境 ready。获准后仍须按单元查收再继续，不继承 M1 额度，不自动 bind/live、pilot/main/formal；人工标注、研究因果结论和 official outcome 继续 not_evaluated。
+
+# 历史计划 — 2026-09-22 M2 F1 离线对照与干预
+
+本次局部修复（2026-09-22 14:55）：已修复 MockProviderServer 计数访问与09统计/路径；Ruff/Bash/diff通过。当前沙箱三例均在socket创建前受限，待用户普通终端重跑09并查收；不改guard策略、不发真实请求。
 
 本轮仅代码、短时离线验证和禁用运行准备，真实 M2 请求未授权。实际基线 `f86ae0d`，进入时已有 M1 未提交修改及新增任务文档，均保留。① **已完成：** F1 三条件及来源明确对照的低信任文件物化、八单元共同合同/独立环境预注册、生产 relay 提交前 G-bind/sham、分层报告和版本化人工标注接口。② **已完成：** 默认禁用配置、CLI、编号 Bash 和 v3 独立离线产物；短时纯测试、目标 mypy/ruff/Bash/diff 已验证。③ **待用户普通终端：** 先运行 loopback fake 两例和完整 `make check`；若 Docker M2 集成命令形成新产物，再由助手只读查收，不自动重跑。④ **阻塞于新授权：** 真实 M2 需以最终源码重新 prepare 唯一 batch，审查 manifest/config/source 指纹与 8×5/40 HTTP、0 retry、600/5400 秒后另行授权；不得继承 M1 剩余额度或占位引用。当前真实 M2 未运行，official outcome not_evaluated。
 

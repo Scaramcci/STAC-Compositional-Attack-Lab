@@ -252,10 +252,63 @@ def _request_tool_result_projections(
     return projections, unsupported
 
 
+def _sse_data_events(text: str) -> list[str]:
+    """Return JSON SSE payloads, including Ark's consecutive data-line form.
+
+    A standards-compliant multi-line event is joined until its blank delimiter.
+    Some OpenAI-compatible providers instead emit one complete JSON value per
+    consecutive ``data:`` line.  Split that form only when every line is an
+    independently valid JSON value (or the terminal marker); otherwise retain
+    the joined payload so the caller rejects malformed or ambiguous input.
+    """
+
+    events: list[str] = []
+    data_lines: list[str] = []
+
+    def flush() -> None:
+        nonlocal data_lines
+        if not data_lines:
+            return
+        joined = "\n".join(data_lines)
+        if len(data_lines) == 1 or joined == "[DONE]":
+            events.append(joined)
+            data_lines = []
+            return
+        try:
+            json.loads(joined)
+        except json.JSONDecodeError:
+            individually_complete = True
+            for payload in data_lines:
+                if payload == "[DONE]":
+                    continue
+                try:
+                    json.loads(payload)
+                except json.JSONDecodeError:
+                    individually_complete = False
+                    break
+            events.extend(data_lines if individually_complete else [joined])
+        else:
+            events.append(joined)
+        data_lines = []
+
+    for line in [*text.splitlines(), ""]:
+        if line == "":
+            flush()
+        elif line.startswith("data:"):
+            data_lines.append(line[5:].lstrip())
+    return events
+
+
 def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str, Any]], str]:
-    text = body.decode("utf-8", errors="strict")
+    try:
+        text = body.decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return [], "response_utf8_invalid"
     if "text/event-stream" not in content_type.lower() and not text.lstrip().startswith("data:"):
-        value = json.loads(text)
+        try:
+            value = json.loads(text)
+        except json.JSONDecodeError:
+            return [], "response_json_invalid"
         if not isinstance(value, dict):
             return [], "response_json_not_object"
         choices = value.get("choices")
@@ -279,21 +332,14 @@ def _response_tool_calls(body: bytes, content_type: str) -> tuple[list[dict[str,
     done = False
     finish_reasons: list[str] = []
     choice_indexes: set[int] = set()
-    events: list[str] = []
-    data_lines: list[str] = []
-    for line in [*text.splitlines(), ""]:
-        if line == "":
-            if data_lines:
-                events.append("\n".join(data_lines))
-                data_lines = []
-            continue
-        if line.startswith("data:"):
-            data_lines.append(line[5:].lstrip())
-    for raw_event in events:
+    for raw_event in _sse_data_events(text):
         if raw_event == "[DONE]":
             done = True
             continue
-        event = json.loads(raw_event)
+        try:
+            event = json.loads(raw_event)
+        except json.JSONDecodeError:
+            return [], "response_sse_event_invalid_json"
         if not isinstance(event, dict):
             return [], "response_sse_event_not_object"
         for choice in event.get("choices", []):
@@ -499,11 +545,7 @@ def _extract_provider_usage(
     if "text/event-stream" in content_type.lower() or text.lstrip().startswith("data:"):
         usage_values: list[object] = []
         done = False
-        for line in text.splitlines():
-            line = line.strip()
-            if not line or not line.startswith("data:"):
-                continue
-            payload = line[5:].strip()
+        for payload in _sse_data_events(text):
             if payload == "[DONE]":
                 done = True
                 continue

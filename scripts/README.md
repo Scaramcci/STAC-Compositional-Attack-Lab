@@ -15,6 +15,7 @@
 | `08_m2_offline_check.sh RUN_ROOT REPORT_ROOT` | 重验输入/hash/配对并生成完整分母报告和盲化人工审核表；0 请求。 |
 | `09_m2_fake_http.sh OUTPUT` | 本机 loopback fake provider 验证生产 relay 的 G-bind 阻断与 sham 放行；无真实 provider，需 socket。 |
 | `10_m2_live_unit.sh bind|run ...` | **待唯一 M2 batch 另获明确授权后**绑定实际审计引用并逐单元执行；不会继承 M1 授权/额度，禁止放入本机一键测试。 |
+| `11_m2_local_runtime.sh OUTPUT [--unit UNIT_ID]...` | 实际 OpenClaw/production driver + 本机 deterministic fake provider 的 M2 闭环；单元或八项矩阵均写 seal、ledger、cleanup、完整分母报告，拒绝公网 provider 地址且不读取真实凭证。 |
 | `python -m stac_attack_lab.cli capability demo --config configs/capability/f1_status_acceptance.json --output experiments/runs/capability/<unique-id>` | 九原语 M0/M1 离线完整闭环；fake transport，零真实请求。 |
 | `python -m stac_attack_lab.cli capability inventory/compile/validate/replay/report ...` | 九原语固定 upstream 核对、确定性编译、密封校验、只读重分析和报告。 |
 | `bash scripts/run_cross_session_revalidation.sh prepare` | 创建唯一、默认禁用真实执行的复验目录，写入新 provenance/configuration review；不访问 provider。成功 0。 |
@@ -29,6 +30,8 @@
 | `python -m stac_attack_lab.cli flow reanalyze ...` | 显式 Primitive v3 离线重分析；校验 collection seal/registry，写新 manifest、效果图、切片、分层准入和报告。 |
 | `python -m stac_attack_lab.cli benign validate/prepare` | 校验正常场景并生成默认禁用快照；零网络请求。 |
 | `python -m stac_attack_lab.cli benign collect-fixture` | 仅运行受版本控制的 synthetic 正常场景，经共用 collector/normalizer 进入 v3；拒绝 live-enabled 配置。 |
+
+M2 最终本机矩阵 `m2-local-acceptance-20260922-b6da0cd-v3-final` 已通过；查收摘要位于相邻 `m2-final-local-review-20260922-b6da0cd-v1/acceptance_review.json`。唯一新的 `m2-f1-candidate-20260922-b6da0cd-final-v1` 仍为 disabled 且无 execution binding；不要对这些已存在目录重跑 07/08/11，真实 M2 不由本机验收自动授权。完整路径及后续步骤见 [Capability 运行手册](../docs/CAPABILITY_RUNBOOK_ZH.md)。
 
 复验入口不复制历史 `experiments/runs`，不自动启用 live，不探测 provider，也不负责清理其他 run。prepare 会验证模板并写禁用配置、不可变 prepared snapshot、配置审核和 provenance；live 必须同时有仅改变 `execution_enabled` 的运行配置和 `--authorize-live`。launch reservation 在 collection 前原子创建，失败进程不能覆盖获胜进程的 live review/summary；可能已产生请求后的失败不会删除 marker。`max_tokens` 是 collection action 后累计的 Victim usage 检查，不是请求前硬 token 上限。
 

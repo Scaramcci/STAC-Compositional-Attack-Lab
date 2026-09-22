@@ -350,6 +350,7 @@ class SafeClawCapabilityRuntimeAdapter:
         final_public: dict[str, Any] | None = None
         failure: str | None = None
         cleanup_error: str | None = None
+        diagnostic_tail: str | None = None
         started = False
         delivered = False
         try:
@@ -380,6 +381,12 @@ class SafeClawCapabilityRuntimeAdapter:
                     failure = finished.failure_category or f"victim_{finished.status}"
         except Exception as exc:
             failure = f"{type(exc).__name__}:{str(exc)[:500]}"
+            diagnostic_snapshot = getattr(self.driver, "diagnostic_snapshot", None)
+            if callable(diagnostic_snapshot):
+                try:
+                    diagnostic_tail = diagnostic_snapshot()
+                except Exception as diagnostic_exc:
+                    diagnostic_tail = f"diagnostic_unavailable:{type(diagnostic_exc).__name__}"
             partial, _ = self.driver.observed_snapshot()
             source_events.extend(item for item in partial if item not in source_events)
             partial_public = self.driver.public_state_snapshot()
@@ -477,6 +484,7 @@ class SafeClawCapabilityRuntimeAdapter:
                 "failure_category": failure,
                 "cleanup_error": cleanup_error,
                 "cleanup_status": cleanup_status,
+                "diagnostic_tail": diagnostic_tail,
                 "backend_kind": self.backend_kind,
                 "provider_attempts": attempts if provider_records else None,
                 "network_requests_performed": attempts > 0 if provider_records else None,

@@ -19,5 +19,5 @@
   "batch_wallclock_seconds": 5400,
   "provider_timeout_seconds": 90,
   "max_output_tokens_per_request": 2048,
-  "notes": "Disabled M2 engineering matrix. No production execution path or true precommit G-bind hook is yet connected. M1 authorization and remaining attempts do not transfer. Cash is estimate-only."
+  "notes": "Disabled M2 engineering matrix. Production execution and response-boundary precommit G-bind are implemented but require current local OpenClaw acceptance before a new live candidate is prepared. M1 authorization and remaining attempts do not transfer. Cash is estimate-only."
 }

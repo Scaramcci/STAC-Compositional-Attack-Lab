@@ -157,7 +157,8 @@ def test_precommit_guard_runs_on_production_relay_before_tool_execution(
                 },
             )
         assert status == expected
-        assert len(upstream.requests) == 1
+        assert upstream.state.request_count == 1
+        assert len(upstream.state.requests) == 1
         assert relay.state.records[0]["upstream_status"] == 200
         expected_decision = "block" if mode == "g_bind" else "allow"
         assert relay.state.records[0]["precommit_guard"]["decision"] == expected_decision
@@ -515,6 +516,31 @@ def test_provider_usage_extracts_sse_final_usage_only_chunk() -> None:
     usage, observation, reasons = _extract_provider_usage(body, "text/event-stream")
     assert usage == {"input_tokens": 13, "output_tokens": 5, "total_tokens": 18}
     assert observation == "complete" and reasons == []
+
+
+def test_response_parser_accepts_ark_consecutive_complete_data_lines() -> None:
+    body = (
+        b'data: {"choices":[{"index":0,"delta":{"content":"ok"}}]}\n'
+        b'data: {"choices":[],"usage":{"prompt_tokens":4,'
+        b'"completion_tokens":6,"total_tokens":10}}\n'
+        b"data: [DONE]\n"
+    )
+    calls, status = _response_tool_calls(body, "text/event-stream")
+    assert calls == []
+    assert status == "complete"
+
+
+def test_response_parser_joins_standard_multiline_data_and_rejects_malformed() -> None:
+    body = b'data: {"choices":\ndata: [{"index":0,"delta":{"content":"ok"}}]}\n\ndata: [DONE]\n\n'
+    calls, status = _response_tool_calls(body, "text/event-stream")
+    assert calls == []
+    assert status == "complete"
+
+    calls, status = _response_tool_calls(
+        b'data: {"choices":\ndata: not-json\n\n', "text/event-stream"
+    )
+    assert calls == []
+    assert status == "response_sse_event_invalid_json"
 
 
 def test_provider_usage_marks_truncated_and_missing_sse() -> None:
