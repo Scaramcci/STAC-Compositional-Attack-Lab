@@ -316,6 +316,19 @@ def test_request_boundary_projects_only_real_tool_messages_and_response_argument
         assert provider_response["target_tool_arguments"][0]["target_tool_call_id"] == (
             "consumer-1"
         )
+        assert provider_response["response_tool_call_mapping_version"] == (
+            "response-transcript-call/1.0"
+        )
+        assert provider_response["response_tool_call_parse_status"] == "complete"
+        assert provider_response["response_tool_calls"] == [
+            {
+                "tool_call_id": "consumer-1",
+                "tool_name": "add",
+                "arguments_value_sha256": provider_response["target_tool_arguments"][0][
+                    "arguments_value_sha256"
+                ],
+            }
+        ]
 
 
 def test_relay_rejects_bad_ingress_auth_without_spending_budget(tmp_path: Path) -> None:

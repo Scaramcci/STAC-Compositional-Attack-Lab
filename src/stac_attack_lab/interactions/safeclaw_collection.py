@@ -1107,7 +1107,177 @@ class SafeClawSubprocessVictimDriver:
             == session.get("actual_session_identity_sha256")
             and record.get("workspace_identity_sha256") == session.get("workspace_identity_sha256")
         }
+        transcript_call_groups: dict[str, list[dict[str, Any]]] = {}
+        for _, item in indexed_tool_calls:
+            if isinstance(item, dict) and (item.get("id") or item.get("call_id")):
+                transcript_call_groups.setdefault(
+                    str(item.get("id") or item.get("call_id")), []
+                ).append(item)
+        transcript_calls = {
+            call_id: items[0]
+            for call_id, items in transcript_call_groups.items()
+            if len(items) == 1
+        }
+        provider_id_by_transcript: dict[str, str] = {}
+        transcript_id_by_provider: dict[str, str] = {}
+        provider_binding_by_transcript: dict[str, str] = {}
+        ambiguous_transcript_ids = {
+            call_id for call_id, items in transcript_call_groups.items() if len(items) != 1
+        }
+        ambiguous_provider_ids: set[str] = set()
+
+        def bind_provider_id(
+            provider_id: str,
+            candidates: list[str],
+            *,
+            binding_kind: str,
+        ) -> str | None:
+            unique = list(dict.fromkeys(candidates))
+            if provider_id in unique:
+                selected = provider_id
+                kind = "exact_call_id_and_projection"
+            elif len(unique) == 1:
+                selected = unique[0]
+                kind = binding_kind
+            else:
+                return None
+            previous = provider_id_by_transcript.get(selected)
+            previous_transcript = transcript_id_by_provider.get(provider_id)
+            if (previous is not None and previous != provider_id) or (
+                previous_transcript is not None and previous_transcript != selected
+            ):
+                provider_id_by_transcript.pop(selected, None)
+                provider_binding_by_transcript.pop(selected, None)
+                ambiguous_transcript_ids.add(selected)
+                ambiguous_provider_ids.add(provider_id)
+                if previous is not None:
+                    transcript_id_by_provider.pop(previous, None)
+                    ambiguous_provider_ids.add(previous)
+                if previous_transcript is not None:
+                    provider_id_by_transcript.pop(previous_transcript, None)
+                    provider_binding_by_transcript.pop(previous_transcript, None)
+                    ambiguous_transcript_ids.add(previous_transcript)
+                transcript_id_by_provider.pop(provider_id, None)
+                return None
+            if selected in ambiguous_transcript_ids or provider_id in ambiguous_provider_ids:
+                return None
+            provider_id_by_transcript[selected] = provider_id
+            transcript_id_by_provider[provider_id] = selected
+            provider_binding_by_transcript[selected] = kind
+            return selected
+
+        # OpenClaw may rewrite provider call IDs while preserving the exact tool
+        # result/argument projections. Bind only a unique projection inside this
+        # action; a collision remains unbound rather than guessing.
+        for record in boundary_records:
+            context_record = closed_contexts.get(str(record.get("control_context_id")))
+            if (
+                record.get("record_type") != "provider_response"
+                or record.get("send_state") != "response_received"
+                or context_record is None
+                or record.get("action_id") != action.action_id
+            ):
+                continue
+            sources = record.get("source_tool_results", [])
+            targets = record.get("target_tool_arguments", [])
+            if isinstance(sources, list):
+                for source in sources:
+                    if (
+                        not isinstance(source, dict)
+                        or not isinstance(source.get("tool_result_call_id"), str)
+                        or source.get("projection_complete") is not True
+                        or not isinstance(source.get("projection_sha256"), str)
+                    ):
+                        continue
+                    bind_provider_id(
+                        str(source["tool_result_call_id"]),
+                        [
+                            transcript_id
+                            for transcript_id, item in transcript_calls.items()
+                            if item.get("raw_result_projection_sha256")
+                            == source.get("projection_sha256")
+                        ],
+                        binding_kind="unique_result_projection",
+                    )
+            if isinstance(targets, list):
+                for target in targets:
+                    if (
+                        not isinstance(target, dict)
+                        or not isinstance(target.get("target_tool_call_id"), str)
+                        or not isinstance(target.get("target_tool_name"), str)
+                        or not isinstance(target.get("arguments_value_sha256"), str)
+                    ):
+                        continue
+                    bind_provider_id(
+                        str(target["target_tool_call_id"]),
+                        [
+                            transcript_id
+                            for transcript_id, item in transcript_calls.items()
+                            if item.get("tool_name") == target.get("target_tool_name")
+                            and item.get("raw_arguments_value_sha256")
+                            == target.get("arguments_value_sha256")
+                        ],
+                        binding_kind="unique_argument_projection",
+                    )
+        response_sources: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+        for record in boundary_records:
+            context_record = closed_contexts.get(str(record.get("control_context_id")))
+            if (
+                record.get("record_type") != "provider_response"
+                or record.get("send_state") != "response_received"
+                or record.get("response_tool_call_parse_status") != "complete"
+                or record.get("response_tool_call_mapping_version")
+                != "response-transcript-call/1.0"
+                or not isinstance(record.get("record_id"), str)
+                or not record["record_id"]
+                or not isinstance(record.get("request_id"), str)
+                or not record["request_id"]
+                or record.get("action_id") != action.action_id
+                or not isinstance(record.get("batch_id"), str)
+                or not record["batch_id"]
+                or record.get("batch_id") != getattr(self, "batch_id", None)
+                or record.get("logical_session_id") != session_id
+                or not isinstance(record.get("workspace_identity_sha256"), str)
+                or not record["workspace_identity_sha256"]
+                or record.get("workspace_identity_sha256")
+                != session.get("workspace_identity_sha256")
+                or context_record is None
+                or context_record.get("actual_session_identity_sha256")
+                != session.get("actual_session_identity_sha256")
+            ):
+                continue
+            calls = record.get("response_tool_calls")
+            if not isinstance(calls, list):
+                continue
+            for call in calls:
+                if not isinstance(call, dict):
+                    continue
+                provider_id = call.get("tool_call_id")
+                if not isinstance(provider_id, str) or not provider_id:
+                    continue
+                transcript_id = transcript_id_by_provider.get(provider_id)
+                if transcript_id is None and provider_id in transcript_calls:
+                    transcript_id = provider_id
+                transcript = transcript_calls.get(transcript_id or "")
+                if (
+                    not isinstance(transcript_id, str)
+                    or not transcript_id
+                    or transcript is None
+                    or transcript_id in ambiguous_transcript_ids
+                    or provider_id in ambiguous_provider_ids
+                    or transcript.get("tool_name") != call.get("tool_name")
+                    or transcript.get("raw_arguments_value_sha256")
+                    != call.get("arguments_value_sha256")
+                ):
+                    continue
+                response_sources.setdefault(transcript_id, []).append((record, call))
+        response_source_by_transcript = {
+            call_id: records[0]
+            for call_id, records in response_sources.items()
+            if len(records) == 1
+        }
         boundary_links_by_consumer: dict[str, list[dict[str, Any]]] = {}
+        request_boundary_events: list[dict[str, Any]] = []
         for record in boundary_records:
             context_record = closed_contexts.get(str(record.get("control_context_id")))
             if (
@@ -1123,6 +1293,72 @@ class SafeClawSubprocessVictimDriver:
             targets = record.get("target_tool_arguments", [])
             if not isinstance(sources, list) or not isinstance(targets, list):
                 continue
+            response_ref = f"provider-evidence:{record['record_id']}:{record.get('record_sha256')}"
+            context_ref = (
+                f"provider-evidence:{context_record['record_id']}:"
+                f"{context_record.get('record_sha256')}"
+            )
+            request_links: list[dict[str, Any]] = []
+            request_inputs: list[str] = []
+            request_result_lines: list[int] = []
+            for source in sources:
+                if not isinstance(source, dict):
+                    continue
+                source_call_id = source.get("tool_result_call_id")
+                transcript_source_id = transcript_id_by_provider.get(str(source_call_id))
+                candidates = result_artifacts_by_call.get(str(transcript_source_id), [])
+                matching = [
+                    (line, artifact_id)
+                    for line, artifact_id, raw_hash in candidates
+                    if raw_hash
+                    and raw_hash == source.get("projection_sha256")
+                    and source.get("projection_complete") is True
+                ]
+                if len(matching) != 1:
+                    continue
+                result_line, artifact_id = matching[0]
+                request_inputs.append(artifact_id)
+                request_result_lines.append(result_line)
+                request_links.append(
+                    {
+                        "consumer_binding_kind": "provider_request",
+                        "source_artifact_id": artifact_id,
+                        "source_tool_result_call_id": source_call_id,
+                        "request_id": record.get("request_id"),
+                        "batch_id": record.get("batch_id"),
+                        "control_context_id": record.get("control_context_id"),
+                        "action_id": record.get("action_id"),
+                        "rule_id": None,
+                        "evidence_ref_ids": [response_ref, context_ref],
+                    }
+                )
+            if request_links:
+                request_id = str(record.get("request_id"))
+                request_occurrence = stable_hash(
+                    [session_id, request_id, action_nonce, record.get("attempt_sequence")]
+                )[:16]
+                request_boundary_events.append(
+                    {
+                        "event_id": f"provider-request-{request_occurrence}",
+                        "session_id": session_id,
+                        "sequence_no": self._next_sequence(),
+                        "_provider_order": max(request_result_lines) * 10 + 2,
+                        "actor_role": "provider_relay",
+                        "event_type": "message",
+                        "component_role": "provider_request_boundary",
+                        "operation": "provider.request_context",
+                        "status": "passed",
+                        "input_artifact_ids": list(dict.fromkeys(request_inputs)),
+                        "public_payload": {
+                            "provider_request_id": request_id,
+                            "attempt_sequence": record.get("attempt_sequence"),
+                            "context_reachability_status": "candidate",
+                            "artifact_context_evidence": request_links,
+                            "artifact_derivation_candidates": [],
+                        },
+                        "evidence_ref_ids": [response_ref, context_ref],
+                    }
+                )
             for target in targets:
                 if not isinstance(target, dict) or not isinstance(
                     target.get("target_tool_call_id"), str
@@ -1132,7 +1368,8 @@ class SafeClawSubprocessVictimDriver:
                     if not isinstance(source, dict):
                         continue
                     source_call_id = source.get("tool_result_call_id")
-                    candidates = result_artifacts_by_call.get(str(source_call_id), [])
+                    transcript_source_id = transcript_id_by_provider.get(str(source_call_id))
+                    candidates = result_artifacts_by_call.get(str(transcript_source_id), [])
                     matching = [
                         (line, artifact_id)
                         for line, artifact_id, raw_hash in candidates
@@ -1143,13 +1380,6 @@ class SafeClawSubprocessVictimDriver:
                     if len(matching) != 1:
                         continue
                     _, artifact_id = matching[0]
-                    response_ref = (
-                        f"provider-evidence:{record['record_id']}:{record.get('record_sha256')}"
-                    )
-                    context_ref = (
-                        f"provider-evidence:{context_record['record_id']}:"
-                        f"{context_record.get('record_sha256')}"
-                    )
                     boundary_links_by_consumer.setdefault(
                         str(target["target_tool_call_id"]), []
                     ).append(
@@ -1167,12 +1397,18 @@ class SafeClawSubprocessVictimDriver:
                             "evidence_ref_ids": [response_ref, context_ref],
                         }
                     )
+        source_events.extend(request_boundary_events)
         tool_call_event_ids: list[str] = []
         tool_call_event_by_provider_id: dict[str, str] = {}
         for index, tool_call in indexed_tool_calls:
             call_payload = tool_call if isinstance(tool_call, dict) else {"value": str(tool_call)}
             provider_call_id = (
                 str(call_payload.get("id") or call_payload.get("call_id") or "") or None
+            )
+            evidence_call_id = (
+                provider_id_by_transcript.get(provider_call_id, provider_call_id)
+                if provider_call_id
+                else None
             )
             call_occurrence = stable_hash(
                 [
@@ -1190,6 +1426,8 @@ class SafeClawSubprocessVictimDriver:
             tool_call_event_ids.append(tool_call_event_id)
             if provider_call_id:
                 tool_call_event_by_provider_id[provider_call_id] = tool_call_event_id
+            if evidence_call_id:
+                tool_call_event_by_provider_id[evidence_call_id] = tool_call_event_id
             request_line = call_payload.get("request_line_number")
             context_inputs: list[str] = []
             if request_line is not None:
@@ -1202,7 +1440,7 @@ class SafeClawSubprocessVictimDriver:
                     for result_line, artifact_id, _ in values
                     if lower_bound < result_line < request_line_int
                 ]
-            boundary_links = boundary_links_by_consumer.get(str(provider_call_id), [])
+            boundary_links = boundary_links_by_consumer.get(str(evidence_call_id), [])
             verified_inputs = [
                 str(item["source_artifact_id"])
                 for item in boundary_links
@@ -1228,7 +1466,37 @@ class SafeClawSubprocessVictimDriver:
                     "input_artifact_ids": list(dict.fromkeys(verified_inputs)),
                     "public_payload": {
                         **call_payload,
-                        "provider_tool_call_id": provider_call_id,
+                        **(
+                            {
+                                "provider_response_record_id": response_source_by_transcript[
+                                    provider_call_id
+                                ][0]["record_id"],
+                                "provider_response_request_id": response_source_by_transcript[
+                                    provider_call_id
+                                ][0]["request_id"],
+                                "produced_by_provider_request_id": response_source_by_transcript[
+                                    provider_call_id
+                                ][0]["request_id"],
+                                "provider_response_tool_call_id": response_source_by_transcript[
+                                    provider_call_id
+                                ][1]["tool_call_id"],
+                                "provider_response_call_mapping_version": (
+                                    "response-transcript-call/1.0"
+                                ),
+                                "provider_response_evidence_ref": (
+                                    "provider-evidence:"
+                                    f"{response_source_by_transcript[provider_call_id][0]['record_id']}:"
+                                    f"{response_source_by_transcript[provider_call_id][0].get('record_sha256')}"
+                                ),
+                            }
+                            if provider_call_id in response_source_by_transcript
+                            else {}
+                        ),
+                        "provider_tool_call_id": evidence_call_id,
+                        "transcript_tool_call_id": provider_call_id,
+                        "provider_call_id_binding": provider_binding_by_transcript.get(
+                            str(provider_call_id), "transcript_only"
+                        ),
                         "execution_result_observed": call_payload.get("result_observation")
                         in {"observed", "rejected", "error"},
                         "context_reachability_status": "unknown",
@@ -1287,7 +1555,11 @@ class SafeClawSubprocessVictimDriver:
                 }.get(result_observation, "not_observable"),
                 "request_event_id": tool_call_event_id,
                 "public_payload": {
-                    "provider_tool_call_id": provider_call_id,
+                    "provider_tool_call_id": evidence_call_id,
+                    "transcript_tool_call_id": provider_call_id,
+                    "provider_call_id_binding": provider_binding_by_transcript.get(
+                        str(provider_call_id), "transcript_only"
+                    ),
                     "tool_name": call_payload.get("tool_name"),
                     "result_observation": result_observation,
                     "result_empty": call_payload.get("result_empty"),
@@ -1347,6 +1619,7 @@ class SafeClawSubprocessVictimDriver:
                 observation, "not_observable"
             )
             call_id = str(raw_operation.get("call_id") or f"{action.action_id}-{operation_index}")
+            evidence_call_id = provider_id_by_transcript.get(call_id, call_id)
             content_hash = raw_operation.get("content_hash")
             evidence_refs = [
                 str(value)
@@ -1443,10 +1716,13 @@ class SafeClawSubprocessVictimDriver:
                             if version_id
                             else []
                         ),
-                        "request_event_id": tool_call_event_by_provider_id.get(call_id),
+                        "request_event_id": tool_call_event_by_provider_id.get(evidence_call_id),
                         "public_payload": {
                             "workspace_relative_path": path,
                             "content_hash_scope": raw_operation.get("content_hash_scope"),
+                            "commit_projection_verified": raw_operation.get(
+                                "commit_projection_verified", False
+                            ),
                             "version_observation": "observed" if version_id else "unknown",
                             "path_scope": "lexically_normalized_controlled_workspace",
                             "realpath_verified": False,
@@ -1488,17 +1764,21 @@ class SafeClawSubprocessVictimDriver:
                     candidate_payload = candidate_event.get("public_payload", {})
                     if not isinstance(candidate_payload, dict):
                         continue
-                    candidates = candidate_payload.get("artifact_derivation_candidates", [])
-                    if not isinstance(candidates, list):
-                        continue
                     matched = False
-                    for candidate in candidates:
-                        if (
-                            isinstance(candidate, dict)
-                            and candidate.get("source_tool_result_call_id") == call_id
-                        ):
-                            candidate["source_artifact_id"] = read_artifact_id
-                            matched = True
+                    for candidate_key in (
+                        "artifact_context_evidence",
+                        "artifact_derivation_candidates",
+                    ):
+                        candidates = candidate_payload.get(candidate_key, [])
+                        if not isinstance(candidates, list):
+                            continue
+                        for candidate in candidates:
+                            if (
+                                isinstance(candidate, dict)
+                                and candidate.get("source_tool_result_call_id") == evidence_call_id
+                            ):
+                                candidate["source_artifact_id"] = read_artifact_id
+                                matched = True
                     if matched:
                         old_inputs = candidate_event.get("input_artifact_ids", [])
                         candidate_event["input_artifact_ids"] = list(
@@ -1553,13 +1833,17 @@ class SafeClawSubprocessVictimDriver:
                         "read_completeness": raw_operation.get("read_completeness", "unknown"),
                         "path_scope": "lexically_normalized_controlled_workspace",
                         "realpath_verified": False,
-                        "provider_tool_call_id": call_id,
+                        "provider_tool_call_id": evidence_call_id,
+                        "transcript_tool_call_id": call_id,
+                        "provider_call_id_binding": provider_binding_by_transcript.get(
+                            call_id, "transcript_only"
+                        ),
                         "raw_result_projection_sha256": raw_operation.get(
                             "raw_result_projection_sha256"
                         ),
                         "result_redaction_changed": raw_operation.get("result_redaction_changed"),
                     },
-                    "request_event_id": tool_call_event_by_provider_id.get(call_id),
+                    "request_event_id": tool_call_event_by_provider_id.get(evidence_call_id),
                     "evidence_ref_ids": evidence_refs,
                 }
             )
@@ -1626,6 +1910,8 @@ class SafeClawSubprocessVictimDriver:
         )
         for event in source_events:
             event["sequence_no"] = self._next_sequence()
+            if isinstance(getattr(self, "batch_id", None), str) and self.batch_id:
+                event["batch_id"] = self.batch_id
         for event in source_events:
             payload = cast(dict[str, Any], event.setdefault("public_payload", {}))
             payload.update(

@@ -16,6 +16,8 @@
 | `09_m2_fake_http.sh OUTPUT` | 本机 loopback fake provider 验证生产 relay 的 G-bind 阻断与 sham 放行；无真实 provider，需 socket。 |
 | `10_m2_live_unit.sh bind|run ...` | **待唯一 M2 batch 另获明确授权后**绑定实际审计引用并逐单元执行；不会继承 M1 授权/额度，禁止放入本机一键测试。 |
 | `11_m2_local_runtime.sh OUTPUT [--unit UNIT_ID]...` | 实际 OpenClaw/production driver + 本机 deterministic fake provider 的 M2 闭环；单元或八项矩阵均写 seal、ledger、cleanup、完整分母报告，拒绝公网 provider 地址且不读取真实凭证。 |
+| `12_m2_ai_review.sh prepare|validate|dry-run|bind|run|resume|status|report|import|merge ...` | M2 去标识 case 的独立 AI 审核入口。`prepare RUN_ROOT [CONFIG]` 支持全量或显式子集；宿主封存 pointer allowlist，响应在语义校验前受控留证。当前两项模板上限 2 次 Annotation HTTP、逐 case 独立上下文、零重试、无工具；`merge` 显式保留跨 prompt 来源，AI 标签与独立人工审核分开统计。`prepare/validate/dry-run/merge` 为零请求，`bind/run` 必须另获覆盖该唯一审核批次的明确授权。 |
+| `13_m3_f3.sh prepare|validate|status|report|review-export|bind|run ...` | M3-A F3 三条件双会话入口。零请求模式生成或验证分母、分层报告和空白 Adopt 包；run 复用生产 driver，S1 Victim write 通过后才新建 actual session，并验证版本化 S2 read-from。非 benign 单元要求同 batch benign 的封存结构链和 cleanup 已通过。bind/run 需覆盖唯一 batch 的新授权。 |
 | `python -m stac_attack_lab.cli capability demo --config configs/capability/f1_status_acceptance.json --output experiments/runs/capability/<unique-id>` | 九原语 M0/M1 离线完整闭环；fake transport，零真实请求。 |
 | `python -m stac_attack_lab.cli capability inventory/compile/validate/replay/report ...` | 九原语固定 upstream 核对、确定性编译、密封校验、只读重分析和报告。 |
 | `bash scripts/run_cross_session_revalidation.sh prepare` | 创建唯一、默认禁用真实执行的复验目录，写入新 provenance/configuration review；不访问 provider。成功 0。 |
@@ -30,6 +32,13 @@
 | `python -m stac_attack_lab.cli flow reanalyze ...` | 显式 Primitive v3 离线重分析；校验 collection seal/registry，写新 manifest、效果图、切片、分层准入和报告。 |
 | `python -m stac_attack_lab.cli benign validate/prepare` | 校验正常场景并生成默认禁用快照；零网络请求。 |
 | `python -m stac_attack_lab.cli benign collect-fixture` | 仅运行受版本控制的 synthetic 正常场景，经共用 collector/normalizer 进入 v3；拒绝 live-enabled 配置。 |
+| `bash scripts/capability/14_m3_f3_ai_review.sh prepare|validate|dry-run|status|bind|run|report|import ...` | F3 双判断 AI 审核，复用 M2 有界执行器；新批次默认禁用、3 个 case 各一次请求，独立授权后才可 bind/run。 |
+| `bash scripts/capability/15_m3_f5.sh prepare|validate|status|bind|run|report ...` | F5 正常任务与外部 benign 引用；`prepare OUTPUT --config configs/capability/m3b_f5_external.disabled.json` 生成仅 direct/semantic 的禁用新批，validate/status/report 只读复算历史封存证据，bind/run 需新批明确授权。 |
+| `PYTHONPATH=src python scripts/capability/run_f5_external_local_fake_runtime.py <unique-output>` | 本机 fake provider 经外部 v11 引用、synthetic binding、真实 OpenClaw/bridge/relay、两单元事件落盘与比较报告；无真实模型请求，需本机 Docker/socket。 |
+| `PYTHONPATH=src python scripts/capability/run_f5_local_fake_runtime.py <unique-output>` | 本机 fake provider 经真实 OpenClaw/bridge/relay 验收 F5 三案例；只落盘合成证据，不发真实模型请求。 |
+| `PYTHONPATH=src python scripts/capability/revalidate_f5_local_fake_runtime.py <sealed-run> <unique-output>` | 对封存的 F5 本机集成产物用当前原样 verifier 只读重算，校验 bundle 与输入 hash，并生成新派生验收报告。 |
+
+上述 capability 脚本使用当前环境的 `python`（或显式 `STAC_PYTHON`）。从 `(base)` 终端调用时，使用 `conda run -n stac bash scripts/capability/<脚本> ...`；不要在未设置对应批次授权引用时执行 `bind`/`run`。长输出路径应作为单个 shell 参数传入，避免终端换行拆成第二条命令。
 
 M2 最终本机矩阵 `m2-local-acceptance-20260922-b6da0cd-v3-final` 已通过；查收摘要位于相邻 `m2-final-local-review-20260922-b6da0cd-v1/acceptance_review.json`。唯一新的 `m2-f1-candidate-20260922-b6da0cd-final-v1` 仍为 disabled 且无 execution binding；不要对这些已存在目录重跑 07/08/11，真实 M2 不由本机验收自动授权。完整路径及后续步骤见 [Capability 运行手册](../docs/CAPABILITY_RUNBOOK_ZH.md)。
 
@@ -52,3 +61,4 @@ STAC_PYTHON=.venv/bin/python bash scripts/run_cross_session_revalidation.sh prep
 Attacker/Victim/Embedding 各最多 1 次、自动重试 0、墙钟 300 秒、provider evidence policy
 保持 disabled。后续应先用它执行 `prepare --template ... --run-id <new-unique-id>`，再审查生成的
 config/source hash；本轮不得执行 `live`。
+# F5 prospective repeat preparation: `bash scripts/capability/16_m3_f5_repeats.sh prepare <new-plan-root>` compiles three disabled F5 batches; `validate`, `status <plan-root> <r01|r02|r03>` and `report <plan-root> <new-report.json>` perform no provider requests. `bash scripts/capability/17_stage_summary.sh <new-output.json>` regenerates the F1/F3/F5 sealed-source summary. See `docs/CAPABILITY_RUNBOOK_ZH.md` for the authorized per-group bind/run boundary.

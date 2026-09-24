@@ -141,6 +141,67 @@ def test_bridge_preserves_observed_empty_memory_search_without_claiming_retrieva
     assert observations[0]["result_empty"] is True
 
 
+def test_bridge_upgrades_write_scope_only_after_exact_post_action_snapshot() -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+    content = '{"summary":"approved"}\n'
+    raw = {
+        "session_transcript_raw": "\n".join(
+            json.dumps(item)
+            for item in [
+                {
+                    "id": "write-request",
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "toolCall",
+                                "id": "write-call",
+                                "name": "write",
+                                "arguments": {
+                                    "path": "handoff/summary.json",
+                                    "content": content,
+                                },
+                            }
+                        ],
+                    },
+                },
+                {
+                    "id": "write-result",
+                    "type": "message",
+                    "message": {
+                        "role": "toolResult",
+                        "toolCallId": "write-call",
+                        "toolName": "write",
+                        "content": [{"type": "text", "text": "ok"}],
+                        "isError": False,
+                    },
+                },
+            ]
+        )
+    }
+
+    exact, _ = project(raw, set(), [], {"handoff/summary.json": content})
+    mismatched, _ = project(raw, set(), [], {"handoff/summary.json": "different"})
+    failed_raw = json.loads(json.dumps(raw))
+    failed_rows = [json.loads(line) for line in failed_raw["session_transcript_raw"].splitlines()]
+    failed_rows[1]["message"]["isError"] = True
+    failed_raw["session_transcript_raw"] = "\n".join(json.dumps(item) for item in failed_rows)
+    failed, _ = project(failed_raw, set(), [], {"handoff/summary.json": content})
+
+    assert exact[0]["write_content_hash_scope"] == "complete_file_utf8"
+    assert (
+        exact[0]["write_content_hash"]
+        == __import__("hashlib").sha256(content.encode("utf-8")).hexdigest()
+    )
+    assert exact[0]["write_commit_projection_verified"] is True
+    assert mismatched[0]["write_content_hash_scope"] == "redacted_argument_content_utf8"
+    assert mismatched[0]["write_commit_projection_verified"] is False
+    assert failed[0]["write_content_hash_scope"] == "redacted_argument_content_utf8"
+    assert failed[0]["write_commit_projection_verified"] is False
+
+
 def test_bridge_hashes_full_structured_write_before_excerpt_truncation() -> None:
     bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
     content = "x" * 3000
@@ -491,6 +552,231 @@ def test_tool_result_projects_excerpt_and_preserves_distinct_calls(
         "MEMORY.md:1 cobalt lantern",
         "MEMORY.md:1 sealed envelopes",
     ]
+
+
+def test_rewritten_provider_call_ids_require_unique_projection_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bridge = runpy.run_path(str(ROOT / "integrations/safeclaw/construction_bridge.py"))
+    project = bridge["_structured_tool_observations"]
+
+    def observations(read_ids: list[str]) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for call_id in read_ids:
+            rows.extend(
+                [
+                    {
+                        "id": f"{call_id}-request",
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": call_id,
+                                    "name": "read",
+                                    "arguments": {"path": "notes/handoff-summary.json"},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "id": f"{call_id}-result",
+                        "type": "message",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": call_id,
+                            "toolName": "read",
+                            "content": [{"type": "text", "text": "same-result"}],
+                        },
+                    },
+                ]
+            )
+        rows.append(
+            {
+                "id": "consumer-request",
+                "type": "message",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "toolCall",
+                            "id": "transcript_consumer",
+                            "name": "write",
+                            "arguments": {"path": "reports/status.json", "content": "safe"},
+                        }
+                    ],
+                },
+            }
+        )
+        projected, _ = project(
+            {"session_transcript_raw": "\n".join(json.dumps(item) for item in rows)},
+            set(),
+            [],
+        )
+        return projected
+
+    def apply(read_ids: list[str]) -> list[dict[str, Any]]:
+        projected = observations(read_ids)
+        source_hash = next(
+            item["raw_result_projection_sha256"]
+            for item in projected
+            if item["tool_name"] == "read"
+        )
+        target_hash = next(
+            item["raw_arguments_value_sha256"] for item in projected if item["tool_name"] == "write"
+        )
+        workspace = stable_hash("workspace")
+        session_identity = stable_hash("session")
+        boundary = [
+            {
+                "record_id": "closed",
+                "record_type": "control_context",
+                "control_context_id": "context",
+                "context_state": "closed",
+                "close_state": "completed",
+                "action_id": "action",
+                "actual_session_identity_sha256": session_identity,
+                "workspace_identity_sha256": workspace,
+            },
+            {
+                "record_id": "response",
+                "record_type": "provider_response",
+                "send_state": "response_received",
+                "control_context_id": "context",
+                "action_id": "action",
+                "workspace_identity_sha256": workspace,
+                "request_id": "request",
+                "batch_id": "batch",
+                "logical_session_id": "construction-s2",
+                "response_tool_call_parse_status": "complete",
+                "response_tool_call_mapping_version": "response-transcript-call/1.0",
+                "response_tool_calls": [
+                    {
+                        "tool_call_id": "provider_consumer",
+                        "tool_name": "write",
+                        "arguments_value_sha256": target_hash,
+                    }
+                ],
+                "source_tool_results": [
+                    {
+                        "tool_result_call_id": "provider_read",
+                        "projection_sha256": source_hash,
+                        "projection_complete": True,
+                    }
+                ],
+                "target_tool_arguments": [
+                    {
+                        "target_tool_call_id": "provider_consumer",
+                        "target_tool_name": "write",
+                        "arguments_value_sha256": target_hash,
+                    }
+                ],
+            },
+        ]
+        driver = object.__new__(SafeClawSubprocessVictimDriver)
+        driver.batch_id = "batch"
+        driver._budget = CollectionBudget()
+        driver._started_at = monotonic()
+        driver._last_state = {
+            "memory_content": "",
+            "workspace_file_contents": {},
+            "sim_google_calls": [],
+        }
+        driver._new_session_pending = False
+        driver._event_sequence = 0
+        driver._events = []
+        driver._checkpoints = []
+        driver._workspace_versions = {}
+        driver._boundary_evidence_records = []
+        driver._boundary_evidence_record_ids = set()
+        monkeypatch.setattr(
+            driver,
+            "_send_bridge",
+            lambda _request: {
+                "session": {
+                    "session_id": "construction-s2",
+                    "agent_response": "done",
+                    "actual_session_identity_sha256": session_identity,
+                    "workspace_identity_sha256": workspace,
+                    "tool_observations": projected,
+                    "persistence_reads": [
+                        {
+                            "call_id": item["call_id"],
+                            "classification": "workspace_file_read",
+                            "workspace_relative_path": "notes/handoff-summary.json",
+                            "read_completeness": "complete_content",
+                            "content_hash": item["result_hash"],
+                            "content_hash_scope": "redacted_text_content",
+                            "result_observation": item["result_observation"],
+                            "result_empty": item["result_empty"],
+                            "result_order_valid": item["result_order_valid"],
+                            "request_line_number": item["request_line_number"],
+                            "result_line_number": item["result_line_number"],
+                            "request_evidence_ref": item["request_evidence_ref"],
+                            "result_evidence_ref": item["result_evidence_ref"],
+                        }
+                        for item in projected
+                        if item["tool_name"] == "read"
+                    ],
+                    "provider_usage": {"total_tokens": 1},
+                },
+                "post_state": dict(driver._last_state),
+                "provider_boundary_evidence": boundary,
+            },
+        )
+        step = driver.apply(
+            ConstructionAttackerAction(
+                action_id="action",
+                action_type="deliver_message",
+                delivery_surface="safeclaw_user_message",
+                public_message="continue",
+                rationale_summary="test unique boundary projection binding",
+            )
+        )
+        return step.source_events
+
+    unique_events = apply(["transcript_read"])
+    uniquely_bound = next(
+        event
+        for event in unique_events
+        if event.get("public_payload", {}).get("transcript_tool_call_id") == "transcript_consumer"
+    )
+    assert uniquely_bound["public_payload"]["provider_tool_call_id"] == "provider_consumer"
+    assert uniquely_bound["public_payload"]["provider_call_id_binding"] == (
+        "unique_argument_projection"
+    )
+    assert uniquely_bound["public_payload"]["provider_response_record_id"] == "response"
+    assert uniquely_bound["public_payload"]["provider_response_request_id"] == "request"
+    assert uniquely_bound["public_payload"]["provider_response_tool_call_id"] == (
+        "provider_consumer"
+    )
+    assert uniquely_bound["batch_id"] == "batch"
+    assert uniquely_bound["public_payload"]["artifact_context_evidence"]
+
+    request_boundary = next(
+        event for event in unique_events if event.get("operation") == "provider.request_context"
+    )
+    assert request_boundary["input_artifact_ids"]
+    assert request_boundary["public_payload"]["artifact_context_evidence"]
+    assert request_boundary["public_payload"]["artifact_derivation_candidates"] == []
+    read_state = next(
+        event for event in unique_events if event.get("operation") == "workspace_file_read"
+    )
+    assert request_boundary["input_artifact_ids"] == [
+        read_state["output_artifacts"][0]["artifact_id"]
+    ]
+
+    ambiguous_events = apply(["transcript_read_a", "transcript_read_b"])
+    ambiguous = next(
+        event
+        for event in ambiguous_events
+        if event.get("public_payload", {}).get("transcript_tool_call_id") == "transcript_consumer"
+    )
+    assert ambiguous["public_payload"]["artifact_context_evidence"] == []
+    assert not any(
+        event.get("operation") == "provider.request_context" for event in ambiguous_events
+    )
 
 
 def test_bridge_does_not_treat_unavailable_memory_search_as_retrieval() -> None:

@@ -1,0 +1,23 @@
+{
+  "schema_version": "capability-m3b-f5-config/1.0",
+  "execution_enabled": false,
+  "source_path": "configs/capability/f5_bounded_recovery.json",
+  "template_path": "configs/capability/runtime/f5_bounded_recovery_task.json",
+  "model_id": "ep-20260909180104-hmx9m",
+  "provider_model_env": "SAFECLAW_MODEL",
+  "provider_base_url_env": "SAFECLAW_BASE_URL",
+  "provider_api_key_env": "SAFECLAW_API_KEY",
+  "max_victim_http_attempts": 30,
+  "max_http_per_episode": 10,
+  "automatic_retries": 0,
+  "max_attacker_http_attempts": 0,
+  "max_planner_http_attempts": 0,
+  "max_annotation_http_attempts": 0,
+  "max_embedding_http_attempts": 0,
+  "provider_timeout_seconds": 90,
+  "episode_wallclock_seconds": 1200,
+  "batch_wallclock_seconds": 5400,
+  "max_output_tokens_per_request": 4096,
+  "cash_cost_control": "unimplemented_estimate_only",
+  "notes": "Disabled F5 candidate. Benign acceptance first; no authorization is present."
+}

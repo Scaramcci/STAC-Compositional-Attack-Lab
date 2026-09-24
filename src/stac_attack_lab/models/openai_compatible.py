@@ -48,7 +48,11 @@ class ProviderRequestLedger:
         if not self.batch_id:
             raise ModelCallError("attacker_ledger_batch_id_required")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = self.path.with_suffix(".lock").open("a")
+        lock_path = self.path.with_suffix(".lock")
+        self._lock = lock_path.open("a")
+        os.chmod(lock_path, 0o600)
+        if self.path.exists():
+            os.chmod(self.path, 0o600)
         try:
             fcntl.flock(self._lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             if self.path.exists():
@@ -96,6 +100,7 @@ class ProviderRequestLedger:
                 )
                 stream.flush()
                 os.fsync(stream.fileno())
+            os.chmod(self.path, 0o600)
 
     @staticmethod
     def summary(record: ProviderRequestRecord) -> dict[str, Any]:
@@ -154,6 +159,8 @@ class OpenAICompatibleClient:
         self.last_usage: dict[str, Any] | None = None
         self.last_request_id: str | None = None
         self.last_returned_model: str | None = None
+        self.last_finish_reason: str | None = None
+        self.last_refusal: str | None = None
         self.last_retry_count = 0
         self.request_ledger = request_ledger
         if not 0 <= http_502_retries <= 2:
@@ -177,6 +184,8 @@ class OpenAICompatibleClient:
         timeout: int,
     ) -> BaseModel:
         self.last_returned_model = None
+        self.last_finish_reason = None
+        self.last_refusal = None
         self.last_retry_count = 0
         self.last_upstream_attempts = []
         self.last_raw_response = None
@@ -235,7 +244,13 @@ class OpenAICompatibleClient:
                     self.last_retry_count = max(0, len(current_records) - 1)
             self.last_returned_model = str(data["model"]) if data.get("model") else None
             choices = cast(list[dict[str, Any]], data["choices"])
-            content = cast(str, choices[0]["message"]["content"])
+            choice = choices[0]
+            message = cast(dict[str, Any], choice["message"])
+            content = cast(str, message["content"])
+            finish_reason = choice.get("finish_reason")
+            self.last_finish_reason = str(finish_reason) if finish_reason is not None else None
+            refusal = message.get("refusal")
+            self.last_refusal = str(refusal) if refusal else None
             usage = data.get("usage")
             self.last_usage = dict(usage) if isinstance(usage, dict) else None
             if self.request_ledger is not None and self.request_ledger.records:

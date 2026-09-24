@@ -175,6 +175,7 @@ def _bind_candidate(
     consumer_event: Any,
     candidate: dict[str, Any],
     records: dict[str, dict[str, Any]],
+    require_target_tool_call: bool = True,
 ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     """Resolve one unambiguous open/prepared/attempted/response/close lifecycle."""
     raw_refs = candidate.get("evidence_ref_ids")
@@ -326,14 +327,19 @@ def _bind_candidate(
         return None, _binding_failure("unknown", "provider_trajectory_batch_missing")
     if response.get("batch_id") != expected_batch:
         return None, _binding_failure("failed", "provider_evidence_trajectory_batch_mismatch")
-    candidate_bindings = {
+    candidate_bindings: dict[str, object] = {
         "request_id": request_id,
         "batch_id": response.get("batch_id"),
         "control_context_id": context_id,
         "action_id": response.get("action_id"),
         "source_tool_result_call_id": source_event.public_payload.get("provider_tool_call_id"),
-        "target_tool_call_id": consumer_event.public_payload.get("provider_tool_call_id"),
     }
+    if require_target_tool_call:
+        candidate_bindings["target_tool_call_id"] = consumer_event.public_payload.get(
+            "provider_tool_call_id"
+        )
+    elif consumer_event.public_payload.get("provider_request_id") != request_id:
+        return None, _binding_failure("failed", "provider_request_event_identity_mismatch")
     for field, expected in candidate_bindings.items():
         if not _nonempty(expected):
             return None, _binding_failure("unknown", f"provider_{field}_missing")
@@ -395,12 +401,14 @@ def verify_context_candidate(
         return _binding_failure(
             str(bundle_status.get("state", "unknown")), str(bundle_status.get("reason_code"))
         )
+    request_boundary_consumer = candidate.get("consumer_binding_kind") == "provider_request"
     binding, failure = _bind_candidate(
         trajectory=trajectory,
         source_event=source_event,
         consumer_event=consumer_event,
         candidate=candidate,
         records=records,
+        require_target_tool_call=not request_boundary_consumer,
     )
     if failure:
         return failure

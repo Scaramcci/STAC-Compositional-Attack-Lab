@@ -1,18 +1,25 @@
 from __future__ import annotations
 
 import json
+import runpy
 import subprocess
 from pathlib import Path
 
 from stac_attack_lab.environments.safeclaw.workspace_snapshot import (
     CONTAINER_CAPTURE_SCRIPT,
+    M3_F3_WORKSPACE_ALLOWLIST,
     validate_workspace_snapshot,
 )
 
 
-def _capture(root: Path, stage: str = "initial") -> dict[str, object]:
+def _capture(
+    root: Path, stage: str = "initial", paths: tuple[str, ...] | None = None
+) -> dict[str, object]:
+    command = ["python", "-c", CONTAINER_CAPTURE_SCRIPT, str(root), stage, "test-run"]
+    if paths is not None:
+        command.append(json.dumps(paths))
     result = subprocess.run(
-        ["python", "-c", CONTAINER_CAPTURE_SCRIPT, str(root), stage, "test-run"],
+        command,
         text=True,
         capture_output=True,
         check=True,
@@ -114,3 +121,41 @@ def test_snapshot_stage_and_hash_are_bound() -> None:
     assert contents == {}
     assert "capability_file_observation_integrity_mismatch" in reasons
     assert "capability_file_missing" in reasons
+
+
+def test_f3_allowlist_is_explicit_and_does_not_change_legacy_capture(tmp_path: Path) -> None:
+    _write_fixture(tmp_path)
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "inbox").mkdir()
+    (tmp_path / "notes/handoff-summary.json").write_text('{"clearance":"pending"}')
+    (tmp_path / "inbox/vendor-delivery-note.txt").write_text("synthetic note\n")
+
+    legacy = _capture(tmp_path)
+    assert {item["path"] for item in legacy["files"]} == {
+        "reports/status.json",
+        "trusted/acceptance-ledger.json",
+    }
+
+    f3 = _capture(tmp_path, paths=M3_F3_WORKSPACE_ALLOWLIST)
+    contents, reasons = validate_workspace_snapshot(
+        f3,
+        expected_stage="initial",
+        allowed_paths=M3_F3_WORKSPACE_ALLOWLIST,
+    )
+    assert not reasons
+    assert contents["notes/handoff-summary.json"] == '{"clearance":"pending"}'
+
+
+def test_bridge_selects_extended_paths_only_for_fixed_synthetic_f3_contract() -> None:
+    bridge = runpy.run_path("integrations/safeclaw/construction_bridge.py")
+    select = bridge["_workspace_snapshot_paths"]
+    task = {
+        "metadata": {
+            "task_id": "capability-f3-runtime-001",
+            "category": "cross-session-workspace-continuation",
+            "tags": ["synthetic", "workspace"],
+        }
+    }
+    assert select(task) == M3_F3_WORKSPACE_ALLOWLIST
+    task["metadata"]["task_id"] = "unreviewed-task"
+    assert select(task) != M3_F3_WORKSPACE_ALLOWLIST

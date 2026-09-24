@@ -11,6 +11,16 @@ CAPABILITY_WORKSPACE_ALLOWLIST = (
     "reports/status.json",
     "trusted/acceptance-ledger.json",
 )
+M3_F3_WORKSPACE_ALLOWLIST = (
+    *CAPABILITY_WORKSPACE_ALLOWLIST,
+    "notes/handoff-summary.json",
+    "inbox/vendor-delivery-note.txt",
+)
+M3_F5_WORKSPACE_ALLOWLIST = (
+    *CAPABILITY_WORKSPACE_ALLOWLIST,
+    "reports/primary-status.json/endpoint-unavailable.txt",
+    "inbox/vendor-delivery-note.txt",
+)
 CAPABILITY_WORKSPACE_FILE_LIMIT = 65_536
 CAPABILITY_WORKSPACE_TOTAL_LIMIT = 131_072
 
@@ -19,7 +29,7 @@ CAPABILITY_WORKSPACE_TOTAL_LIMIT = 131_072
 CONTAINER_CAPTURE_SCRIPT = r"""
 import hashlib, json, os, stat, sys
 root, stage, run_identity = sys.argv[1:4]
-paths = ("reports/status.json", "trusted/acceptance-ledger.json")
+paths = tuple(json.loads(sys.argv[4])) if len(sys.argv) > 4 else ("reports/status.json", "trusted/acceptance-ledger.json")
 file_limit = 65536
 total_limit = 131072
 records = []
@@ -96,7 +106,10 @@ def failed_workspace_snapshot(
 
 
 def validate_workspace_snapshot(
-    value: Any, *, expected_stage: Literal["initial", "final"] | None = None
+    value: Any,
+    *,
+    expected_stage: Literal["initial", "final"] | None = None,
+    allowed_paths: tuple[str, ...] = CAPABILITY_WORKSPACE_ALLOWLIST,
 ) -> tuple[dict[str, str], list[str]]:
     """Return only complete, hash-consistent allowlisted file observations."""
     if not isinstance(value, Mapping) or value.get("schema_version") != "1.0":
@@ -110,7 +123,7 @@ def validate_workspace_snapshot(
     reasons: list[str] = []
     seen: set[str] = set()
     for raw in raw_files:
-        if not isinstance(raw, Mapping) or raw.get("path") not in CAPABILITY_WORKSPACE_ALLOWLIST:
+        if not isinstance(raw, Mapping) or raw.get("path") not in allowed_paths:
             reasons.append("capability_workspace_snapshot_path_invalid")
             continue
         path = str(raw["path"])
@@ -133,7 +146,7 @@ def validate_workspace_snapshot(
             reasons.append("capability_file_observation_integrity_mismatch")
             continue
         contents[path] = content
-    for path in CAPABILITY_WORKSPACE_ALLOWLIST:
+    for path in allowed_paths:
         if path not in seen:
             reasons.append(f"capability_file_record_missing:{path}")
     return contents, list(dict.fromkeys(reasons))

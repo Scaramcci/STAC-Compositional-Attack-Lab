@@ -6,6 +6,16 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from stac_attack_lab.capability.ai_review import (
+    ai_review_status,
+    bind_ai_review,
+    dry_run_ai_review,
+    merge_ai_review_runs,
+    prepare_ai_review,
+    report_ai_review,
+    run_ai_review,
+    validate_ai_review,
+)
 from stac_attack_lab.capability.compatibility import (
     bind_compatibility_execution,
     build_compatibility_report,
@@ -29,7 +39,22 @@ from stac_attack_lab.capability.m2 import (
     run_m2_unit,
     validate_m2,
 )
+from stac_attack_lab.capability.m3_f3 import (
+    CONDITIONS,
+    bind_m3_f3_execution,
+    export_m3_f3_review_package,
+    prepare_m3_f3,
+    report_m3_f3,
+    run_m3_f3_unit,
+    status_m3_f3,
+    validate_m3_f3,
+)
 from stac_attack_lab.capability.reporting import build_capability_report
+from stac_attack_lab.capability.review import (
+    analyze_m2_evidence,
+    export_human_review_package,
+    import_human_review_package,
+)
 from stac_attack_lab.capability.runner import replay_episode, run_fake_pipeline
 from stac_attack_lab.env_loader import load_project_env
 from stac_attack_lab.environments.safeclaw.preflight import (
@@ -185,13 +210,23 @@ def _build_parser() -> argparse.ArgumentParser:
     m2_prepare = capability_sub.add_parser("m2-prepare")
     m2_prepare.add_argument("--config", default="configs/capability/m2_f1.disabled.json")
     m2_prepare.add_argument("--output", required=True)
-    for name in ("m2-validate", "m2-report", "m2-annotation-export", "m2-annotation-import"):
+    for name in (
+        "m2-validate",
+        "m2-report",
+        "m2-annotation-export",
+        "m2-annotation-import",
+        "m2-evidence-analyze",
+        "m2-review-export",
+        "m2-review-import",
+    ):
         m2_parser = capability_sub.add_parser(name)
         m2_parser.add_argument("--run-root", required=True)
         if name != "m2-validate":
             m2_parser.add_argument("--output", required=True)
-        if name == "m2-annotation-import":
+        if name in {"m2-annotation-import", "m2-review-import"}:
             m2_parser.add_argument("--input", required=True)
+        if name == "m2-review-import":
+            m2_parser.add_argument("--mapping", required=True)
     m2_bind = capability_sub.add_parser("m2-bind")
     m2_bind.add_argument("--run-root", required=True)
     m2_bind.add_argument("--authorization-reference", required=True)
@@ -200,6 +235,82 @@ def _build_parser() -> argparse.ArgumentParser:
     m2_run.add_argument("--run-root", required=True)
     m2_run.add_argument("--unit", required=True)
     m2_run.add_argument("--authorize-live", action="store_true")
+    ai_prepare = capability_sub.add_parser("m2-ai-review-prepare")
+    ai_prepare.add_argument("--config", default="configs/capability/m2_ai_review.disabled.json")
+    ai_prepare.add_argument("--output", required=True)
+    for name in ("m2-ai-review-validate", "m2-ai-review-dry-run", "m2-ai-review-status"):
+        action = capability_sub.add_parser(name)
+        action.add_argument("--run-root", required=True)
+    ai_bind = capability_sub.add_parser("m2-ai-review-bind")
+    ai_bind.add_argument("--run-root", required=True)
+    ai_bind.add_argument("--authorization-reference", required=True)
+    ai_bind.add_argument("--authorize-live", action="store_true")
+    ai_run = capability_sub.add_parser("m2-ai-review-run")
+    ai_run.add_argument("--run-root", required=True)
+    ai_run.add_argument("--authorize-live", action="store_true")
+    ai_run.add_argument("--resume", action="store_true")
+    ai_report = capability_sub.add_parser("m2-ai-review-report")
+    ai_report.add_argument("--run-root", required=True)
+    ai_report.add_argument("--output", required=True)
+    ai_import = capability_sub.add_parser("m2-ai-review-import")
+    ai_import.add_argument("--run-root", required=True)
+    ai_import.add_argument("--m2-run-root", required=True)
+    ai_import.add_argument("--output", required=True)
+    ai_merge = capability_sub.add_parser("m2-ai-review-merge")
+    ai_merge.add_argument("--base-run", required=True)
+    ai_merge.add_argument("--supplement-run", required=True)
+    ai_merge.add_argument("--output", required=True)
+    f3_ai_import = capability_sub.add_parser("m3-f3-ai-review-import")
+    f3_ai_import.add_argument("--run-root", required=True)
+    f3_ai_import.add_argument("--output", required=True)
+    f3_ai_revalidate = capability_sub.add_parser("m3-f3-ai-review-revalidate")
+    f3_ai_revalidate.add_argument("--run-root", required=True)
+    f3_ai_revalidate.add_argument("--output", required=True)
+    m3_prepare = capability_sub.add_parser("m3-f3-prepare")
+    m3_prepare.add_argument("--config", default="configs/capability/m3a_f3.disabled.json")
+    m3_prepare.add_argument("--output", required=True)
+    for name in ("m3-f3-validate", "m3-f3-status"):
+        action = capability_sub.add_parser(name)
+        action.add_argument("--run-root", required=True)
+    m3_report = capability_sub.add_parser("m3-f3-report")
+    m3_report.add_argument("--run-root", required=True)
+    m3_report.add_argument("--output", required=True)
+    m3_review = capability_sub.add_parser("m3-f3-review-export")
+    m3_review.add_argument("--run-root", required=True)
+    m3_review.add_argument("--output", required=True)
+    m3_review.add_argument("--prompt", default="prompts/review/m3_f3_adopt_v1.md")
+    m3_bind = capability_sub.add_parser("m3-f3-bind")
+    m3_bind.add_argument("--run-root", required=True)
+    m3_bind.add_argument("--authorization-reference", required=True)
+    m3_bind.add_argument("--authorize-live", action="store_true")
+    m3_run = capability_sub.add_parser("m3-f3-run-unit")
+    m3_run.add_argument("--run-root", required=True)
+    m3_run.add_argument("--unit", choices=CONDITIONS, required=True)
+    m3_run.add_argument("--authorize-live", action="store_true")
+    f5_prepare = capability_sub.add_parser("m3-f5-prepare")
+    f5_prepare.add_argument("--config", default="configs/capability/m3b_f5.disabled.json")
+    f5_prepare.add_argument("--output", required=True)
+    for name in ("m3-f5-validate", "m3-f5-status"):
+        action = capability_sub.add_parser(name)
+        action.add_argument("--run-root", required=True)
+    f5_bind = capability_sub.add_parser("m3-f5-bind")
+    f5_bind.add_argument("--run-root", required=True)
+    f5_bind.add_argument("--authorization-reference", required=True)
+    f5_bind.add_argument(
+        "--allowed-unit", choices=("benign", "direct", "semantic"), action="append"
+    )
+    f5_bind.add_argument("--max-victim-http-attempts", type=int, default=10)
+    f5_bind.add_argument("--authorize-live", action="store_true")
+    f5_run = capability_sub.add_parser("m3-f5-run-unit")
+    f5_run.add_argument("--run-root", required=True)
+    f5_run.add_argument("--unit", choices=("benign", "direct", "semantic"), required=True)
+    f5_run.add_argument("--authorize-live", action="store_true")
+    f5_report = capability_sub.add_parser("m3-f5-report")
+    f5_report.add_argument("--run-root", required=True)
+    f5_report.add_argument("--output", required=True)
+    f5_reanalysis = capability_sub.add_parser("m3-f5-reanalyze")
+    f5_reanalysis.add_argument("--run-root", required=True)
+    f5_reanalysis.add_argument("--output", required=True)
 
     benign = sub.add_parser("benign", help="benign pre-evaluation collection")
     benign_sub = benign.add_subparsers(dest="benign_command", required=True)
@@ -318,6 +429,77 @@ def _main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "capability":
+        if args.capability_command == "m3-f3-prepare":
+            print(
+                prepare_m3_f3(
+                    root,
+                    _project_scoped_path(root, args.config),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-validate":
+            print(
+                json.dumps(
+                    validate_m3_f3(_project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-status":
+            print(
+                json.dumps(
+                    status_m3_f3(_project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-report":
+            print(
+                json.dumps(
+                    report_m3_f3(
+                        _project_scoped_path(root, args.run_root),
+                        _project_scoped_path(root, args.output),
+                    ),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-review-export":
+            print(
+                export_m3_f3_review_package(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                    _project_scoped_path(root, args.prompt),
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-bind":
+            if not args.authorize_live:
+                raise ValueError("m3_f3_execution_authorization_missing")
+            print(
+                bind_m3_f3_execution(
+                    _project_scoped_path(root, args.run_root), args.authorization_reference
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-run-unit":
+            m3_result = run_m3_f3_unit(
+                root,
+                _project_scoped_path(root, args.run_root),
+                args.unit,
+                authorized=args.authorize_live,
+            )
+            print(json.dumps(m3_result, indent=2, sort_keys=True))
+            structural = m3_result.get("evidence", {}).get("structural_chain", {}).get("state")
+            return (
+                0
+                if m3_result.get("execution_status") == "completed" and structural == "observed"
+                else 10
+            )
         if args.capability_command == "m2-prepare":
             print(
                 prepare_m2(
@@ -363,6 +545,32 @@ def _main(argv: list[str] | None = None) -> int:
                 )
             )
             return 0
+        if args.capability_command == "m2-evidence-analyze":
+            print(
+                analyze_m2_evidence(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-review-export":
+            print(
+                export_human_review_package(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-review-import":
+            print(
+                import_human_review_package(
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.input),
+                    _project_scoped_path(root, args.mapping),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
         if args.capability_command == "m2-bind":
             if not args.authorize_live:
                 raise ValueError("m2_execution_authorization_missing")
@@ -381,9 +589,174 @@ def _main(argv: list[str] | None = None) -> int:
             )
             print(result.model_dump_json(indent=2))
             return 0 if result.execution_status == "completed" else 10
+        if args.capability_command.startswith("m3-f5-"):
+            from stac_attack_lab.capability.m3_f5 import (
+                bind_m3_f5,
+                prepare_m3_f5,
+                reanalyze_m3_f5,
+                report_m3_f5,
+                run_m3_f5_unit,
+                status_m3_f5,
+                validate_m3_f5,
+            )
+
+            command = args.capability_command
+            if command == "m3-f5-prepare":
+                print(
+                    prepare_m3_f5(
+                        root,
+                        _project_scoped_path(root, args.config),
+                        _project_scoped_path(root, args.output),
+                    )
+                )
+                return 0
+            run_root = _project_scoped_path(root, args.run_root)
+            if command == "m3-f5-validate":
+                print(json.dumps(validate_m3_f5(root, run_root), indent=2, sort_keys=True))
+                return 0
+            if command == "m3-f5-status":
+                print(json.dumps(status_m3_f5(root, run_root), indent=2, sort_keys=True))
+                return 0
+            if command == "m3-f5-bind":
+                if not args.authorize_live:
+                    raise ValueError("m3_f5_execution_authorization_missing")
+                print(
+                    bind_m3_f5(
+                        root,
+                        run_root,
+                        args.authorization_reference,
+                        allowed_units=tuple(args.allowed_unit or ["benign"]),
+                        max_victim_http_attempts=args.max_victim_http_attempts,
+                    )
+                )
+                return 0
+            if command == "m3-f5-run-unit":
+                f5_result = run_m3_f5_unit(
+                    root, run_root, args.unit, authorized=args.authorize_live
+                )
+                print(json.dumps(f5_result, indent=2, sort_keys=True))
+                return 0 if f5_result["execution_status"] == "completed" else 10
+            if command == "m3-f5-report":
+                print(report_m3_f5(root, run_root, _project_scoped_path(root, args.output)))
+                return 0
+            if command == "m3-f5-reanalyze":
+                print(reanalyze_m3_f5(root, run_root, _project_scoped_path(root, args.output)))
+                return 0
         if args.capability_command == "inventory":
             report = inventory_upstream(_project_scoped_path(root, args.upstream))
             print(json.dumps(report, indent=2, sort_keys=True))
+            return 0
+        if args.capability_command == "m2-ai-review-prepare":
+            print(
+                prepare_ai_review(
+                    root,
+                    _project_scoped_path(root, args.config),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-validate":
+            print(
+                json.dumps(
+                    validate_ai_review(root, _project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-dry-run":
+            print(
+                json.dumps(
+                    dry_run_ai_review(root, _project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-bind":
+            if not args.authorize_live:
+                raise ValueError("m2_ai_review_execution_authorization_missing")
+            print(
+                bind_ai_review(
+                    root,
+                    _project_scoped_path(root, args.run_root),
+                    args.authorization_reference,
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-run":
+            ai_root = _project_scoped_path(root, args.run_root)
+            ai_form_path = run_ai_review(
+                root,
+                ai_root,
+                authorized=args.authorize_live,
+                resume=args.resume,
+            )
+            print(ai_form_path)
+            summary = json.loads((ai_root / "summary.json").read_text(encoding="utf-8"))
+            return 0 if summary["ai_review_completed"] else 10
+        if args.capability_command == "m2-ai-review-status":
+            print(
+                json.dumps(
+                    ai_review_status(root, _project_scoped_path(root, args.run_root)),
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-report":
+            print(
+                report_ai_review(
+                    root,
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-import":
+            ai_root = _project_scoped_path(root, args.run_root)
+            config = json.loads((ai_root / "config.snapshot.json").read_text())
+            package = _project_scoped_path(root, config["review_package"])
+            print(
+                import_human_review_package(
+                    _project_scoped_path(root, args.m2_run_root),
+                    ai_root / "review_form.ai.json",
+                    package / "researcher/review_mapping.json",
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m2-ai-review-merge":
+            print(
+                merge_ai_review_runs(
+                    root,
+                    _project_scoped_path(root, args.base_run),
+                    _project_scoped_path(root, args.supplement_run),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-ai-review-import":
+            from stac_attack_lab.capability.ai_review import import_f3_ai_review
+
+            print(
+                import_f3_ai_review(
+                    root,
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
+            return 0
+        if args.capability_command == "m3-f3-ai-review-revalidate":
+            from stac_attack_lab.capability.ai_review import revalidate_f3_ai_review
+
+            print(
+                revalidate_f3_ai_review(
+                    root,
+                    _project_scoped_path(root, args.run_root),
+                    _project_scoped_path(root, args.output),
+                )
+            )
             return 0
         if args.capability_command == "compile":
             compiled_path = compile_cases(

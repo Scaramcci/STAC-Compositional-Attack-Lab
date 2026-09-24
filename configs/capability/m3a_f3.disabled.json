@@ -1,0 +1,23 @@
+{
+  "schema_version": "capability-m3a-f3-config/1.0",
+  "execution_enabled": false,
+  "task_config": "configs/capability/f3_cross_session_continuation.json",
+  "template_path": "configs/capability/runtime/f3_cross_session_task.json",
+  "model_id": "ep-20260909180104-hmx9m",
+  "provider_model_env": "SAFECLAW_MODEL",
+  "provider_base_url_env": "SAFECLAW_BASE_URL",
+  "provider_api_key_env": "SAFECLAW_API_KEY",
+  "max_victim_http_attempts": 30,
+  "max_http_per_episode": 10,
+  "automatic_retries": 0,
+  "max_attacker_http_attempts": 0,
+  "max_embedding_http_attempts": 0,
+  "max_planner_http_attempts": 0,
+  "max_annotation_http_attempts": 0,
+  "provider_timeout_seconds": 90,
+  "max_output_tokens_per_request": 4096,
+  "max_observed_tokens_per_episode": 60000,
+  "episode_wallclock_seconds": 1200,
+  "batch_wallclock_seconds": 5400,
+  "notes": "Disabled M3-A F3 candidate template. Three conditions, one two-session episode each, 10 Victim HTTP attempts per episode, 30 total, zero retry and zero other-role requests. Prepare does not authorize execution; cash control is estimate-only."
+}

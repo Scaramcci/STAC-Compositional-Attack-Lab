@@ -32,8 +32,11 @@ from stac_attack_lab.environments.safeclaw.provider_relay import (
 )
 from stac_attack_lab.environments.safeclaw.redaction import redact_value
 from stac_attack_lab.environments.safeclaw.workspace_snapshot import (
+    CAPABILITY_WORKSPACE_ALLOWLIST,
     CAPABILITY_WORKSPACE_SNAPSHOT_FIELD,
     CONTAINER_CAPTURE_SCRIPT,
+    M3_F3_WORKSPACE_ALLOWLIST,
+    M3_F5_WORKSPACE_ALLOWLIST,
     failed_workspace_snapshot,
 )
 
@@ -147,6 +150,7 @@ def _capture_capability_workspace_snapshot(
     *,
     stage: str,
     run_identity: str,
+    allowed_paths: tuple[str, ...] = CAPABILITY_WORKSPACE_ALLOWLIST,
     timeout_seconds: int = 5,
 ) -> dict[str, Any]:
     if stage not in {"initial", "final"}:
@@ -161,6 +165,7 @@ def _capture_capability_workspace_snapshot(
         str(judge.WORKSPACE),
         stage,
         run_identity,
+        json.dumps(allowed_paths, separators=(",", ":")),
     ]
     try:
         completed = subprocess.run(
@@ -197,6 +202,31 @@ def _capture_capability_workspace_snapshot(
         )
     value["container_identity_sha256"] = _session_identity(str(judge.CONTAINER))
     return value
+
+
+def _workspace_snapshot_paths(task: Any) -> tuple[str, ...]:
+    """Select the fixed capture contract without accepting task-supplied paths."""
+    if not isinstance(task, dict):
+        return CAPABILITY_WORKSPACE_ALLOWLIST
+    metadata = task.get("metadata")
+    if not isinstance(metadata, dict):
+        return CAPABILITY_WORKSPACE_ALLOWLIST
+    tags = metadata.get("tags")
+    if (
+        metadata.get("task_id") == "capability-f3-runtime-001"
+        and metadata.get("category") == "cross-session-workspace-continuation"
+        and isinstance(tags, list)
+        and "synthetic" in tags
+    ):
+        return M3_F3_WORKSPACE_ALLOWLIST
+    if (
+        metadata.get("task_id") == "capability-f5-runtime-001"
+        and metadata.get("category") == "bounded-recovery-workspace"
+        and isinstance(tags, list)
+        and "synthetic" in tags
+    ):
+        return M3_F5_WORKSPACE_ALLOWLIST
+    return CAPABILITY_WORKSPACE_ALLOWLIST
 
 
 def _nonnegative_int(value: Any) -> int | None:
@@ -306,6 +336,16 @@ def _structured_tool_observations(
                     "write_content_hash_scope": (
                         "redacted_argument_content_utf8" if tool_name == "write" else None
                     ),
+                    # Used only inside this projection function to compare the
+                    # requested bytes with the independently captured
+                    # post-action workspace. It is never emitted.
+                    "_write_content_text": (
+                        sanitized_arguments.get("content")
+                        if tool_name == "write"
+                        and isinstance(sanitized_arguments, dict)
+                        and isinstance(sanitized_arguments.get("content"), str)
+                        else None
+                    ),
                     "request_line_number": line_number,
                     "request_evidence_ref": f"openclaw-session-entry:{entry_id}",
                     # No producer for this non-pinned field exists in the current
@@ -318,7 +358,13 @@ def _structured_tool_observations(
                 continue
             raw_result_text = _text_content(content)
             result_text = str(redact_value(raw_result_text, exact_secrets or []).sanitized)
-            is_error = bool(message.get("isError"))
+            # OpenClaw can preserve a structured filesystem error while leaving
+            # the transport boolean unset. Keep that error observable at the
+            # common bridge boundary; ordinary text containing "error" remains
+            # a successful result unless the provider marks it structurally.
+            is_error = bool(
+                message.get("isError") or message.get("error") or message.get("result_error")
+            )
             lowered = result_text.lower()
             parsed_result: Any = None
             with contextlib.suppress(json.JSONDecodeError):
@@ -364,6 +410,19 @@ def _structured_tool_observations(
                 "result_evidence_ref": f"openclaw-session-entry:{entry_id}",
                 "_exact_match_text": result_text,
             }
+    successful_writes_by_path: dict[str, int] = {}
+    for call_id, call in calls.items():
+        result = results.get(call_id)
+        path = call.get("workspace_relative_path")
+        if (
+            call.get("tool_name") == "write"
+            and isinstance(path, str)
+            and path
+            and result is not None
+            and result.get("result_observation") == "observed"
+            and int(result.get("result_line_number", 0)) > int(call.get("request_line_number", 0))
+        ):
+            successful_writes_by_path[path] = successful_writes_by_path.get(path, 0) + 1
     projected = []
     for call_id, call in sorted(
         calls.items(), key=lambda item: (item[1].get("request_line_number", 0), item[0])
@@ -412,6 +471,21 @@ def _structured_tool_observations(
         }
         path = call.get("workspace_relative_path")
         expected = (workspace_exact_contents or {}).get(str(path))
+        write_commit_projection_verified = False
+        if (
+            call.get("tool_name") == "write"
+            and result is not None
+            and result.get("result_observation") == "observed"
+            and call.get("arguments_redaction_changed") is False
+            and isinstance(expected, str)
+            and call.get("_write_content_text") == expected
+            and successful_writes_by_path.get(str(path)) == 1
+        ):
+            item["write_content_hash"] = hashlib.sha256(expected.encode("utf-8")).hexdigest()
+            item["write_content_hash_scope"] = "complete_file_utf8"
+            write_commit_projection_verified = True
+        if call.get("tool_name") == "write":
+            item["write_commit_projection_verified"] = write_commit_projection_verified
         if (
             call.get("tool_name") == "read"
             and result is not None
@@ -563,6 +637,11 @@ def main() -> int:
     upstream = Path(args.upstream).resolve()
     task_path = Path(args.task).resolve()
     task = json.loads(task_path.read_text(encoding="utf-8"))
+    workspace_snapshot_paths = _workspace_snapshot_paths(task)
+    action_workspace_capture = workspace_snapshot_paths in {
+        M3_F3_WORKSPACE_ALLOWLIST,
+        M3_F5_WORKSPACE_ALLOWLIST,
+    }
     model_runtime = json.loads(Path(args.model_config).read_text(encoding="utf-8"))
     run_identity = str(model_runtime.get("batch_id") or "unbound")
     exact_secrets = [
@@ -629,7 +708,10 @@ def main() -> int:
             phase = "capture_pre_state"
             runner.pre_state = runner.capture_pre_state()
             initial_snapshot = _capture_capability_workspace_snapshot(
-                judge, stage="initial", run_identity=run_identity
+                judge,
+                stage="initial",
+                run_identity=run_identity,
+                allowed_paths=workspace_snapshot_paths,
             )
             initial_exact_contents = {
                 str(item["path"]): str(item["content"])
@@ -672,7 +754,10 @@ def main() -> int:
                 with contextlib.redirect_stdout(sys.stderr):
                     post_state = runner.capture_post_state()
                     final_snapshot = _capture_capability_workspace_snapshot(
-                        judge, stage="final", run_identity=run_identity
+                        judge,
+                        stage="final",
+                        run_identity=run_identity,
+                        allowed_paths=workspace_snapshot_paths,
                     )
                 _emit(
                     {
@@ -723,7 +808,19 @@ def main() -> int:
                         shared_session_key=current_key,
                     )
                     raw_post_state = runner.capture_post_state()
-                    public_post_state = _observable_state(raw_post_state, exact_secrets)
+                    action_snapshot = (
+                        _capture_capability_workspace_snapshot(
+                            judge,
+                            stage="final",
+                            run_identity=run_identity,
+                            allowed_paths=workspace_snapshot_paths,
+                        )
+                        if action_workspace_capture
+                        else None
+                    )
+                    public_post_state = _observable_state(
+                        raw_post_state, exact_secrets, action_snapshot
+                    )
                 except Exception:
                     if relay is not None and evidence_context is not None:
                         relay.close_evidence_context(
@@ -761,7 +858,16 @@ def main() -> int:
                 raw_post_state,
                 seen_transcript_entry_ids,
                 exact_secrets,
-                initial_exact_contents,
+                {
+                    str(item["path"]): str(item["content"])
+                    for item in (action_snapshot or initial_snapshot).get("files", [])
+                    if isinstance(item, dict)
+                    and item.get("status") == "observed"
+                    and isinstance(item.get("path"), str)
+                    and isinstance(item.get("content"), str)
+                }
+                if action_workspace_capture
+                else initial_exact_contents,
             )
             seen_transcript_entry_ids.update(newly_seen)
             classification = _classify_response(
@@ -865,6 +971,8 @@ def main() -> int:
                     or item.get("result_hash"),
                     "content_hash_scope": item.get("complete_file_content_hash_scope")
                     or item.get("result_hash_scope"),
+                    "raw_result_projection_sha256": item.get("raw_result_projection_sha256"),
+                    "result_redaction_changed": item.get("result_redaction_changed"),
                     "result_observation": item.get("result_observation"),
                     "result_empty": bool(item.get("result_empty")),
                     "result_order_valid": bool(item.get("result_order_valid")),
@@ -883,6 +991,9 @@ def main() -> int:
                     "workspace_relative_path": item.get("workspace_relative_path"),
                     "content_hash": item.get("write_content_hash"),
                     "content_hash_scope": item.get("write_content_hash_scope"),
+                    "commit_projection_verified": item.get(
+                        "write_commit_projection_verified", False
+                    ),
                     "result_observation": item.get("result_observation"),
                     "result_order_valid": bool(item.get("result_order_valid")),
                     "request_line_number": item.get("request_line_number"),
@@ -953,7 +1064,10 @@ def main() -> int:
             with contextlib.suppress(Exception), contextlib.redirect_stdout(sys.stderr):
                 partial_raw = runner.capture_post_state()
                 partial_snapshot = _capture_capability_workspace_snapshot(
-                    judge, stage="final", run_identity=run_identity
+                    judge,
+                    stage="final",
+                    run_identity=run_identity,
+                    allowed_paths=workspace_snapshot_paths,
                 )
                 error_payload["partial_state"] = _observable_state(
                     partial_raw, exact_secrets, partial_snapshot

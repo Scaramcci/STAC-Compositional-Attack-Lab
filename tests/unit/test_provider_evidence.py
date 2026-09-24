@@ -269,6 +269,45 @@ def test_context_and_derivation_recompute_valid_fixture() -> None:
     assert _verify(fixture, derivation=True)["state"] == "observed"
 
 
+def test_context_recomputes_request_boundary_without_derivation_target() -> None:
+    trajectory, artifact, source, consumer, candidate, records = _fixture()
+    consumer.public_payload.pop("provider_tool_call_id")
+    consumer.public_payload["provider_request_id"] = "request-1"
+    candidate = {
+        key: value
+        for key, value in candidate.items()
+        if key not in {"target_tool_call_id", "target_tool_name", "target_json_pointer", "rule_id"}
+    }
+    candidate["consumer_binding_kind"] = "provider_request"
+    _refresh_refs(candidate, consumer, records)
+
+    result = verify_context_candidate(
+        trajectory=trajectory,
+        source_artifact=artifact,
+        source_event=source,
+        consumer_event=consumer,
+        candidate=candidate,
+        records=records,
+        bundle_status={"state": "observed", "reason_code": "test_bundle"},
+    )
+
+    assert result["state"] == "observed"
+    assert result["reason_code"] == "provider_request_context_recomputed"
+
+    consumer.public_payload["provider_request_id"] = "different-request"
+    mismatch = verify_context_candidate(
+        trajectory=trajectory,
+        source_artifact=artifact,
+        source_event=source,
+        consumer_event=consumer,
+        candidate=candidate,
+        records=records,
+        bundle_status={"state": "observed", "reason_code": "test_bundle"},
+    )
+    assert mismatch["state"] == "failed"
+    assert mismatch["reason_code"] == "provider_request_event_identity_mismatch"
+
+
 def test_verified_provider_results_adapt_to_port_scoped_v3_claims() -> None:
     trajectory, artifact, source, consumer, candidate, records = _fixture()
     claims, evidence = verify_and_adapt_provider_claims(

@@ -706,7 +706,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
                         "role": "assistant",
                         "tool_calls": [
                             {
-                                "id": "u",
+                                "id": "provider_u",
                                 "type": "function",
                                 "function": {
                                     "name": "exec",
@@ -752,7 +752,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
                             {"role": "user", "content": "read"},
                             {
                                 "role": "tool",
-                                "tool_call_id": "r",
+                                "tool_call_id": "provider_r",
                                 "content": "CONTROLLED_CANARY",
                             },
                         ],
@@ -820,7 +820,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
     use_event = next(
         event
         for event in events
-        if event.get("public_payload", {}).get("provider_tool_call_id") == "u"
+        if event.get("public_payload", {}).get("provider_tool_call_id") == "provider_u"
     )
     assert use_event["public_payload"]["artifact_use_evidence"] == []
     assert use_event["public_payload"]["artifact_derivation_candidates"]
@@ -878,7 +878,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
                 }
             }
         )
-        if event.public_payload.get("provider_tool_call_id") == "u"
+        if event.public_payload.get("provider_tool_call_id") == "provider_u"
         else event
         for event in graph.events
     ]
@@ -903,7 +903,7 @@ def test_bridge_driver_normalizer_admission_file_chain(
         next(
             event
             for event in graph.events
-            if event.public_payload.get("provider_tool_call_id") == "u"
+            if event.public_payload.get("provider_tool_call_id") == "provider_u"
         ).sequence_no
         > next(
             event for event in graph.events if event.operation == "workspace_file_read"

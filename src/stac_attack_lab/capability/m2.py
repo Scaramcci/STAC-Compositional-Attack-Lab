@@ -972,7 +972,11 @@ def report_m2(root: Path, output: Path) -> dict[str, Any]:
 
 
 def export_annotation_review(root: Path, output: Path) -> Path:
-    """Blind, unscored review form. No variant, guard, oracle, or answer is exported."""
+    """Export the legacy v1 form.
+
+    This format omits explicit condition fields but its evidence paths identify the unit.
+    Use ``m2-review-export`` for the de-identified v2 reviewer package.
+    """
     manifest = validate_m2(root)
     rows = [
         {

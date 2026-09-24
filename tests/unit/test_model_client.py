@@ -108,6 +108,15 @@ def test_provider_request_ledger_counts_boundary_and_hard_limits(monkeypatch: An
     assert calls == 1
 
 
+def test_provider_request_ledger_files_are_private(tmp_path: Path) -> None:
+    path = tmp_path / "attempts.jsonl"
+    ledger = ProviderRequestLedger(max_requests=1, path=path, batch_id="private-batch")
+    ledger.begin("https://example.test/v1/chat/completions", {"model": "m"})
+    ledger.close()
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert path.with_suffix(".lock").stat().st_mode & 0o777 == 0o600
+
+
 def test_construction_schema_and_failed_attempt_share_http_cap(monkeypatch: Any) -> None:
     import json
 

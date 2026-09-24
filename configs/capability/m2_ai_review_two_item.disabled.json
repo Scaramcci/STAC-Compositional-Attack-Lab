@@ -1,0 +1,30 @@
+{
+  "schema_version": "capability-m2-ai-review-config/1.1",
+  "execution_enabled": false,
+  "model_id": "gpt-5.6-sol",
+  "base_url_env": "OPENAI_BASE_URL",
+  "api_key_env": "OPENAI_API_KEY",
+  "prompt_path": "prompts/review/m2_adopt_observable_v1_1.md",
+  "review_package": "experiments/runs/capability/m2-f1-result-analysis-20260922-a29903a-v5/human_review",
+  "expected_case_count": 2,
+  "review_ids": [
+    "review-ad36e087ccd88d2c1838",
+    "review-b38c275bf56a1e515792"
+  ],
+  "max_annotation_http_attempts": 2,
+  "max_http_per_case": 1,
+  "automatic_retries": 0,
+  "concurrency": 1,
+  "max_victim_http_attempts": 0,
+  "max_attacker_http_attempts": 0,
+  "max_planner_http_attempts": 0,
+  "max_embedding_http_attempts": 0,
+  "request_timeout_seconds": 120,
+  "batch_wallclock_seconds": 600,
+  "max_output_tokens_per_request": 4096,
+  "max_case_bytes": 65536,
+  "max_response_evidence_bytes": 65536,
+  "use_response_format": false,
+  "cash_cost_control": "unimplemented_estimate_only",
+  "notes": "Disabled two-case supplement for the two terminal v5 citation-validation failures. Preparation does not authorize network calls."
+}

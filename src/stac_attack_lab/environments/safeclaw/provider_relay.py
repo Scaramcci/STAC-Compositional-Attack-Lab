@@ -252,6 +252,65 @@ def _request_tool_result_projections(
     return projections, unsupported
 
 
+def request_context_shape(payload: dict[str, Any]) -> dict[str, Any]:
+    """Project request structure without retaining arbitrary message content.
+
+    This can rule out transcript messages at an observed request boundary.  It
+    deliberately cannot rule out provider- or gateway-side hidden injection.
+    """
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return {
+            "observation_status": "unsupported",
+            "reason_code": "request_messages_not_list",
+        }
+    counts = {role: 0 for role in ("system", "developer", "user", "assistant", "tool", "other")}
+    content_projections: list[dict[str, Any]] = []
+    last_user_sha256: str | None = None
+    last_user_kind: str | None = None
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            counts["other"] += 1
+            content_projections.append(
+                {"message_index": index, "role": "other", "content_kind": "unsupported"}
+            )
+            continue
+        role = message.get("role")
+        normalized = role if role in counts and role != "other" else "other"
+        counts[normalized] += 1
+        content = message.get("content")
+        if isinstance(content, str):
+            kind = "string"
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        elif isinstance(content, list):
+            kind = "content_blocks"
+            digest = hashlib.sha256(_canonical_bytes(content)).hexdigest()
+        else:
+            kind = "unsupported"
+            digest = None
+        projection = {
+            "message_index": index,
+            "role": normalized,
+            "content_kind": kind,
+            "content_sha256": digest,
+            "hash_scope": "exact_utf8_message_content" if kind == "string" else "canonical_json",
+        }
+        content_projections.append(projection)
+        if role == "user":
+            last_user_kind = kind
+            last_user_sha256 = digest
+    return {
+        "observation_status": "observed",
+        "reason_code": "request_message_structure_projected",
+        "message_count": len(messages),
+        "role_counts": counts,
+        "message_content_projections": content_projections,
+        "last_user_content_kind": last_user_kind,
+        "last_user_content_sha256": last_user_sha256,
+        "content_retained": False,
+    }
+
+
 def _sse_data_events(text: str) -> list[str]:
     """Return JSON SSE payloads, including Ark's consecutive data-line form.
 
@@ -950,6 +1009,7 @@ class _RelayHandler(BaseHTTPRequestHandler):
             "request_sha256": hashlib.sha256(encoded).hexdigest(),
             "source_tool_results": source_projections,
             "unsupported_source_projections": source_unsupported,
+            "request_context_shape": request_context_shape(payload),
             "rule_id": config.derivation_policy.get("rule_id"),
             "policy_enabled": config.derivation_policy.get("enabled") is True,
             "policy_id": config.derivation_policy["policy_id"],
@@ -1017,6 +1077,35 @@ class _RelayHandler(BaseHTTPRequestHandler):
         guard_decision = None
         if response_received:
             parsed_calls, parse_status = _response_tool_calls(body, content_type)
+            response_call_projections: list[dict[str, str]] = []
+            if parse_status == "complete":
+                for call in parsed_calls:
+                    function = call.get("function")
+                    if not isinstance(function, dict) or not isinstance(function.get("name"), str):
+                        parse_status = "response_tool_function_invalid"
+                        break
+                    try:
+                        arguments = json.loads(function.get("arguments", ""))
+                    except (TypeError, json.JSONDecodeError):
+                        parse_status = "response_tool_arguments_invalid"
+                        break
+                    response_call_projections.append(
+                        {
+                            "tool_call_id": call["id"],
+                            "tool_name": function["name"],
+                            "arguments_value_sha256": hashlib.sha256(
+                                json.dumps(
+                                    arguments,
+                                    sort_keys=True,
+                                    separators=(",", ":"),
+                                    ensure_ascii=False,
+                                    default=str,
+                                ).encode("utf-8")
+                            ).hexdigest(),
+                        }
+                    )
+            if parse_status != "complete":
+                response_call_projections = []
             if parse_status == "complete":
                 guard_decision = evaluate_tool_calls_precommit(
                     parsed_calls, config.precommit_guard_policy
@@ -1035,6 +1124,9 @@ class _RelayHandler(BaseHTTPRequestHandler):
                         "http_status": status,
                         "response_sha256": hashlib.sha256(body).hexdigest(),
                         "response_content_type": content_type,
+                        "response_tool_call_mapping_version": "response-transcript-call/1.0",
+                        "response_tool_call_parse_status": parse_status,
+                        "response_tool_calls": response_call_projections,
                         "target_tool_arguments": target_projections,
                         "unsupported_target_projections": target_unsupported,
                         "precommit_guard": (
