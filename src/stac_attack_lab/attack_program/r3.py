@@ -10,7 +10,8 @@ from typing import Any, Protocol
 from pydantic import ValidationError
 
 from stac_attack_lab.attack_program import demo_r2
-from stac_attack_lab.attack_program.development import _new, _read_json, _write, audit_library
+from stac_attack_lab.attack_program.development import _new, _read_json, audit_library
+from stac_attack_lab.attack_program.file_io import write_json_exclusive as _write
 from stac_attack_lab.attack_program.models import (
     Arm,
     AttackCandidate,
@@ -140,6 +141,7 @@ class ProductionPlannerTransport:
 def _sources(root: Path) -> dict[str, str]:
     names = [
         "src/stac_attack_lab/attack_program/r3.py",
+        "src/stac_attack_lab/attack_program/file_io.py",
         "src/stac_attack_lab/attack_program/models.py",
         "src/stac_attack_lab/attack_program/observation.py",
         "src/stac_attack_lab/attack_program/pipeline.py",

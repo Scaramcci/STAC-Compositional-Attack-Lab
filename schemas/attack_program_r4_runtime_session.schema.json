@@ -1,0 +1,112 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "issued_session_key": {
+      "title": "Issued Session Key",
+      "type": "string"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Role"
+    },
+    "user_instruction": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "User Instruction"
+    },
+    "agent_response": {
+      "title": "Agent Response",
+      "type": "string"
+    },
+    "tool_calls": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Tool Calls",
+      "type": "array"
+    },
+    "raw_api_response": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Raw Api Response"
+    },
+    "transcript_entries": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Transcript Entries",
+      "type": "array"
+    },
+    "memory_before": {
+      "title": "Memory Before",
+      "type": "string"
+    },
+    "memory_after": {
+      "title": "Memory After",
+      "type": "string"
+    },
+    "memory_before_version": {
+      "title": "Memory Before Version",
+      "type": "string"
+    },
+    "memory_after_version": {
+      "title": "Memory After Version",
+      "type": "string"
+    },
+    "preconditions_satisfied": {
+      "default": true,
+      "title": "Preconditions Satisfied",
+      "type": "boolean"
+    },
+    "provider_attempts_before": {
+      "default": 0,
+      "title": "Provider Attempts Before",
+      "type": "integer"
+    },
+    "provider_attempts_after": {
+      "default": 0,
+      "title": "Provider Attempts After",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "session_id",
+    "issued_session_key",
+    "agent_response",
+    "memory_before",
+    "memory_after",
+    "memory_before_version",
+    "memory_after_version"
+  ],
+  "title": "RuntimeSession",
+  "type": "object"
+}

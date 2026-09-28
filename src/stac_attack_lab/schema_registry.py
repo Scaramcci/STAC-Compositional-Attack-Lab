@@ -24,6 +24,7 @@ from stac_attack_lab.attack_program.models import (
     Split,
     StructuredExampleView,
 )
+from stac_attack_lab.attack_program.r4 import RuntimeBundle, RuntimeSession
 
 SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "attack_program_candidate": AttackCandidate,
@@ -41,6 +42,8 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "attack_program_raw_view": RawExampleView,
     "attack_program_split": Split,
     "attack_program_structured_view": StructuredExampleView,
+    "attack_program_r4_runtime_bundle": RuntimeBundle,
+    "attack_program_r4_runtime_session": RuntimeSession,
 }
 
 

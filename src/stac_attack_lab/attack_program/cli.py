@@ -6,7 +6,6 @@ import argparse
 import json
 import os
 from pathlib import Path
-from typing import Any
 
 from stac_attack_lab.attack_program.demo_r2 import demo as r2_demo
 from stac_attack_lab.attack_program.demo_r3 import demo as r3_demo
@@ -16,7 +15,14 @@ from stac_attack_lab.attack_program.development import (
     freeze_synthetic,
     replay,
 )
-from stac_attack_lab.attack_program.models import Catalog, DevelopmentInput, R3Config, Split
+from stac_attack_lab.attack_program.file_io import write_json_exclusive as _save
+from stac_attack_lab.attack_program.models import (
+    AttackCandidate,
+    Catalog,
+    DevelopmentInput,
+    R3Config,
+    Split,
+)
 from stac_attack_lab.attack_program.pipeline import (
     GateError,
     build_catalog,
@@ -27,16 +33,18 @@ from stac_attack_lab.attack_program.pipeline import (
 from stac_attack_lab.attack_program.r3 import ScriptedTransport
 from stac_attack_lab.attack_program.r3 import replay as r3_replay
 from stac_attack_lab.attack_program.r3 import run as r3_run
+from stac_attack_lab.attack_program.r4 import replay_case
+from stac_attack_lab.attack_program.r4_batch import (
+    bind_disabled,
+    generate_candidate,
+    load_candidate,
+    prepare_disabled,
+    run_disabled,
+    validate_prepared,
+)
+from stac_attack_lab.attack_program.r4_runtime import _upstream_preflight, run_local_fake_batch
 
 ROOT = Path(__file__).resolve().parents[3]
-
-
-def _save(path: Path, data: Any, *, private: bool = False) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    fd = os.open(path, flags, 0o600 if private else 0o644)
-    with os.fdopen(fd, "w", encoding="utf-8") as stream:
-        json.dump(data, stream, ensure_ascii=False, indent=2)
-        stream.write("\n")
 
 
 def _new_dir(path: Path) -> Path:
@@ -54,7 +62,7 @@ def _load_split(path: Path) -> Split:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="R1–R3 offline attack program tools; demos make zero model requests"
+        description="R1–R4 attack program tools; R4 live execution remains disabled"
     )
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor")
@@ -94,6 +102,27 @@ def main() -> int:
     audit_cmd.add_argument("--output", type=Path, required=True)
     st = sub.add_parser("status-r2")
     st.add_argument("--run", type=Path, required=True)
+    sub.add_parser("r4-doctor")
+    r4_fake = sub.add_parser("r4-local-fake")
+    r4_fake.add_argument("--candidate", type=Path, required=True)
+    r4_fake.add_argument("--output", type=Path, required=True)
+    r4_prepare = sub.add_parser("r4-prepare")
+    r4_prepare.add_argument("--candidate", type=Path, required=True)
+    r4_prepare.add_argument("--output", type=Path, required=True)
+    for name in ("r4-validate", "r4-status", "r4-bind", "r4-run-batch"):
+        command = sub.add_parser(name)
+        command.add_argument("--batch", type=Path, required=True)
+    for name in ("r4-review", "r4-replay"):
+        command = sub.add_parser(name)
+        command.add_argument("--case", type=Path, required=True)
+        command.add_argument("--output", type=Path, required=True)
+    r4_generate = sub.add_parser("r4-generate-local-fake")
+    r4_generate.add_argument("--task-id", required=True)
+    r4_generate.add_argument("--model-id", required=True)
+    r4_generate.add_argument("--base-url", required=True)
+    r4_generate.add_argument("--api-key-env", required=True)
+    r4_generate.add_argument("--batch-id", required=True)
+    r4_generate.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == "doctor":
@@ -210,6 +239,55 @@ def main() -> int:
                         "status": "development_recorded",
                         "assigned": report["assigned"],
                         "next": "Replay with --compare, then freeze-synthetic in a new directory.",
+                    }
+                )
+            )
+        elif args.command == "r4-doctor":
+            preflight = _upstream_preflight(ROOT)
+            print(json.dumps({"status": "offline_runtime_preflight_valid", **preflight}))
+        elif args.command == "r4-local-fake":
+            candidate = load_candidate(args.candidate)
+            report = run_local_fake_batch(ROOT, candidate, args.output)
+            print(json.dumps(report))
+            if report["completed"] != report["assigned"]:
+                return 2
+        elif args.command == "r4-prepare":
+            manifest = prepare_disabled(ROOT, args.candidate, args.output)
+            print(
+                json.dumps(
+                    {
+                        "status": "prepared_disabled",
+                        "manifest": str(args.output / "manifest.json"),
+                        "batch_id": manifest["batch_id"],
+                    }
+                )
+            )
+        elif args.command in {"r4-validate", "r4-status"}:
+            print(json.dumps(validate_prepared(ROOT, args.batch)))
+        elif args.command == "r4-bind":
+            bind_disabled(ROOT, args.batch)
+        elif args.command == "r4-run-batch":
+            run_disabled(ROOT, args.batch)
+        elif args.command in {"r4-review", "r4-replay"}:
+            print(json.dumps(replay_case(ROOT, args.case, args.output)))
+        elif args.command == "r4-generate-local-fake":
+            key = os.environ.get(args.api_key_env)
+            if not key:
+                raise GateError("attacker_api_key_env_missing")
+            generated_candidate: AttackCandidate = generate_candidate(
+                ROOT,
+                task_id=args.task_id,
+                model_id=args.model_id,
+                base_url=args.base_url,
+                api_key=key,
+                output=args.output,
+                batch_id=args.batch_id,
+            )
+            print(
+                json.dumps(
+                    {
+                        "candidate": str(args.output / "candidate.json"),
+                        "candidate_id": generated_candidate.candidate_id,
                     }
                 )
             )

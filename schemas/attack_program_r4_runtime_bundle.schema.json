@@ -1,0 +1,290 @@
+{
+  "$defs": {
+    "RuntimeSession": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "issued_session_key": {
+          "title": "Issued Session Key",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "user_instruction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "User Instruction"
+        },
+        "agent_response": {
+          "title": "Agent Response",
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        },
+        "raw_api_response": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw Api Response"
+        },
+        "transcript_entries": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Transcript Entries",
+          "type": "array"
+        },
+        "memory_before": {
+          "title": "Memory Before",
+          "type": "string"
+        },
+        "memory_after": {
+          "title": "Memory After",
+          "type": "string"
+        },
+        "memory_before_version": {
+          "title": "Memory Before Version",
+          "type": "string"
+        },
+        "memory_after_version": {
+          "title": "Memory After Version",
+          "type": "string"
+        },
+        "preconditions_satisfied": {
+          "default": true,
+          "title": "Preconditions Satisfied",
+          "type": "boolean"
+        },
+        "provider_attempts_before": {
+          "default": 0,
+          "title": "Provider Attempts Before",
+          "type": "integer"
+        },
+        "provider_attempts_after": {
+          "default": 0,
+          "title": "Provider Attempts After",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "session_id",
+        "issued_session_key",
+        "agent_response",
+        "memory_before",
+        "memory_after",
+        "memory_before_version",
+        "memory_after_version"
+      ],
+      "title": "RuntimeSession",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-runtime-bundle/1",
+      "default": "attack-runtime-bundle/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "local_fake",
+        "real"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "materialized_task_hash": {
+      "title": "Materialized Task Hash",
+      "type": "string"
+    },
+    "sessions": {
+      "items": {
+        "$ref": "#/$defs/RuntimeSession"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Sessions",
+      "type": "array"
+    },
+    "pre_state": {
+      "additionalProperties": true,
+      "title": "Pre State",
+      "type": "object"
+    },
+    "post_state": {
+      "additionalProperties": true,
+      "title": "Post State",
+      "type": "object"
+    },
+    "relay_records": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Relay Records",
+      "type": "array"
+    },
+    "relay_reservations": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Relay Reservations",
+      "type": "array"
+    },
+    "relay_evidence": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Relay Evidence",
+      "type": "array"
+    },
+    "cleanup": {
+      "additionalProperties": true,
+      "title": "Cleanup",
+      "type": "object"
+    },
+    "upstream_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Upstream Commit"
+    },
+    "upstream_task_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Upstream Task Hash"
+    },
+    "judge_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Judge Hash"
+    },
+    "patch_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Patch Hash"
+    },
+    "image_digest": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Image Digest"
+    },
+    "runtime_producer": {
+      "anyOf": [
+        {
+          "const": "r4_runtime_adapter",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Runtime Producer"
+    },
+    "capture_complete": {
+      "default": true,
+      "title": "Capture Complete",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "source",
+    "run_id",
+    "task_id",
+    "candidate_id",
+    "materialized_task_hash",
+    "sessions",
+    "pre_state",
+    "post_state",
+    "relay_records",
+    "relay_evidence",
+    "cleanup"
+  ],
+  "title": "RuntimeBundle",
+  "type": "object"
+}

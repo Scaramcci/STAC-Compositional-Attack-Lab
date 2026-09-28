@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
+from stac_attack_lab.attack_program.file_io import write_json_exclusive as _write
 from stac_attack_lab.attack_program.models import (
     AttackCandidate,
     Catalog,
@@ -42,13 +42,6 @@ LIBRARY_VERSION = "primitive-attack-library/1"
 
 def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write(path: Path, value: Any, *, private: bool = False) -> None:
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600 if private else 0o644)
-    with os.fdopen(fd, "w", encoding="utf-8") as stream:
-        json.dump(value, stream, ensure_ascii=False, indent=2)
-        stream.write("\n")
 
 
 def _new(path: Path) -> None:
@@ -150,6 +143,7 @@ def _decision(
 def _provenance(root: Path) -> dict[str, str]:
     names = [
         "src/stac_attack_lab/attack_program/development.py",
+        "src/stac_attack_lab/attack_program/file_io.py",
         "src/stac_attack_lab/attack_program/observation.py",
         "src/stac_attack_lab/attack_program/pipeline.py",
         "src/stac_attack_lab/attack_program/models.py",
