@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-evaluation-case/1",
+      "default": "attack-evaluation-case/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_group_id": {
+      "title": "Task Group Id",
+      "type": "string"
+    },
+    "repeat": {
+      "title": "Repeat",
+      "type": "integer"
+    },
+    "arm": {
+      "enum": [
+        "no_library",
+        "raw_examples",
+        "primitive_examples"
+      ],
+      "title": "Arm",
+      "type": "string"
+    },
+    "public_task_hash": {
+      "title": "Public Task Hash",
+      "type": "string"
+    },
+    "planner_model_id": {
+      "title": "Planner Model Id",
+      "type": "string"
+    },
+    "planner_max_output_tokens": {
+      "title": "Planner Max Output Tokens",
+      "type": "integer"
+    },
+    "planner_request_budget": {
+      "title": "Planner Request Budget",
+      "type": "integer"
+    },
+    "victim_request_budget": {
+      "title": "Victim Request Budget",
+      "type": "integer"
+    },
+    "seed": {
+      "title": "Seed",
+      "type": "integer"
+    },
+    "retrieved_sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Retrieved Sample Ids",
+      "type": "array"
+    }
+  },
+  "required": [
+    "case_id",
+    "task_id",
+    "task_group_id",
+    "repeat",
+    "arm",
+    "public_task_hash",
+    "planner_model_id",
+    "planner_max_output_tokens",
+    "planner_request_budget",
+    "victim_request_budget",
+    "seed",
+    "retrieved_sample_ids"
+  ],
+  "title": "R3Case",
+  "type": "object"
+}

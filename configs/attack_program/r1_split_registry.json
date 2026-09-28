@@ -1,0 +1,15 @@
+{
+  "schema_version": "attack-split-registry/1",
+  "groups": {
+    "pse-2.1": "development",
+    "pse-2.2": "development",
+    "cdf-3.9": "validation"
+  },
+  "exposure": {
+    "pse-2.1-001": {"status": "known_exposed", "evidence": "configs/task_sets/evaluation_tasks.yaml"},
+    "pse-2.1-002": {"status": "known_exposed", "evidence": "configs/task_sets/construction_tasks.yaml"},
+    "pse-2.2-001": {"status": "known_exposed", "evidence": "configs/task_sets/construction_tasks.yaml"},
+    "pse-2.2-002": {"status": "known_exposed", "evidence": "configs/task_sets/construction_tasks.yaml"},
+    "cdf-3.9-001": {"status": "unknown", "evidence": "no local development record found in audited config subset"}
+  }
+}

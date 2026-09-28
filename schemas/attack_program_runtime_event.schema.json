@@ -1,0 +1,187 @@
+{
+  "additionalProperties": false,
+  "description": "Observed runtime event for the current attack program.",
+  "properties": {
+    "schema_version": {
+      "const": "attack-runtime-event/1",
+      "default": "attack-runtime-event/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "episode_id": {
+      "title": "Episode Id",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "sequence_no": {
+      "exclusiveMinimum": 0,
+      "title": "Sequence No",
+      "type": "integer"
+    },
+    "actor": {
+      "enum": [
+        "harness",
+        "user",
+        "victim",
+        "tool",
+        "environment"
+      ],
+      "title": "Actor",
+      "type": "string"
+    },
+    "event_type": {
+      "enum": [
+        "session_started",
+        "source_delivered",
+        "semantic_use",
+        "tool_selected",
+        "tool_request",
+        "tool_result",
+        "state_write",
+        "state_read",
+        "record_write",
+        "recovery",
+        "response"
+      ],
+      "title": "Event Type",
+      "type": "string"
+    },
+    "session_label": {
+      "title": "Session Label",
+      "type": "string"
+    },
+    "actual_session_key": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Actual Session Key"
+    },
+    "invocation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Invocation Id"
+    },
+    "attempt_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attempt Id"
+    },
+    "tool_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tool Name"
+    },
+    "arguments": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Arguments"
+    },
+    "status": {
+      "enum": [
+        "observed",
+        "attempted",
+        "committed",
+        "blocked",
+        "error",
+        "unknown"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "resource_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resource Id"
+    },
+    "resource_version_before": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resource Version Before"
+    },
+    "resource_version_after": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resource Version After"
+    },
+    "evidence": {
+      "additionalProperties": true,
+      "title": "Evidence",
+      "type": "object"
+    }
+  },
+  "required": [
+    "run_id",
+    "episode_id",
+    "event_id",
+    "sequence_no",
+    "actor",
+    "event_type",
+    "session_label",
+    "actual_session_key",
+    "status"
+  ],
+  "title": "RuntimeEvent",
+  "type": "object"
+}

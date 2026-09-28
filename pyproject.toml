@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "stac-compositional-attack-lab"
 version = "0.1.0"
-description = "Reproducible SafeClaw compositional attack collection and evaluation framework."
+description = "Offline SafeClawArena nine-primitive sample and multi-example Planner research program."
 requires-python = ">=3.11"
 dependencies = ["pydantic>=2.0", "PyYAML>=6.0", "jsonschema>=4.21"]
 

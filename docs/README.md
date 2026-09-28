@@ -1,15 +1,10 @@
-# Documentation
+# 当前文档
 
-| 文档 | 职责 |
-|---|---|
-| [PROJECT_STRUCTURE_ZH.md](PROJECT_STRUCTURE_ZH.md) | 双轨架构、Primitive v3、正常交互、legacy formal 与中文学习路线 |
-| [PROJECT_GUIDE_ZH.md](PROJECT_GUIDE_ZH.md) | 教师/审阅者理解 collection→sample→Planner→Attacker→evaluation 的输入、输出、证据与限制 |
-| [LINUX_TMUX_RUNBOOK_ZH.md](LINUX_TMUX_RUNBOOK_ZH.md) | 环境变量、端口、诊断、tmux、日志、停止与恢复 |
-| [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) | 本次实际实施、离线/真实验证和当前阻塞 |
-| [IMPLEMENTATION_WORKPLAN.md](IMPLEMENTATION_WORKPLAN.md) | 仅保留尚未完成的研究工作及验收 |
-| [CLEANUP_MANIFEST.md](CLEANUP_MANIFEST.md) | 删除路径、引用核查、理由和恢复方式 |
-| [EXPERIMENT_PROTOCOL.md](EXPERIMENT_PROTOCOL.md) | 研究契约、门禁、配对设计、指标和停止条件 |
-| [PROMPTS.md](PROMPTS.md) | Planner/Attacker prompt 与权限边界 |
-| [../SECURITY.md](../SECURITY.md) | 授权、凭证、隔离和 fail-closed 边界 |
+- [重构实施方案](AgentLAB_SafeClawArena_原语样本库与Planner实验重构实施方案.md)
+- [实验协议与证据边界](EXPERIMENT_PROTOCOL.md)
+- [当前进度](IMPLEMENTATION_PROGRESS.md)
+- [剩余工作](IMPLEMENTATION_WORKPLAN.md)
+- [项目结构](PROJECT_STRUCTURE_ZH.md)
+- [R4 runtime 接口任务](ATTACK_PROGRAM_R4_RUNTIME_TASK.md)
 
-本目录不再叠加日期化“当前状态”。真实执行事实写入 progress；未来工作只写入 workplan。
+已退役的旧路线 Prompt、旧实验任务和旧报告不再作为本仓库工作入口。历史运行证据保留在 `experiments/runs/`。

@@ -1,0 +1,74 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-evaluation-config/1",
+      "default": "attack-evaluation-config/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "default": "engineering_only",
+      "enum": [
+        "engineering_only",
+        "formal"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "repeats": {
+      "maximum": 10,
+      "minimum": 1,
+      "title": "Repeats",
+      "type": "integer"
+    },
+    "top_k": {
+      "maximum": 10,
+      "minimum": 2,
+      "title": "Top K",
+      "type": "integer"
+    },
+    "planner_model_id": {
+      "title": "Planner Model Id",
+      "type": "string"
+    },
+    "planner_max_output_tokens": {
+      "default": 1200,
+      "maximum": 8192,
+      "minimum": 1,
+      "title": "Planner Max Output Tokens",
+      "type": "integer"
+    },
+    "planner_request_budget": {
+      "maximum": 100,
+      "minimum": 1,
+      "title": "Planner Request Budget",
+      "type": "integer"
+    },
+    "victim_request_budget": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Victim Request Budget",
+      "type": "integer"
+    },
+    "seed": {
+      "default": 17,
+      "title": "Seed",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "task_id",
+    "repeats",
+    "top_k",
+    "planner_model_id",
+    "planner_request_budget",
+    "victim_request_budget"
+  ],
+  "title": "R3Config",
+  "type": "object"
+}

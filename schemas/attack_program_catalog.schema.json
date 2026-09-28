@@ -1,0 +1,233 @@
+{
+  "$defs": {
+    "AttackSurface": {
+      "additionalProperties": false,
+      "properties": {
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        },
+        "mirror_pointer": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mirror Pointer"
+        },
+        "value_type": {
+          "const": "string",
+          "default": "string",
+          "title": "Value Type",
+          "type": "string"
+        },
+        "max_chars": {
+          "default": 8192,
+          "title": "Max Chars",
+          "type": "integer"
+        },
+        "stage": {
+          "const": "before_initialization",
+          "default": "before_initialization",
+          "title": "Stage",
+          "type": "string"
+        },
+        "owner": {
+          "const": "external_sender",
+          "default": "external_sender",
+          "title": "Owner",
+          "type": "string"
+        },
+        "trust": {
+          "const": "low",
+          "default": "low",
+          "title": "Trust",
+          "type": "string"
+        },
+        "resource_path": {
+          "title": "Resource Path",
+          "type": "string"
+        },
+        "immutable_root_hash": {
+          "title": "Immutable Root Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pointer",
+        "resource_path",
+        "immutable_root_hash"
+      ],
+      "title": "AttackSurface",
+      "type": "object"
+    },
+    "TaskEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_group_id": {
+          "title": "Task Group Id",
+          "type": "string"
+        },
+        "template_group_id": {
+          "title": "Template Group Id",
+          "type": "string"
+        },
+        "task_path": {
+          "title": "Task Path",
+          "type": "string"
+        },
+        "task_hash": {
+          "title": "Task Hash",
+          "type": "string"
+        },
+        "upstream_commit": {
+          "title": "Upstream Commit",
+          "type": "string"
+        },
+        "track": {
+          "enum": [
+            "official_conformance",
+            "official_task_payload_variant",
+            "synthetic_extension"
+          ],
+          "title": "Track",
+          "type": "string"
+        },
+        "support": {
+          "enum": [
+            "offline_validated",
+            "pending_runtime",
+            "unsupported"
+          ],
+          "title": "Support",
+          "type": "string"
+        },
+        "reason_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Reason Codes",
+          "type": "array"
+        },
+        "known_exposure": {
+          "default": false,
+          "title": "Known Exposure",
+          "type": "boolean"
+        },
+        "exposure_status": {
+          "default": "unknown",
+          "enum": [
+            "known_exposed",
+            "unknown"
+          ],
+          "title": "Exposure Status",
+          "type": "string"
+        },
+        "exposure_evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exposure Evidence"
+        },
+        "capability_evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Capability Evidence",
+          "type": "array"
+        },
+        "public_view": {
+          "additionalProperties": true,
+          "title": "Public View",
+          "type": "object"
+        },
+        "attack_surfaces": {
+          "items": {
+            "$ref": "#/$defs/AttackSurface"
+          },
+          "title": "Attack Surfaces",
+          "type": "array"
+        },
+        "evaluator_ref": {
+          "title": "Evaluator Ref",
+          "type": "string"
+        },
+        "evaluator_hash": {
+          "title": "Evaluator Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "task_group_id",
+        "template_group_id",
+        "task_path",
+        "task_hash",
+        "upstream_commit",
+        "track",
+        "support",
+        "public_view",
+        "attack_surfaces",
+        "evaluator_ref",
+        "evaluator_hash"
+      ],
+      "title": "TaskEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-program-catalog/1",
+      "default": "attack-program-catalog/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    },
+    "schema_hash": {
+      "title": "Schema Hash",
+      "type": "string"
+    },
+    "patch_hash": {
+      "title": "Patch Hash",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/TaskEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "catalog_hash": {
+      "title": "Catalog Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "upstream_commit",
+    "schema_hash",
+    "patch_hash",
+    "entries",
+    "catalog_hash"
+  ],
+  "title": "Catalog",
+  "type": "object"
+}

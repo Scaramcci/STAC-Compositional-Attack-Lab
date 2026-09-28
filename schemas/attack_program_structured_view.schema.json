@@ -1,0 +1,182 @@
+{
+  "$defs": {
+    "PrimitiveOccurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "occurrence_id": {
+          "title": "Occurrence Id",
+          "type": "string"
+        },
+        "primitive": {
+          "enum": [
+            "Ingest",
+            "Adopt",
+            "Persist",
+            "Recall",
+            "Select",
+            "Bind",
+            "Act",
+            "Record",
+            "Recover"
+          ],
+          "title": "Primitive",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "status": {
+          "default": "unknown",
+          "enum": [
+            "observed",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "occurrence_id",
+        "primitive"
+      ],
+      "title": "PrimitiveOccurrence",
+      "type": "object"
+    },
+    "PrimitiveRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "precedes",
+            "delivered_to",
+            "read_from",
+            "argument_binding",
+            "triggered_recovery",
+            "annotated_decision_support"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_id",
+        "target_id",
+        "kind"
+      ],
+      "title": "PrimitiveRelation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "view": {
+      "const": "primitive_examples",
+      "default": "primitive_examples",
+      "title": "View",
+      "type": "string"
+    },
+    "sample_id": {
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "source_task_group_id": {
+      "title": "Source Task Group Id",
+      "type": "string"
+    },
+    "source_split": {
+      "const": "development",
+      "default": "development",
+      "title": "Source Split",
+      "type": "string"
+    },
+    "validation_class": {
+      "title": "Validation Class",
+      "type": "string"
+    },
+    "raw_example": {
+      "title": "Raw Example",
+      "type": "string"
+    },
+    "occurrences": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveOccurrence"
+      },
+      "title": "Occurrences",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveRelation"
+      },
+      "title": "Relations",
+      "type": "array"
+    },
+    "primitive_status": {
+      "additionalProperties": {
+        "enum": [
+          "observed",
+          "unknown"
+        ],
+        "type": "string"
+      },
+      "propertyNames": {
+        "enum": [
+          "Ingest",
+          "Adopt",
+          "Persist",
+          "Recall",
+          "Select",
+          "Bind",
+          "Act",
+          "Record",
+          "Recover"
+        ]
+      },
+      "title": "Primitive Status",
+      "type": "object"
+    },
+    "preconditions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "evidence_boundary": {
+      "title": "Evidence Boundary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sample_id",
+    "source_task_group_id",
+    "validation_class",
+    "raw_example",
+    "occurrences",
+    "relations",
+    "primitive_status",
+    "preconditions",
+    "evidence_boundary"
+  ],
+  "title": "StructuredExampleView",
+  "type": "object"
+}

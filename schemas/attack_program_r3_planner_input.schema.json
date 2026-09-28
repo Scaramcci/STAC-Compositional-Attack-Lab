@@ -1,0 +1,372 @@
+{
+  "$defs": {
+    "PrimitiveOccurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "occurrence_id": {
+          "title": "Occurrence Id",
+          "type": "string"
+        },
+        "primitive": {
+          "enum": [
+            "Ingest",
+            "Adopt",
+            "Persist",
+            "Recall",
+            "Select",
+            "Bind",
+            "Act",
+            "Record",
+            "Recover"
+          ],
+          "title": "Primitive",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "status": {
+          "default": "unknown",
+          "enum": [
+            "observed",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "occurrence_id",
+        "primitive"
+      ],
+      "title": "PrimitiveOccurrence",
+      "type": "object"
+    },
+    "PrimitiveRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "precedes",
+            "delivered_to",
+            "read_from",
+            "argument_binding",
+            "triggered_recovery",
+            "annotated_decision_support"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_id",
+        "target_id",
+        "kind"
+      ],
+      "title": "PrimitiveRelation",
+      "type": "object"
+    },
+    "R3Case": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "attack-evaluation-case/1",
+          "default": "attack-evaluation-case/1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "task_group_id": {
+          "title": "Task Group Id",
+          "type": "string"
+        },
+        "repeat": {
+          "title": "Repeat",
+          "type": "integer"
+        },
+        "arm": {
+          "enum": [
+            "no_library",
+            "raw_examples",
+            "primitive_examples"
+          ],
+          "title": "Arm",
+          "type": "string"
+        },
+        "public_task_hash": {
+          "title": "Public Task Hash",
+          "type": "string"
+        },
+        "planner_model_id": {
+          "title": "Planner Model Id",
+          "type": "string"
+        },
+        "planner_max_output_tokens": {
+          "title": "Planner Max Output Tokens",
+          "type": "integer"
+        },
+        "planner_request_budget": {
+          "title": "Planner Request Budget",
+          "type": "integer"
+        },
+        "victim_request_budget": {
+          "title": "Victim Request Budget",
+          "type": "integer"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "retrieved_sample_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retrieved Sample Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "task_id",
+        "task_group_id",
+        "repeat",
+        "arm",
+        "public_task_hash",
+        "planner_model_id",
+        "planner_max_output_tokens",
+        "planner_request_budget",
+        "victim_request_budget",
+        "seed",
+        "retrieved_sample_ids"
+      ],
+      "title": "R3Case",
+      "type": "object"
+    },
+    "RawExampleView": {
+      "additionalProperties": false,
+      "properties": {
+        "view": {
+          "const": "raw_examples",
+          "default": "raw_examples",
+          "title": "View",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "source_task_group_id": {
+          "title": "Source Task Group Id",
+          "type": "string"
+        },
+        "source_split": {
+          "const": "development",
+          "default": "development",
+          "title": "Source Split",
+          "type": "string"
+        },
+        "validation_class": {
+          "title": "Validation Class",
+          "type": "string"
+        },
+        "raw_example": {
+          "title": "Raw Example",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_id",
+        "source_task_group_id",
+        "validation_class",
+        "raw_example"
+      ],
+      "title": "RawExampleView",
+      "type": "object"
+    },
+    "StructuredExampleView": {
+      "additionalProperties": false,
+      "properties": {
+        "view": {
+          "const": "primitive_examples",
+          "default": "primitive_examples",
+          "title": "View",
+          "type": "string"
+        },
+        "sample_id": {
+          "title": "Sample Id",
+          "type": "string"
+        },
+        "source_task_group_id": {
+          "title": "Source Task Group Id",
+          "type": "string"
+        },
+        "source_split": {
+          "const": "development",
+          "default": "development",
+          "title": "Source Split",
+          "type": "string"
+        },
+        "validation_class": {
+          "title": "Validation Class",
+          "type": "string"
+        },
+        "raw_example": {
+          "title": "Raw Example",
+          "type": "string"
+        },
+        "occurrences": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveOccurrence"
+          },
+          "title": "Occurrences",
+          "type": "array"
+        },
+        "relations": {
+          "items": {
+            "$ref": "#/$defs/PrimitiveRelation"
+          },
+          "title": "Relations",
+          "type": "array"
+        },
+        "primitive_status": {
+          "additionalProperties": {
+            "enum": [
+              "observed",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "Ingest",
+              "Adopt",
+              "Persist",
+              "Recall",
+              "Select",
+              "Bind",
+              "Act",
+              "Record",
+              "Recover"
+            ]
+          },
+          "title": "Primitive Status",
+          "type": "object"
+        },
+        "preconditions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Preconditions",
+          "type": "array"
+        },
+        "evidence_boundary": {
+          "title": "Evidence Boundary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sample_id",
+        "source_task_group_id",
+        "validation_class",
+        "raw_example",
+        "occurrences",
+        "relations",
+        "primitive_status",
+        "preconditions",
+        "evidence_boundary"
+      ],
+      "title": "StructuredExampleView",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-planner-input/1",
+      "default": "attack-planner-input/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "case": {
+      "$ref": "#/$defs/R3Case"
+    },
+    "public_task": {
+      "additionalProperties": true,
+      "title": "Public Task",
+      "type": "object"
+    },
+    "public_goal": {
+      "title": "Public Goal",
+      "type": "string"
+    },
+    "allowed_surfaces": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Allowed Surfaces",
+      "type": "array"
+    },
+    "compatible_samples": {
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/RawExampleView"
+          },
+          {
+            "$ref": "#/$defs/StructuredExampleView"
+          }
+        ]
+      },
+      "title": "Compatible Samples",
+      "type": "array"
+    },
+    "max_patches": {
+      "const": 1,
+      "default": 1,
+      "title": "Max Patches",
+      "type": "integer"
+    },
+    "max_selected_samples": {
+      "const": 2,
+      "default": 2,
+      "title": "Max Selected Samples",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "case",
+    "public_task",
+    "public_goal",
+    "allowed_surfaces",
+    "compatible_samples"
+  ],
+  "title": "R3PlannerInput",
+  "type": "object"
+}

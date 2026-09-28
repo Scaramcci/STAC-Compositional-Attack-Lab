@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "Patch": {
+      "additionalProperties": false,
+      "properties": {
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pointer",
+        "value"
+      ],
+      "title": "Patch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-plan/1",
+      "default": "attack-plan/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selected_sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selected Sample Ids",
+      "type": "array"
+    },
+    "patches": {
+      "items": {
+        "$ref": "#/$defs/Patch"
+      },
+      "title": "Patches",
+      "type": "array"
+    },
+    "abstain": {
+      "title": "Abstain",
+      "type": "boolean"
+    },
+    "decision_summary": {
+      "maxLength": 500,
+      "title": "Decision Summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "selected_sample_ids",
+    "patches",
+    "abstain",
+    "decision_summary"
+  ],
+  "title": "R3Plan",
+  "type": "object"
+}

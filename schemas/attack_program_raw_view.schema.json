@@ -1,0 +1,41 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "view": {
+      "const": "raw_examples",
+      "default": "raw_examples",
+      "title": "View",
+      "type": "string"
+    },
+    "sample_id": {
+      "title": "Sample Id",
+      "type": "string"
+    },
+    "source_task_group_id": {
+      "title": "Source Task Group Id",
+      "type": "string"
+    },
+    "source_split": {
+      "const": "development",
+      "default": "development",
+      "title": "Source Split",
+      "type": "string"
+    },
+    "validation_class": {
+      "title": "Validation Class",
+      "type": "string"
+    },
+    "raw_example": {
+      "title": "Raw Example",
+      "type": "string"
+    }
+  },
+  "required": [
+    "sample_id",
+    "source_task_group_id",
+    "validation_class",
+    "raw_example"
+  ],
+  "title": "RawExampleView",
+  "type": "object"
+}

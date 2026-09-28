@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "Patch": {
+      "additionalProperties": false,
+      "properties": {
+        "pointer": {
+          "title": "Pointer",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pointer",
+        "value"
+      ],
+      "title": "Patch",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-candidate/1",
+      "default": "attack-candidate/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_group_id": {
+      "title": "Task Group Id",
+      "type": "string"
+    },
+    "source_split": {
+      "enum": [
+        "development",
+        "validation",
+        "test"
+      ],
+      "title": "Source Split",
+      "type": "string"
+    },
+    "patches": {
+      "items": {
+        "$ref": "#/$defs/Patch"
+      },
+      "title": "Patches",
+      "type": "array"
+    },
+    "planned_primitives": {
+      "items": {
+        "enum": [
+          "Ingest",
+          "Adopt",
+          "Persist",
+          "Recall",
+          "Select",
+          "Bind",
+          "Act",
+          "Record",
+          "Recover"
+        ],
+        "type": "string"
+      },
+      "title": "Planned Primitives",
+      "type": "array"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "task_id",
+    "task_group_id",
+    "source_split",
+    "patches"
+  ],
+  "title": "AttackCandidate",
+  "type": "object"
+}

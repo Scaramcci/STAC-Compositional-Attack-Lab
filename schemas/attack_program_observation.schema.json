@@ -1,0 +1,337 @@
+{
+  "$defs": {
+    "RawSession": {
+      "additionalProperties": false,
+      "properties": {
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        },
+        "actual_session_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Session Key"
+        },
+        "agent_response": {
+          "title": "Agent Response",
+          "type": "string"
+        },
+        "tool_calls": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Tool Calls",
+          "type": "array"
+        }
+      },
+      "required": [
+        "session_id",
+        "agent_response"
+      ],
+      "title": "RawSession",
+      "type": "object"
+    },
+    "RuntimeEvent": {
+      "additionalProperties": false,
+      "description": "Observed runtime event for the current attack program.",
+      "properties": {
+        "schema_version": {
+          "const": "attack-runtime-event/1",
+          "default": "attack-runtime-event/1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "episode_id": {
+          "title": "Episode Id",
+          "type": "string"
+        },
+        "event_id": {
+          "title": "Event Id",
+          "type": "string"
+        },
+        "sequence_no": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence No",
+          "type": "integer"
+        },
+        "actor": {
+          "enum": [
+            "harness",
+            "user",
+            "victim",
+            "tool",
+            "environment"
+          ],
+          "title": "Actor",
+          "type": "string"
+        },
+        "event_type": {
+          "enum": [
+            "session_started",
+            "source_delivered",
+            "semantic_use",
+            "tool_selected",
+            "tool_request",
+            "tool_result",
+            "state_write",
+            "state_read",
+            "record_write",
+            "recovery",
+            "response"
+          ],
+          "title": "Event Type",
+          "type": "string"
+        },
+        "session_label": {
+          "title": "Session Label",
+          "type": "string"
+        },
+        "actual_session_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Actual Session Key"
+        },
+        "invocation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Invocation Id"
+        },
+        "attempt_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attempt Id"
+        },
+        "tool_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Name"
+        },
+        "arguments": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Arguments"
+        },
+        "status": {
+          "enum": [
+            "observed",
+            "attempted",
+            "committed",
+            "blocked",
+            "error",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "resource_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource Id"
+        },
+        "resource_version_before": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource Version Before"
+        },
+        "resource_version_after": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resource Version After"
+        },
+        "evidence": {
+          "additionalProperties": true,
+          "title": "Evidence",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run_id",
+        "episode_id",
+        "event_id",
+        "sequence_no",
+        "actor",
+        "event_type",
+        "session_label",
+        "actual_session_key",
+        "status"
+      ],
+      "title": "RuntimeEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "attack-observation/1",
+      "enum": [
+        "attack-observation/1",
+        "attack-observation/2"
+      ],
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "enum": [
+        "synthetic_runtime_fixture",
+        "local_fake",
+        "real"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "materialized_task_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Materialized Task Hash"
+    },
+    "sessions": {
+      "items": {
+        "$ref": "#/$defs/RawSession"
+      },
+      "maxItems": 16,
+      "title": "Sessions",
+      "type": "array"
+    },
+    "pre_state": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Pre State"
+    },
+    "post_state": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Post State"
+    },
+    "events": {
+      "items": {
+        "$ref": "#/$defs/RuntimeEvent"
+      },
+      "maxItems": 500,
+      "title": "Events",
+      "type": "array"
+    },
+    "event_log_complete": {
+      "default": false,
+      "title": "Event Log Complete",
+      "type": "boolean"
+    },
+    "state_capture_complete": {
+      "default": false,
+      "title": "State Capture Complete",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "source",
+    "run_id",
+    "task_id",
+    "candidate_id",
+    "sessions",
+    "pre_state",
+    "post_state",
+    "events"
+  ],
+  "title": "RawObservation",
+  "type": "object"
+}

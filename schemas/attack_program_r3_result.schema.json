@@ -1,0 +1,296 @@
+{
+  "$defs": {
+    "PrimitiveOccurrence": {
+      "additionalProperties": false,
+      "properties": {
+        "occurrence_id": {
+          "title": "Occurrence Id",
+          "type": "string"
+        },
+        "primitive": {
+          "enum": [
+            "Ingest",
+            "Adopt",
+            "Persist",
+            "Recall",
+            "Select",
+            "Bind",
+            "Act",
+            "Record",
+            "Recover"
+          ],
+          "title": "Primitive",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "status": {
+          "default": "unknown",
+          "enum": [
+            "observed",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "occurrence_id",
+        "primitive"
+      ],
+      "title": "PrimitiveOccurrence",
+      "type": "object"
+    },
+    "PrimitiveRelation": {
+      "additionalProperties": false,
+      "properties": {
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "target_id": {
+          "title": "Target Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "precedes",
+            "delivered_to",
+            "read_from",
+            "argument_binding",
+            "triggered_recovery",
+            "annotated_decision_support"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_id",
+        "target_id",
+        "kind"
+      ],
+      "title": "PrimitiveRelation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-evaluation-result/1",
+      "default": "attack-evaluation-result/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "case_id": {
+      "title": "Case Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "assigned",
+        "not_started",
+        "abstained",
+        "invalid_plan",
+        "infra_error",
+        "incomplete",
+        "completed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "reason_codes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reason Codes",
+      "type": "array"
+    },
+    "selected_sample_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Selected Sample Ids",
+      "type": "array"
+    },
+    "planner_decisions": {
+      "title": "Planner Decisions",
+      "type": "integer"
+    },
+    "planner_source": {
+      "anyOf": [
+        {
+          "enum": [
+            "scripted",
+            "local_fake",
+            "real"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Planner Source"
+    },
+    "planner_http_attempts": {
+      "title": "Planner Http Attempts",
+      "type": "integer"
+    },
+    "victim_http_attempts": {
+      "title": "Victim Http Attempts",
+      "type": "integer"
+    },
+    "planner_usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Planner Usage"
+    },
+    "planner_usage_observation": {
+      "enum": [
+        "returned",
+        "unknown"
+      ],
+      "title": "Planner Usage Observation",
+      "type": "string"
+    },
+    "planner_prompt_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Planner Prompt Tokens"
+    },
+    "planner_output_tokens": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Planner Output Tokens"
+    },
+    "prompt_chars": {
+      "title": "Prompt Chars",
+      "type": "integer"
+    },
+    "sample_view_chars": {
+      "title": "Sample View Chars",
+      "type": "integer"
+    },
+    "materialized_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Materialized Hash"
+    },
+    "execution_source": {
+      "anyOf": [
+        {
+          "enum": [
+            "synthetic_runtime_fixture",
+            "local_fake",
+            "real"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Execution Source"
+    },
+    "official": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Official"
+    },
+    "independent": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Independent"
+    },
+    "occurrences": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveOccurrence"
+      },
+      "title": "Occurrences",
+      "type": "array"
+    },
+    "relations": {
+      "items": {
+        "$ref": "#/$defs/PrimitiveRelation"
+      },
+      "title": "Relations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "case_id",
+    "status",
+    "reason_codes",
+    "selected_sample_ids",
+    "planner_decisions",
+    "planner_source",
+    "planner_http_attempts",
+    "victim_http_attempts",
+    "planner_usage",
+    "planner_usage_observation",
+    "planner_prompt_tokens",
+    "planner_output_tokens",
+    "prompt_chars",
+    "sample_view_chars",
+    "materialized_hash",
+    "execution_source",
+    "official",
+    "independent",
+    "occurrences",
+    "relations"
+  ],
+  "title": "R3Result",
+  "type": "object"
+}

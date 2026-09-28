@@ -1,171 +1,65 @@
+"""JSON schemas for the current attack program contracts."""
+
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from pydantic import BaseModel
 
-from stac_attack_lab.capability.models import (
-    BatchManifest,
-    CapabilityCase,
-    CapabilityDoctorReport,
-    CapabilityProfile,
-    CompatibilityConfig,
-    CompatibilityPreparationManifest,
-    CompatibilityStageStatus,
-    CompilationManifest,
-    EpisodeResult,
-    EvidenceBundleManifest,
-    ReplayAnalysisManifest,
+from stac_attack_lab.attack_program.models import (
+    AttackCandidate,
+    Catalog,
+    DevelopmentInput,
+    LibraryManifest,
+    R3Case,
+    R3Config,
+    R3Manifest,
+    R3Plan,
+    R3PlannerInput,
+    R3Result,
+    RawExampleView,
+    RawObservation,
+    RuntimeEvent,
+    Split,
+    StructuredExampleView,
 )
-from stac_attack_lab.capability.models import (
-    PrimitiveOccurrence as CapabilityPrimitiveOccurrence,
-)
-from stac_attack_lab.capability.models import (
-    PrimitiveSpec as CapabilityPrimitiveSpec,
-)
-from stac_attack_lab.capability.models import (
-    RuntimeEvent as CapabilityRuntimeEvent,
-)
-from stac_attack_lab.capability.models import (
-    RuntimeTask as CapabilityRuntimeTask,
-)
-from stac_attack_lab.datasets.primitive_chain import (
-    AcceptedSampleRecord,
-    PrimitiveChainCandidate,
-    PrimitiveChainSample,
-    SampleLibraryManifest,
-)
-from stac_attack_lab.environments.safeclaw.contracts import (
-    BaselineBinding,
-    BenchmarkBinding,
-    BenchmarkPublicPrompt,
-    SafeClawEpisodeResult,
-    SafeClawPublicTaskView,
-    SafeClawTaskDescriptor,
-)
-from stac_attack_lab.execution.benign_collection import (
-    BenignCollectionConfig,
-    BenignPreparationManifest,
-    BenignSourceModeManifest,
-    BenignTraceAssessment,
-)
-from stac_attack_lab.execution.formal_attacker import (
-    FormalAttackerInput,
-    FormalAttackRealization,
-)
-from stac_attack_lab.execution.readiness import (
-    CompatibilityProbeAssessment,
-    WorkflowReadinessReport,
-)
-from stac_attack_lab.execution.sample_generation import (
-    SampleCollectionStageManifest,
-    SampleLibraryAuditReport,
-    SampleMiningStageManifest,
-)
-from stac_attack_lab.execution.sample_preflight import SampleCollectionPreflightReport
-from stac_attack_lab.flow.analysis import (
-    AnalysisManifest,
-    DependencySlice,
-    FlowAnalysisReport,
-    FlowRegistry,
-    InterventionRecord,
-    MacroBinding,
-)
-from stac_attack_lab.flow.models import EffectGraph, ObservationProfile
-from stac_attack_lab.interactions.benign import (
-    BenignPolicyAction,
-    BenignPolicyObservation,
-    BenignScenario,
-    BenignScenarioSet,
-    NeutralizationResult,
-)
-from stac_attack_lab.interactions.construction import (
-    ConstructionAttackerAction,
-    ConstructionObservation,
-)
-from stac_attack_lab.interactions.models import (
-    InteractionEvent,
-    InteractionGraph,
-    PrimitiveOccurrence,
-    RawInteractionTrajectory,
-)
-from stac_attack_lab.planning.formal_base import (
-    FormalCaseAssignment,
-    FormalEvaluationPlan,
-    FormalPlannerInput,
-    SingleSamplePlannerInput,
-)
-from stac_attack_lab.primitives.core import CorePrimitiveSpec
-from stac_attack_lab.primitives.macros import AttackMacroSpec
-from stac_attack_lab.verification.formal_aggregate import FormalRunResult
 
 SCHEMA_MODELS: dict[str, type[BaseModel]] = {
-    "capability_primitive_spec": CapabilityPrimitiveSpec,
-    "capability_profile": CapabilityProfile,
-    "capability_compatibility_config": CompatibilityConfig,
-    "capability_case": CapabilityCase,
-    "capability_runtime_task": CapabilityRuntimeTask,
-    "capability_runtime_event": CapabilityRuntimeEvent,
-    "capability_primitive_occurrence": CapabilityPrimitiveOccurrence,
-    "capability_episode_result": EpisodeResult,
-    "capability_compilation_manifest": CompilationManifest,
-    "capability_batch_manifest": BatchManifest,
-    "capability_evidence_bundle": EvidenceBundleManifest,
-    "capability_replay_analysis_manifest": ReplayAnalysisManifest,
-    "capability_doctor_report": CapabilityDoctorReport,
-    "capability_compatibility_preparation": CompatibilityPreparationManifest,
-    "capability_compatibility_stage_status": CompatibilityStageStatus,
-    "core_primitive_spec": CorePrimitiveSpec,
-    "attack_macro_spec": AttackMacroSpec,
-    "raw_interaction_trajectory": RawInteractionTrajectory,
-    "interaction_event": InteractionEvent,
-    "interaction_graph": InteractionGraph,
-    "primitive_occurrence": PrimitiveOccurrence,
-    "primitive_chain_candidate": PrimitiveChainCandidate,
-    "primitive_chain_sample": PrimitiveChainSample,
-    "accepted_sample_record": AcceptedSampleRecord,
-    "sample_library_manifest": SampleLibraryManifest,
-    "safeclaw_task_descriptor": SafeClawTaskDescriptor,
-    "safeclaw_public_task_view": SafeClawPublicTaskView,
-    "benchmark_public_prompt": BenchmarkPublicPrompt,
-    "formal_case_assignment": FormalCaseAssignment,
-    "single_sample_planner_input": SingleSamplePlannerInput,
-    "baseline_binding": BaselineBinding,
-    "benchmark_binding": BenchmarkBinding,
-    "formal_planner_input": FormalPlannerInput,
-    "formal_evaluation_plan": FormalEvaluationPlan,
-    "safeclaw_episode_result": SafeClawEpisodeResult,
-    "formal_run_result": FormalRunResult,
-    "construction_observation": ConstructionObservation,
-    "construction_attacker_action": ConstructionAttackerAction,
-    "formal_attacker_input": FormalAttackerInput,
-    "formal_attack_realization": FormalAttackRealization,
-    "sample_collection_preflight_report": SampleCollectionPreflightReport,
-    "workflow_readiness_report": WorkflowReadinessReport,
-    "compatibility_probe_assessment": CompatibilityProbeAssessment,
-    "sample_collection_stage_manifest": SampleCollectionStageManifest,
-    "sample_mining_stage_manifest": SampleMiningStageManifest,
-    "sample_library_audit_report": SampleLibraryAuditReport,
-    "observation_profile_v3": ObservationProfile,
-    "effect_graph_v3": EffectGraph,
-    "flow_registry_v3": FlowRegistry,
-    "dependency_slice_v3": DependencySlice,
-    "flow_analysis_manifest_v3": AnalysisManifest,
-    "flow_analysis_report_v3": FlowAnalysisReport,
-    "flow_macro_binding_v3": MacroBinding,
-    "flow_intervention_record_v3": InterventionRecord,
-    "benign_scenario": BenignScenario,
-    "benign_scenario_set": BenignScenarioSet,
-    "benign_policy_observation": BenignPolicyObservation,
-    "benign_policy_action": BenignPolicyAction,
-    "benign_collection_config": BenignCollectionConfig,
-    "benign_source_mode_manifest": BenignSourceModeManifest,
-    "benign_preparation_manifest": BenignPreparationManifest,
-    "benign_trace_assessment": BenignTraceAssessment,
-    "benign_neutralization_result": NeutralizationResult,
+    "attack_program_candidate": AttackCandidate,
+    "attack_program_catalog": Catalog,
+    "attack_program_development_input": DevelopmentInput,
+    "attack_program_library_manifest": LibraryManifest,
+    "attack_program_observation": RawObservation,
+    "attack_program_runtime_event": RuntimeEvent,
+    "attack_program_r3_case": R3Case,
+    "attack_program_r3_config": R3Config,
+    "attack_program_r3_manifest": R3Manifest,
+    "attack_program_r3_plan": R3Plan,
+    "attack_program_r3_planner_input": R3PlannerInput,
+    "attack_program_r3_result": R3Result,
+    "attack_program_raw_view": RawExampleView,
+    "attack_program_split": Split,
+    "attack_program_structured_view": StructuredExampleView,
 }
 
 
 def validate_schema_registry() -> None:
     for name, model in SCHEMA_MODELS.items():
-        schema = model.model_json_schema()
-        if schema.get("type") != "object":
+        if model.model_json_schema().get("type") != "object":
             raise ValueError(f"schema_root_not_object:{name}")
+
+
+def build_schemas(directory: Path = Path("schemas")) -> list[Path]:
+    validate_schema_registry()
+    directory.mkdir(parents=True, exist_ok=True)
+    result: list[Path] = []
+    for name, model in SCHEMA_MODELS.items():
+        path = directory / f"{name}.schema.json"
+        path.write_text(json.dumps(model.model_json_schema(), indent=2) + "\n", encoding="utf-8")
+        result.append(path)
+    return result
+
+
+if __name__ == "__main__":
+    build_schemas()

@@ -1,9 +1,3 @@
-# Data
+# 数据目录
 
-```text
-primitive_libraries/
-├── generated/  collection、mining 和 audit 的可恢复工作树
-└── frozen/     通过审计且不可覆盖的正式 sample library
-```
-
-生成内容默认不进入 Git。当前正式评估要求 `frozen/safeclaw-main`，该 library 尚未产生。
+本目录保留历史输入与封存库作为只读证据。当前 R1–R3 synthetic 工程库由 `scripts/attack_program/10_demo_r2.sh` 或 `11_demo_r3.sh` 写入唯一的 `experiments/runs/attack-program/<run-id>/`，不写入本目录，也不构成正式研究库。

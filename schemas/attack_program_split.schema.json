@@ -1,0 +1,57 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-program-split/1",
+      "default": "attack-program-split/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "catalog_hash": {
+      "title": "Catalog Hash",
+      "type": "string"
+    },
+    "rule": {
+      "const": "template-group-explicit-v1",
+      "default": "template-group-explicit-v1",
+      "title": "Rule",
+      "type": "string"
+    },
+    "group_assignments": {
+      "additionalProperties": {
+        "enum": [
+          "development",
+          "validation",
+          "test"
+        ],
+        "type": "string"
+      },
+      "title": "Group Assignments",
+      "type": "object"
+    },
+    "known_exposure": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Known Exposure",
+      "type": "array"
+    },
+    "exposure_registry_hash": {
+      "title": "Exposure Registry Hash",
+      "type": "string"
+    },
+    "split_hash": {
+      "title": "Split Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "catalog_hash",
+    "group_assignments",
+    "known_exposure",
+    "exposure_registry_hash",
+    "split_hash"
+  ],
+  "title": "Split",
+  "type": "object"
+}
