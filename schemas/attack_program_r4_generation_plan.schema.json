@@ -1,0 +1,145 @@
+{
+  "additionalProperties": false,
+  "description": "Versioned, bounded Attacker generation configuration.",
+  "properties": {
+    "schema_version": {
+      "const": "attack-r4-generation-plan/1",
+      "default": "attack-r4-generation-plan/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_group_id": {
+      "title": "Task Group Id",
+      "type": "string"
+    },
+    "source_split": {
+      "const": "development",
+      "default": "development",
+      "title": "Source Split",
+      "type": "string"
+    },
+    "slot_count": {
+      "const": 3,
+      "default": 3,
+      "title": "Slot Count",
+      "type": "integer"
+    },
+    "max_attacker_http_attempts": {
+      "const": 3,
+      "default": 3,
+      "title": "Max Attacker Http Attempts",
+      "type": "integer"
+    },
+    "max_output_tokens": {
+      "default": 2048,
+      "maximum": 2048,
+      "minimum": 1,
+      "title": "Max Output Tokens",
+      "type": "integer"
+    },
+    "request_timeout_seconds": {
+      "default": 90,
+      "maximum": 90,
+      "minimum": 1,
+      "title": "Request Timeout Seconds",
+      "type": "integer"
+    },
+    "wall_clock_seconds": {
+      "default": 600,
+      "maximum": 600,
+      "minimum": 1,
+      "title": "Wall Clock Seconds",
+      "type": "integer"
+    },
+    "concurrency": {
+      "const": 1,
+      "default": 1,
+      "title": "Concurrency",
+      "type": "integer"
+    },
+    "http_502_retries": {
+      "const": 0,
+      "default": 0,
+      "title": "Http 502 Retries",
+      "type": "integer"
+    },
+    "generation_seed": {
+      "default": 17,
+      "title": "Generation Seed",
+      "type": "integer"
+    },
+    "execution_enabled": {
+      "const": false,
+      "default": false,
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "attacker_model_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attacker Model Id"
+    },
+    "attacker_endpoint_identity": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Attacker Endpoint Identity"
+    },
+    "attacker_endpoint_env": {
+      "default": "STAC_R4_ATTACKER_URL",
+      "title": "Attacker Endpoint Env",
+      "type": "string"
+    },
+    "attacker_api_key_env": {
+      "default": "STAC_R4_ATTACKER_KEY",
+      "title": "Attacker Api Key Env",
+      "type": "string"
+    },
+    "prompt_file": {
+      "title": "Prompt File",
+      "type": "string"
+    },
+    "candidate_schema": {
+      "const": "attack-candidate/1",
+      "default": "attack-candidate/1",
+      "title": "Candidate Schema",
+      "type": "string"
+    },
+    "public_goal": {
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Public Goal",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_id",
+    "task_id",
+    "task_group_id",
+    "prompt_file",
+    "public_goal"
+  ],
+  "title": "R4GenerationPlan",
+  "type": "object"
+}

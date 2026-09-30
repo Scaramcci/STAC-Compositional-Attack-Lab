@@ -147,6 +147,7 @@ class OpenAICompatibleClient:
         api_key_env: str = "OPENAI_API_KEY",
         request_ledger: ProviderRequestLedger | None = None,
         http_502_retries: int = 0,
+        max_response_bytes: int | None = None,
     ) -> None:
         self.model_id = model_id
         self.max_output_tokens = max_output_tokens
@@ -166,6 +167,7 @@ class OpenAICompatibleClient:
         if not 0 <= http_502_retries <= 2:
             raise ValueError("http_502_retries_out_of_range")
         self.http_502_retries = http_502_retries
+        self.max_response_bytes = max_response_bytes
         self.last_upstream_attempts: list[dict[str, Any]] = []
 
     @property
@@ -226,10 +228,21 @@ class OpenAICompatibleClient:
                 for retry_index in range(self.http_502_retries + 1):
                     try:
                         if self.request_ledger is None:
-                            data = _post_json(url, payload, self._api_key, timeout)
+                            data = _post_json(
+                                url,
+                                payload,
+                                self._api_key,
+                                timeout,
+                                max_response_bytes=self.max_response_bytes,
+                            )
                         else:
                             data = _post_json(
-                                url, payload, self._api_key, timeout, ledger=self.request_ledger
+                                url,
+                                payload,
+                                self._api_key,
+                                timeout,
+                                ledger=self.request_ledger,
+                                max_response_bytes=self.max_response_bytes,
                             )
                         break
                     except urllib.error.HTTPError as exc:
@@ -279,6 +292,7 @@ def _post_json(
     timeout: int,
     *,
     ledger: ProviderRequestLedger | None = None,
+    max_response_bytes: int | None = None,
 ) -> dict[str, object]:
     request = urllib.request.Request(
         url,
@@ -296,7 +310,9 @@ def _post_json(
     started = monotonic()
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            raw = response.read()
+            raw = response.read(max_response_bytes + 1 if max_response_bytes is not None else -1)
+            if max_response_bytes is not None and len(raw) > max_response_bytes:
+                raise ModelCallError("provider_response_too_large")
             if record is not None:
                 record.status = response.status
                 record.content_type = response.headers.get("Content-Type")

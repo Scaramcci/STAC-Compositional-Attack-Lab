@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "R4GenerationSlot": {
+      "additionalProperties": false,
+      "description": "Durable per-slot outcome; every assigned slot remains in the denominator.",
+      "properties": {
+        "schema_version": {
+          "const": "attack-r4-generation-slot/1",
+          "default": "attack-r4-generation-slot/1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slot_id": {
+          "title": "Slot Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "assigned",
+            "valid",
+            "invalid",
+            "duplicate",
+            "error",
+            "not_started"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "request_attempted": {
+          "title": "Request Attempted",
+          "type": "boolean"
+        },
+        "request_sequence": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Request Sequence"
+        },
+        "model_candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Candidate Id"
+        },
+        "candidate_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Candidate Hash"
+        },
+        "materialized_task_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Materialized Task Hash"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason Code"
+        },
+        "response_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Hash"
+        },
+        "response_bytes": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Response Bytes"
+        },
+        "usage": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Usage"
+        },
+        "usage_observation": {
+          "default": "unknown",
+          "enum": [
+            "returned",
+            "unknown"
+          ],
+          "title": "Usage Observation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot_id",
+        "status",
+        "request_attempted"
+      ],
+      "title": "R4GenerationSlot",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "attack-r4-generation-summary/1",
+      "default": "attack-r4-generation-summary/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "plan_id": {
+      "title": "Plan Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "source_split": {
+      "const": "development",
+      "title": "Source Split",
+      "type": "string"
+    },
+    "assigned_slots": {
+      "title": "Assigned Slots",
+      "type": "integer"
+    },
+    "attacker_http_attempts": {
+      "title": "Attacker Http Attempts",
+      "type": "integer"
+    },
+    "valid_candidates": {
+      "title": "Valid Candidates",
+      "type": "integer"
+    },
+    "invalid_candidates": {
+      "title": "Invalid Candidates",
+      "type": "integer"
+    },
+    "duplicate_candidates": {
+      "title": "Duplicate Candidates",
+      "type": "integer"
+    },
+    "not_started": {
+      "title": "Not Started",
+      "type": "integer"
+    },
+    "slots": {
+      "items": {
+        "$ref": "#/$defs/R4GenerationSlot"
+      },
+      "title": "Slots",
+      "type": "array"
+    },
+    "candidate_files": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Candidate Files",
+      "type": "array"
+    },
+    "status": {
+      "enum": [
+        "prepared_disabled",
+        "completed",
+        "interrupted",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "plan_hash": {
+      "title": "Plan Hash",
+      "type": "string"
+    },
+    "prompt_hash": {
+      "title": "Prompt Hash",
+      "type": "string"
+    },
+    "public_request_hash": {
+      "title": "Public Request Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "plan_id",
+    "task_id",
+    "source_split",
+    "assigned_slots",
+    "attacker_http_attempts",
+    "valid_candidates",
+    "invalid_candidates",
+    "duplicate_candidates",
+    "not_started",
+    "slots",
+    "candidate_files",
+    "status",
+    "plan_hash",
+    "prompt_hash",
+    "public_request_hash"
+  ],
+  "title": "R4GenerationSummary",
+  "type": "object"
+}

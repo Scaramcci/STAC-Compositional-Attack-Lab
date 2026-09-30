@@ -1,0 +1,5 @@
+{
+  "mode": "generation",
+  "model": "attacker-local-fake",
+  "candidate_path": "configs/attack_program/r4_development_candidate.json"
+}

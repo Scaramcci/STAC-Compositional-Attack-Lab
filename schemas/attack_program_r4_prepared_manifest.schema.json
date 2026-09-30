@@ -1,0 +1,235 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "scope": {
+      "title": "Scope",
+      "type": "string"
+    },
+    "execution_enabled": {
+      "title": "Execution Enabled",
+      "type": "boolean"
+    },
+    "binding": {
+      "title": "Binding",
+      "type": "null"
+    },
+    "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^r4-[0-9a-f]{32}$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "task_group_id": {
+      "title": "Task Group Id",
+      "type": "string"
+    },
+    "source_split": {
+      "title": "Source Split",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "candidate_hash": {
+      "title": "Candidate Hash",
+      "type": "string"
+    },
+    "materialized_task_hash": {
+      "title": "Materialized Task Hash",
+      "type": "string"
+    },
+    "materialized_file_hash": {
+      "title": "Materialized File Hash",
+      "type": "string"
+    },
+    "upstream_commit": {
+      "title": "Upstream Commit",
+      "type": "string"
+    },
+    "upstream_task_hash": {
+      "title": "Upstream Task Hash",
+      "type": "string"
+    },
+    "judge_hash": {
+      "title": "Judge Hash",
+      "type": "string"
+    },
+    "patch_hash": {
+      "title": "Patch Hash",
+      "type": "string"
+    },
+    "image": {
+      "title": "Image",
+      "type": "string"
+    },
+    "image_digest": {
+      "title": "Image Digest",
+      "type": "string"
+    },
+    "victim_model_id": {
+      "title": "Victim Model Id",
+      "type": "string"
+    },
+    "victim_endpoint_host": {
+      "title": "Victim Endpoint Host",
+      "type": "string"
+    },
+    "victim_endpoint_identity": {
+      "title": "Victim Endpoint Identity",
+      "type": "string"
+    },
+    "victim_api_type": {
+      "title": "Victim Api Type",
+      "type": "string"
+    },
+    "victim_endpoint_env": {
+      "title": "Victim Endpoint Env",
+      "type": "string"
+    },
+    "victim_api_key_env": {
+      "title": "Victim Api Key Env",
+      "type": "string"
+    },
+    "attacker_model_id": {
+      "title": "Attacker Model Id",
+      "type": "null"
+    },
+    "max_http_attempts": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Max Http Attempts",
+      "type": "object"
+    },
+    "http_502_retries": {
+      "title": "Http 502 Retries",
+      "type": "integer"
+    },
+    "per_request_timeout_seconds": {
+      "maximum": 90,
+      "minimum": 1,
+      "title": "Per Request Timeout Seconds",
+      "type": "integer"
+    },
+    "per_session_timeout_seconds": {
+      "maximum": 360,
+      "minimum": 1,
+      "title": "Per Session Timeout Seconds",
+      "type": "integer"
+    },
+    "episode_deadline_seconds_after_activation": {
+      "maximum": 900,
+      "minimum": 1,
+      "title": "Episode Deadline Seconds After Activation",
+      "type": "integer"
+    },
+    "authorization_ttl_seconds_after_bind": {
+      "maximum": 3600,
+      "minimum": 1,
+      "title": "Authorization Ttl Seconds After Bind",
+      "type": "integer"
+    },
+    "provider_max_output_tokens": {
+      "maximum": 1024,
+      "minimum": 1,
+      "title": "Provider Max Output Tokens",
+      "type": "integer"
+    },
+    "cleanup_timeout_seconds": {
+      "maximum": 120,
+      "minimum": 1,
+      "title": "Cleanup Timeout Seconds",
+      "type": "integer"
+    },
+    "max_cost_usd": {
+      "title": "Max Cost Usd",
+      "type": "null"
+    },
+    "cost_control": {
+      "title": "Cost Control",
+      "type": "string"
+    },
+    "dependency_version": {
+      "title": "Dependency Version",
+      "type": "string"
+    },
+    "processing_source_hashes": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Processing Source Hashes",
+      "type": "object"
+    },
+    "fake_mode": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Fake Mode"
+    },
+    "manifest_hash": {
+      "title": "Manifest Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "scope",
+    "execution_enabled",
+    "binding",
+    "batch_id",
+    "run_id",
+    "task_id",
+    "task_group_id",
+    "source_split",
+    "candidate_id",
+    "candidate_hash",
+    "materialized_task_hash",
+    "materialized_file_hash",
+    "upstream_commit",
+    "upstream_task_hash",
+    "judge_hash",
+    "patch_hash",
+    "image",
+    "image_digest",
+    "victim_model_id",
+    "victim_endpoint_host",
+    "victim_endpoint_identity",
+    "victim_api_type",
+    "victim_endpoint_env",
+    "victim_api_key_env",
+    "attacker_model_id",
+    "max_http_attempts",
+    "http_502_retries",
+    "per_request_timeout_seconds",
+    "per_session_timeout_seconds",
+    "episode_deadline_seconds_after_activation",
+    "authorization_ttl_seconds_after_bind",
+    "provider_max_output_tokens",
+    "cleanup_timeout_seconds",
+    "max_cost_usd",
+    "cost_control",
+    "dependency_version",
+    "processing_source_hashes",
+    "fake_mode",
+    "manifest_hash"
+  ],
+  "title": "PreparedManifest",
+  "type": "object"
+}

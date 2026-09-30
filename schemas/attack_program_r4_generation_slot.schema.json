@@ -1,0 +1,145 @@
+{
+  "additionalProperties": false,
+  "description": "Durable per-slot outcome; every assigned slot remains in the denominator.",
+  "properties": {
+    "schema_version": {
+      "const": "attack-r4-generation-slot/1",
+      "default": "attack-r4-generation-slot/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slot_id": {
+      "title": "Slot Id",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "assigned",
+        "valid",
+        "invalid",
+        "duplicate",
+        "error",
+        "not_started"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "request_attempted": {
+      "title": "Request Attempted",
+      "type": "boolean"
+    },
+    "request_sequence": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Request Sequence"
+    },
+    "model_candidate_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Candidate Id"
+    },
+    "candidate_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate Hash"
+    },
+    "materialized_task_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Materialized Task Hash"
+    },
+    "reason_code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason Code"
+    },
+    "response_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Hash"
+    },
+    "response_bytes": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Response Bytes"
+    },
+    "usage": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Usage"
+    },
+    "usage_observation": {
+      "default": "unknown",
+      "enum": [
+        "returned",
+        "unknown"
+      ],
+      "title": "Usage Observation",
+      "type": "string"
+    }
+  },
+  "required": [
+    "slot_id",
+    "status",
+    "request_attempted"
+  ],
+  "title": "R4GenerationSlot",
+  "type": "object"
+}

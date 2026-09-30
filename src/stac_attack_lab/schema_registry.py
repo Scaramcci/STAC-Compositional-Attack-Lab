@@ -18,6 +18,9 @@ from stac_attack_lab.attack_program.models import (
     R3Plan,
     R3PlannerInput,
     R3Result,
+    R4GenerationPlan,
+    R4GenerationSlot,
+    R4GenerationSummary,
     RawExampleView,
     RawObservation,
     RuntimeEvent,
@@ -25,6 +28,7 @@ from stac_attack_lab.attack_program.models import (
     StructuredExampleView,
 )
 from stac_attack_lab.attack_program.r4 import RuntimeBundle, RuntimeSession
+from stac_attack_lab.attack_program.r4_batch import PreparedManifest
 
 SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "attack_program_candidate": AttackCandidate,
@@ -44,6 +48,10 @@ SCHEMA_MODELS: dict[str, type[BaseModel]] = {
     "attack_program_structured_view": StructuredExampleView,
     "attack_program_r4_runtime_bundle": RuntimeBundle,
     "attack_program_r4_runtime_session": RuntimeSession,
+    "attack_program_r4_prepared_manifest": PreparedManifest,
+    "attack_program_r4_generation_plan": R4GenerationPlan,
+    "attack_program_r4_generation_slot": R4GenerationSlot,
+    "attack_program_r4_generation_summary": R4GenerationSummary,
 }
 
 

@@ -84,6 +84,20 @@
           "title": "Memory After Version",
           "type": "string"
         },
+        "file_versions_before": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "File Versions Before",
+          "type": "object"
+        },
+        "file_versions_after": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "File Versions After",
+          "type": "object"
+        },
         "preconditions_satisfied": {
           "default": true,
           "title": "Preconditions Satisfied",
@@ -270,6 +284,28 @@
       "default": true,
       "title": "Capture Complete",
       "type": "boolean"
+    },
+    "source_material": {
+      "additionalProperties": true,
+      "title": "Source Material",
+      "type": "object"
+    },
+    "runtime_controls": {
+      "additionalProperties": true,
+      "title": "Runtime Controls",
+      "type": "object"
+    },
+    "execution_binding_hash": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Execution Binding Hash"
     }
   },
   "required": [

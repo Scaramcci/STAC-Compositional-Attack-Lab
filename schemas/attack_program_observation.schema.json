@@ -81,6 +81,11 @@
           "enum": [
             "session_started",
             "source_delivered",
+            "source_prepared",
+            "source_read_requested",
+            "source_summary_visible",
+            "source_result_delivered",
+            "provider_context_reachable",
             "semantic_use",
             "tool_selected",
             "tool_request",

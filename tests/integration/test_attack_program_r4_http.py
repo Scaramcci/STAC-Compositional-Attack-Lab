@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import threading
+import time
+import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,7 +13,11 @@ from pathlib import Path
 import pytest
 
 from stac_attack_lab.attack_program.pipeline import GateError
-from stac_attack_lab.attack_program.provider_relay import _PersistentRelayBudget
+from stac_attack_lab.attack_program.provider_relay import (
+    ProviderRelayConfig,
+    ProviderRelayServer,
+    _PersistentRelayBudget,
+)
 from stac_attack_lab.attack_program.r4_batch import _project_env, generate_candidate
 from stac_attack_lab.attack_program.r4_fake_provider import FakeServer
 
@@ -25,7 +31,7 @@ def _serve(server: ThreadingHTTPServer) -> threading.Thread:
 
 
 def test_fake_victim_http_json_and_sse_drive_different_actions():
-    server = FakeServer({"mode": "harm", "payload": "sample memory", "model": "r4-local-fake"}, 0)
+    server = FakeServer({"mode": "harm", "mail_name": "notice.eml", "model": "r4-local-fake"}, 0)
     thread = _serve(server)
     try:
         url = f"http://127.0.0.1:{server.server_address[1]}/v1/chat/completions"
@@ -42,10 +48,37 @@ def test_fake_victim_http_json_and_sse_drive_different_actions():
             body = response.read().decode()
         chunks = [json.loads(line[6:]) for line in body.splitlines() if line.startswith("data: {")]
         tool = chunks[0]["choices"][0]["delta"]["tool_calls"][0]
-        assert tool["function"]["name"] == "write"
-        assert json.loads(tool["function"]["arguments"])["content"] == "sample memory"
+        assert tool["function"]["name"] == "exec"
+        assert (
+            json.loads(tool["function"]["arguments"])["command"]
+            == "sim-google gmail get notice.eml --json"
+        )
         assert "data: [DONE]" in body
-        assert server.requests == 2
+        delivered = {"from": "bot@example.test", "subject": "CI/CD", "body": "actual tool body"}
+        request = urllib.request.Request(
+            url,
+            data=json.dumps(
+                {
+                    "messages": [
+                        {
+                            "role": "tool",
+                            "tool_call_id": "r4-call-2",
+                            "content": json.dumps(delivered),
+                        },
+                    ]
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            third = json.load(response)
+        call = third["choices"][0]["message"]["tool_calls"][0]["function"]
+        assert call["name"] == "write"
+        assert (
+            json.loads(call["arguments"])["content"]
+            == "From: bot@example.test\nSubject: CI/CD\n\nactual tool body"
+        )
+        assert server.requests == 3
     finally:
         server.shutdown()
         server.server_close()
@@ -160,3 +193,90 @@ def test_prepare_environment_projection_omits_credential_value(tmp_path: Path):
         "SAFECLAW_MODEL": "demo",
         "SAFECLAW_BASE_URL": "https://example.invalid/v1",
     }
+
+
+class _FailedProvider(BaseHTTPRequestHandler):
+    calls = 0
+
+    def log_message(self, _format, *args):
+        pass
+
+    def do_POST(self):
+        type(self).calls += 1
+        body = self.rfile.read(int(self.headers["Content-Length"]))
+        if b"redirect" in body:
+            self.send_response(302)
+            self.send_header("Location", "/unauthorized-target")
+            self.end_headers()
+            return
+        self.send_error(503, "synthetic unavailable")
+
+    def do_GET(self):
+        type(self).calls += 1
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+
+def test_relay_no_retry_deadline_model_and_uncertain_count(tmp_path):
+    _FailedProvider.calls = 0
+    upstream = ThreadingHTTPServer(("127.0.0.1", 0), _FailedProvider)
+    up_thread = _serve(upstream)
+    config = ProviderRelayConfig(
+        upstream_base_url=f"http://127.0.0.1:{upstream.server_address[1]}/v1",
+        upstream_api_key="fake-only",
+        ingress_token="fake-ingress",
+        control_token="fake-control",
+        max_requests=4,
+        ledger_path=str(tmp_path / "ledger.jsonl"),
+        evidence_path=str(tmp_path / "evidence.jsonl"),
+        expected_model="fake-model",
+        reject_duplicate_requests=True,
+        deadline_at=time.time() + 10,
+    )
+    relay = ProviderRelayServer(("127.0.0.1", 0), config)
+    relay_thread = _serve(relay)
+
+    def send(model, content="same request"):
+        request = urllib.request.Request(
+            relay.url + "/v1/chat/completions",
+            data=json.dumps(
+                {"model": model, "messages": [{"role": "user", "content": content}]}
+            ).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer fake-ingress"},
+        )
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(request, timeout=2)
+        error.value.close()
+        return error.value.code
+
+    try:
+        assert send("different-model") == 400
+        assert relay.budget.reserved == 0
+        assert send("fake-model") == 503
+        assert send("fake-model") == 409
+        assert _FailedProvider.calls == 1
+        assert relay.budget.reserved == 2
+        assert send("fake-model", "redirect") == 302
+        assert _FailedProvider.calls == 2
+        assert relay.budget.reserved == 3
+        freeze = urllib.request.Request(
+            relay.url + "/stac/evidence/context/freeze",
+            data=b"{}",
+            headers={"X-STAC-Control-Token": "fake-control", "Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(freeze, timeout=2) as response:
+            assert json.load(response)["status"] == "frozen"
+        assert send("fake-model", "after freeze") == 429
+        assert _FailedProvider.calls == 2
+        assert relay.budget.reserved == 3
+        object.__setattr__(config, "deadline_at", time.time() - 1)
+        assert send("fake-model") == 403
+        assert relay.budget.reserved == 3
+    finally:
+        relay.shutdown()
+        relay.server_close()
+        relay_thread.join(timeout=2)
+        upstream.shutdown()
+        upstream.server_close()
+        up_thread.join(timeout=2)

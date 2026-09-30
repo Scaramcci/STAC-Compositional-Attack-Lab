@@ -1,6 +1,6 @@
 # 项目协作规范
 
-本仓库当前唯一代码路线是 `src/stac_attack_lab/attack_program/` 的 R1–R3 离线工程链。开始任务先查 `git status --short`、`git log -3 --oneline`，读本文件、`SECURITY.md`、`docs/IMPLEMENTATION_PROGRESS.md` 和 `docs/IMPLEMENTATION_WORKPLAN.md` 顶部，保护已有修改。根据目标先看合同、入口和对应集成测试，再追实现。
+本仓库当前唯一代码路线是 `src/stac_attack_lab/attack_program/` 的 R1–R3 离线主链及 R4 运行适配；本机 fake 有历史验证，新版绑定/执行路径待查收，真实执行按批次授权。开始任务先查 `git status --short`、`git log -3 --oneline`，读本文件、`SECURITY.md`、`docs/IMPLEMENTATION_PROGRESS.md` 和 `docs/IMPLEMENTATION_WORKPLAN.md` 顶部，保护已有修改。根据目标先看合同、入口和对应集成测试，再追实现。
 
 用户授权决定执行范围。可自主完成离线实现、synthetic fixture、测试、schema、lint/typecheck、fake HTTP 与 replay/audit。真实模型/API、付费探针、真实 Victim、bind、正式库冻结或正式实验须有覆盖该批次的明确授权。测试通过与历史授权不创造授权。未要求时不 commit/push/reset/clean；不改历史 raw、账本、封存 manifest 或库。
 

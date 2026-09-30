@@ -35,6 +35,8 @@ from stac_attack_lab.attack_program.r3 import replay as r3_replay
 from stac_attack_lab.attack_program.r3 import run as r3_run
 from stac_attack_lab.attack_program.r4 import replay_case
 from stac_attack_lab.attack_program.r4_batch import (
+    authorization_text,
+    batch_status,
     bind_disabled,
     generate_candidate,
     load_candidate,
@@ -42,6 +44,14 @@ from stac_attack_lab.attack_program.r4_batch import (
     run_disabled,
     validate_prepared,
 )
+from stac_attack_lab.attack_program.r4_generation import (
+    generation_authorization_preview,
+    generation_status,
+    prepare_generation,
+    prepare_victim_candidates,
+    run_generation,
+)
+from stac_attack_lab.attack_program.r4_real_import import audit_real_attempt, import_real_attempt
 from stac_attack_lab.attack_program.r4_runtime import _upstream_preflight, run_local_fake_batch
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -109,13 +119,27 @@ def main() -> int:
     r4_prepare = sub.add_parser("r4-prepare")
     r4_prepare.add_argument("--candidate", type=Path, required=True)
     r4_prepare.add_argument("--output", type=Path, required=True)
-    for name in ("r4-validate", "r4-status", "r4-bind", "r4-run-batch"):
+    r4_prepare.add_argument("--local-fake-mode", choices=("normal", "harm", "reject"))
+    for name in ("r4-validate", "r4-status", "r4-bind", "r4-run-batch", "r4-authorization-preview"):
         command = sub.add_parser(name)
         command.add_argument("--batch", type=Path, required=True)
+        if name in {"r4-bind", "r4-run-batch"}:
+            command.add_argument("--authorization", type=Path)
+            command.add_argument("--authorization-sha256")
+            command.add_argument("--acknowledge-real-authorization", action="store_true")
+            command.add_argument("--local-fake-authorized", action="store_true")
     for name in ("r4-review", "r4-replay"):
         command = sub.add_parser(name)
         command.add_argument("--case", type=Path, required=True)
         command.add_argument("--output", type=Path, required=True)
+    r4_import = sub.add_parser("r4-import-real-development")
+    r4_import.add_argument("--batch", type=Path, required=True)
+    r4_import.add_argument("--review", type=Path, required=True)
+    r4_import.add_argument("--audit", type=Path, required=True)
+    r4_import_audit = sub.add_parser("r4-audit-real-development")
+    r4_import_audit.add_argument("--batch", type=Path, required=True)
+    r4_import_audit.add_argument("--review", type=Path, required=True)
+    r4_import_audit.add_argument("--audit", type=Path, required=True)
     r4_generate = sub.add_parser("r4-generate-local-fake")
     r4_generate.add_argument("--task-id", required=True)
     r4_generate.add_argument("--model-id", required=True)
@@ -123,6 +147,32 @@ def main() -> int:
     r4_generate.add_argument("--api-key-env", required=True)
     r4_generate.add_argument("--batch-id", required=True)
     r4_generate.add_argument("--output", type=Path, required=True)
+    r4_gen_prepare = sub.add_parser("r4-generation-prepare")
+    r4_gen_prepare.add_argument("--plan", type=Path, required=True)
+    r4_gen_prepare.add_argument("--prompt", type=Path, required=True)
+    r4_gen_prepare.add_argument("--output", type=Path, required=True)
+    r4_gen_prepare.add_argument("--model-id")
+    r4_gen_prepare.add_argument("--base-url")
+    r4_gen_run = sub.add_parser("r4-generation-run")
+    r4_gen_run.add_argument("--plan", type=Path, required=True)
+    r4_gen_run.add_argument("--prompt", type=Path, required=True)
+    r4_gen_run.add_argument("--output", type=Path, required=True)
+    r4_gen_run.add_argument("--model-id")
+    r4_gen_run.add_argument("--base-url")
+    r4_gen_run.add_argument("--api-key-env", default="STAC_R4_ATTACKER_KEY")
+    r4_gen_run.add_argument("--local-fake", action="store_true")
+    r4_gen_run.add_argument("--authorization", type=Path)
+    r4_gen_run.add_argument("--authorization-sha256")
+    r4_gen_run.add_argument("--acknowledge-real-authorization", action="store_true")
+    r4_gen_prepare_victim = sub.add_parser("r4-generation-prepare-victim")
+    r4_gen_prepare_victim.add_argument("--generation", type=Path, required=True)
+    r4_gen_prepare_victim.add_argument("--output", type=Path, required=True)
+    r4_gen_prepare_victim.add_argument("--local-fake-mode", choices=("normal", "harm", "reject"))
+    r4_gen_preview = sub.add_parser("r4-generation-authorization-preview")
+    r4_gen_preview.add_argument("--plan", type=Path, required=True)
+    r4_gen_preview.add_argument("--prompt", type=Path, required=True)
+    r4_gen_status = sub.add_parser("r4-generation-status")
+    r4_gen_status.add_argument("--generation", type=Path, required=True)
     args = parser.parse_args()
     try:
         if args.command == "doctor":
@@ -252,7 +302,9 @@ def main() -> int:
             if report["completed"] != report["assigned"]:
                 return 2
         elif args.command == "r4-prepare":
-            manifest = prepare_disabled(ROOT, args.candidate, args.output)
+            manifest = prepare_disabled(
+                ROOT, args.candidate, args.output, local_fake=args.local_fake_mode
+            )
             print(
                 json.dumps(
                     {
@@ -262,14 +314,73 @@ def main() -> int:
                     }
                 )
             )
-        elif args.command in {"r4-validate", "r4-status"}:
+        elif args.command == "r4-validate":
             print(json.dumps(validate_prepared(ROOT, args.batch)))
-        elif args.command == "r4-bind":
-            bind_disabled(ROOT, args.batch)
-        elif args.command == "r4-run-batch":
-            run_disabled(ROOT, args.batch)
+        elif args.command == "r4-status":
+            print(json.dumps(batch_status(ROOT, args.batch)))
+        elif args.command == "r4-authorization-preview":
+            validate_prepared(ROOT, args.batch)
+            manifest = json.loads((args.batch / "manifest.json").read_text())
+            print(
+                json.dumps(
+                    {
+                        "status": "preview_only_not_authorization",
+                        "authorization_record": {
+                            "schema_version": "attack-r4-authorization/1",
+                            "scope": manifest["scope"],
+                            "manifest_hash": manifest["manifest_hash"],
+                            "text": authorization_text(manifest),
+                        },
+                        "next": (
+                            "User authorization required; save approved original record, "
+                            "compute file SHA256, then bind/run with explicit flag."
+                        ),
+                    }
+                )
+            )
+        elif args.command in {"r4-bind", "r4-run-batch"}:
+            if args.acknowledge_real_authorization and args.local_fake_authorized:
+                raise GateError("runtime_authorization_flags_conflict")
+            operation = bind_disabled if args.command == "r4-bind" else run_disabled
+            print(
+                json.dumps(
+                    operation(
+                        ROOT,
+                        args.batch,
+                        authorization=args.authorization,
+                        authorization_sha256=args.authorization_sha256,
+                        acknowledge=args.acknowledge_real_authorization
+                        or args.local_fake_authorized,
+                        local_fake=args.local_fake_authorized,
+                    )
+                )
+            )
         elif args.command in {"r4-review", "r4-replay"}:
             print(json.dumps(replay_case(ROOT, args.case, args.output)))
+        elif args.command == "r4-import-real-development":
+            print(
+                json.dumps(
+                    import_real_attempt(
+                        ROOT,
+                        args.batch,
+                        args.review,
+                        args.audit,
+                        ROOT / "experiments/runs/attack-program/r4-real-development-imports",
+                    )
+                )
+            )
+        elif args.command == "r4-audit-real-development":
+            print(
+                json.dumps(
+                    audit_real_attempt(
+                        ROOT,
+                        args.batch,
+                        args.review,
+                        args.audit,
+                        ROOT / "experiments/runs/attack-program/r4-real-development-imports",
+                    )
+                )
+            )
         elif args.command == "r4-generate-local-fake":
             key = os.environ.get(args.api_key_env)
             if not key:
@@ -291,6 +402,53 @@ def main() -> int:
                     }
                 )
             )
+        elif args.command == "r4-generation-prepare":
+            print(
+                json.dumps(
+                    prepare_generation(
+                        ROOT,
+                        args.plan,
+                        args.prompt,
+                        args.output,
+                        model_id=args.model_id,
+                        base_url=args.base_url,
+                    )
+                )
+            )
+        elif args.command == "r4-generation-run":
+            key = os.environ.get(args.api_key_env) if args.local_fake else None
+            print(
+                json.dumps(
+                    run_generation(
+                        ROOT,
+                        args.plan,
+                        args.prompt,
+                        args.output,
+                        model_id=args.model_id,
+                        base_url=args.base_url,
+                        api_key=key,
+                        local_fake=args.local_fake,
+                        authorization=args.authorization,
+                        authorization_sha256=args.authorization_sha256,
+                        acknowledge_real_authorization=args.acknowledge_real_authorization,
+                    )
+                )
+            )
+        elif args.command == "r4-generation-prepare-victim":
+            print(
+                json.dumps(
+                    prepare_victim_candidates(
+                        ROOT,
+                        args.generation,
+                        args.output,
+                        local_fake_mode=args.local_fake_mode,
+                    )
+                )
+            )
+        elif args.command == "r4-generation-authorization-preview":
+            print(json.dumps(generation_authorization_preview(ROOT, args.plan, args.prompt)))
+        elif args.command == "r4-generation-status":
+            print(json.dumps(generation_status(args.generation)))
         return 0
     except (GateError, FileExistsError, FileNotFoundError) as exc:
         print(

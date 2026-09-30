@@ -655,6 +655,9 @@ class ProviderRelayConfig:
     control_token: str | None = None
     derivation_policy: dict[str, Any] = field(default_factory=dict)
     precommit_guard_policy: dict[str, Any] | None = None
+    deadline_at: float | None = None
+    expected_model: str | None = None
+    reject_duplicate_requests: bool = False
 
     def __post_init__(self) -> None:
         policy = validate_provider_evidence_policy(self.derivation_policy or None)
@@ -689,6 +692,9 @@ class ProviderRelayConfig:
             precommit_guard_policy=validate_precommit_guard_policy(
                 value.get("precommit_guard_policy")
             ),
+            deadline_at=value.get("deadline_at"),
+            expected_model=value.get("expected_model"),
+            reject_duplicate_requests=bool(value.get("reject_duplicate_requests", False)),
         )
         if not config.upstream_base_url or not config.upstream_api_key or not config.ingress_token:
             raise ValueError("provider_relay_missing_required_config")
@@ -722,6 +728,11 @@ class _PersistentRelayBudget:
         except OSError as exc:
             raise RuntimeError("provider_relay_ledger_unavailable") from exc
         try:
+            if path.exists() != self.reservation_path.exists():
+                raise RuntimeError("provider_relay_ledger_pair_incomplete")
+            for ledger_file in (path, self.reservation_path):
+                descriptor = os.open(ledger_file, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600)
+                os.close(descriptor)
             self.records = self._read()
             reservations = self._read_path(self.reservation_path)
         except Exception:
@@ -736,6 +747,7 @@ class _PersistentRelayBudget:
             ]
             or [0]
         )
+        self.frozen = any(row.get("stage") == "terminal_freeze" for row in self.records)
 
     def _read(self) -> list[dict[str, Any]]:
         return self._read_path(self.path)
@@ -767,7 +779,7 @@ class _PersistentRelayBudget:
     def reserve(self) -> tuple[int, bool]:
         with self._mutex:
             self.sequence += 1
-            accepted = self.reserved < self.maximum
+            accepted = not self.frozen and self.reserved < self.maximum
             item = {
                 "batch_id": self.batch_id,
                 "stage": "reservation",
@@ -781,6 +793,18 @@ class _PersistentRelayBudget:
             if accepted:
                 self.reserved += 1
             return self.sequence, accepted
+
+    def freeze(self) -> None:
+        with self._mutex:
+            if not self.frozen:
+                self._append(
+                    {
+                        "batch_id": self.batch_id,
+                        "stage": "terminal_freeze",
+                        "timestamp": time.time(),
+                    }
+                )
+                self.frozen = True
 
     def append(self, item: dict[str, Any]) -> None:
         with self._mutex:
@@ -873,6 +897,13 @@ def _filtered_payload(
     return copied, [_tool_name(tool) or "unknown" for tool in filtered]
 
 
+class _NoProviderRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> None:
+        return None
+
+
 class _RelayHandler(BaseHTTPRequestHandler):
     server: ProviderRelayServer
 
@@ -903,7 +934,11 @@ class _RelayHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         config = self.server.config
         started = time.monotonic()
-        if self.path in {"/stac/evidence/context/open", "/stac/evidence/context/close"}:
+        if self.path in {
+            "/stac/evidence/context/open",
+            "/stac/evidence/context/close",
+            "/stac/evidence/context/freeze",
+        }:
             supplied_control = self.headers.get("X-STAC-Control-Token", "")
             if not config.control_token or not hmac.compare_digest(
                 supplied_control, config.control_token
@@ -915,6 +950,10 @@ class _RelayHandler(BaseHTTPRequestHandler):
                 value = json.loads(self.rfile.read(size))
                 if not isinstance(value, dict):
                     raise ValueError("control_body_not_object")
+                if self.path.endswith("/freeze"):
+                    self.server.budget.freeze()
+                    self._write(200, b'{"status":"frozen"}', "application/json")
+                    return
                 result = (
                     self.server.open_evidence_context(value)
                     if self.path.endswith("/open")
@@ -936,6 +975,11 @@ class _RelayHandler(BaseHTTPRequestHandler):
         if not hmac.compare_digest(supplied, f"Bearer {config.ingress_token}"):
             self._write(401, b'{"error":{"message":"relay_auth_failed"}}', "application/json")
             return
+        if config.deadline_at is not None and time.time() >= config.deadline_at:
+            self._write(
+                403, b'{"error":{"message":"execution_deadline_expired"}}', "application/json"
+            )
+            return
         try:
             size = int(self.headers.get("Content-Length", "0"))
             if size < 1 or size > 2_000_000:
@@ -945,6 +989,8 @@ class _RelayHandler(BaseHTTPRequestHandler):
             if not isinstance(parsed, dict):
                 raise ValueError("provider_relay_body_not_object")
             payload, final_tools = _filtered_payload(parsed, config.allowed_tools)
+            if config.expected_model is not None and payload.get("model") != config.expected_model:
+                raise ValueError("provider_model_override_forbidden")
         except (ValueError, json.JSONDecodeError) as exc:
             self._write(
                 400,
@@ -985,6 +1031,39 @@ class _RelayHandler(BaseHTTPRequestHandler):
                 payload["stream_options"] = stream_options
             stream_options.setdefault("include_usage", True)
         encoded = json.dumps(payload, separators=(",", ":")).encode()
+        if config.reject_duplicate_requests:
+            fingerprint = hashlib.sha256(encoded).hexdigest()
+            # Durable attempted boundaries survive relay restart and uncertain sends.
+            with self.server.state.lock:
+                evidence_file = self.server.evidence.path
+                previous = (
+                    _parse_jsonl_records(
+                        evidence_file.read_bytes(), corruption="duplicate_guard_evidence_corrupt"
+                    )
+                    if evidence_file.exists()
+                    else []
+                )
+                duplicate = fingerprint in self.server.request_fingerprints or any(
+                    row.get("record_type") == "provider_request"
+                    and row.get("send_state") == "attempted"
+                    and row.get("request_sha256") == fingerprint
+                    for row in previous
+                )
+                self.server.request_fingerprints.add(fingerprint)
+            if duplicate:
+                self.server.record(
+                    {
+                        "sequence": sequence,
+                        "accepted": True,
+                        "status": 409,
+                        "error_category": "duplicate_request_no_retry",
+                        "duration_ms": 0,
+                    }
+                )
+                self._write(
+                    409, b'{"error":{"message":"duplicate_request_no_retry"}}', "application/json"
+                )
+                return
         request_id = f"provider-request-{self.server.budget.batch_id}-{sequence}-{uuid.uuid4().hex}"
         with self.server.state.lock:
             context = (
@@ -1058,7 +1137,15 @@ class _RelayHandler(BaseHTTPRequestHandler):
         error_category: str | None = None
         response_received = False
         try:
-            with urllib.request.urlopen(request, timeout=config.timeout_seconds) as response:
+            remaining_timeout = (
+                config.timeout_seconds
+                if config.deadline_at is None
+                else min(config.timeout_seconds, max(0.001, config.deadline_at - time.time()))
+            )
+            if config.deadline_at is not None and time.time() >= config.deadline_at:
+                raise TimeoutError("execution_deadline_expired")
+            opener = urllib.request.build_opener(_NoProviderRedirect())
+            with opener.open(request, timeout=remaining_timeout) as response:
                 status = response.status
                 content_type = response.headers.get("Content-Type", "application/json")
                 body = response.read()
@@ -1245,6 +1332,7 @@ class _RelayHandler(BaseHTTPRequestHandler):
 class ProviderRelayServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
+    request_fingerprints: set[str]
 
     def __init__(
         self,
@@ -1265,6 +1353,7 @@ class ProviderRelayServer(ThreadingHTTPServer):
             accepted_requests=self.budget.reserved,
             total_attempts=self.budget.sequence,
         )
+        self.request_fingerprints = set()
         super().__init__(address, _RelayHandler)
 
     def server_close(self) -> None:
@@ -1682,47 +1771,34 @@ class ContainerProviderRelay:
         return _parse_jsonl_records(result.stdout, corruption="embedding_ledger_corrupt")
 
     def records(self) -> list[dict[str, Any]]:
-        if not self.started:
-            return []
-        result = self._docker(
-            "exec",
-            self.container,
-            "sh",
-            "-c",
-            "cat /var/lib/stac-ledger/provider.jsonl 2>/dev/null || true",
-            check=False,
-        )
-        return _parse_jsonl_records(result.stdout, corruption="provider_ledger_corrupt")
+        return self._ledger_records("provider.jsonl", "provider_ledger_corrupt")
 
     def reservations(self) -> list[dict[str, Any]]:
         """Durable pre-send reservations, including uncertain HTTP attempts."""
-        if not self.started:
-            return []
-        result = self._docker(
-            "exec",
-            self.container,
-            "sh",
-            "-c",
-            "cat /var/lib/stac-ledger/provider.jsonl.reservations 2>/dev/null || true",
-            check=False,
-        )
-        return _parse_jsonl_records(result.stdout, corruption="provider_reservations_corrupt")
+        return self._ledger_records("provider.jsonl.reservations", "provider_reservations_corrupt")
 
     def evidence_records(self) -> list[dict[str, Any]]:
+        records = self._ledger_records("provider-evidence.jsonl", "provider_evidence_corrupt")
+        if any(row.get("record_sha256") != _record_hash(row) for row in records):
+            raise RuntimeError("provider_evidence_record_hash_mismatch")
+        return records
+
+    def _ledger_records(self, filename: str, corruption: str) -> list[dict[str, Any]]:
         if not self.started:
             return []
         result = self._docker(
             "exec",
             self.container,
-            "sh",
-            "-c",
-            "cat /var/lib/stac-ledger/provider-evidence.jsonl 2>/dev/null || true",
+            "cat",
+            f"/var/lib/stac-ledger/{filename}",
             check=False,
         )
-        return _parse_jsonl_records(result.stdout, corruption="provider_evidence_corrupt")
+        if result.returncode != 0:
+            raise RuntimeError("provider_ledger_capture_unavailable")
+        return _parse_jsonl_records(result.stdout, corruption=corruption)
 
     def _evidence_control(self, operation: str, value: dict[str, Any]) -> dict[str, Any]:
-        if not self.started or operation not in {"open", "close"}:
+        if not self.started or operation not in {"open", "close", "freeze"}:
             raise RuntimeError("provider_evidence_control_unavailable")
         script = "\n".join(
             [
@@ -1771,6 +1847,9 @@ class ContainerProviderRelay:
             },
         )
 
+    def freeze_requests(self) -> dict[str, Any]:
+        return self._evidence_control("freeze", {})
+
     def close_evidence_context(
         self,
         *,
@@ -1787,14 +1866,21 @@ class ContainerProviderRelay:
             },
         )
 
-    def stop(self, *, remove_volume: bool = False) -> None:
+    def stop(self, *, remove_volume: bool = False, timeout_seconds: int = 30) -> None:
         # Callers may remove this relay-owned random volume only after archiving
         # its evidence. Legacy callers retain the prior preservation default.
-        self._docker("rm", "-f", self.container, check=False)
-        self._docker("network", "disconnect", self.network, self.victim_container, check=False)
-        self._docker("network", "rm", self.network, check=False)
+        self._docker("rm", "-f", self.container, check=False, timeout=timeout_seconds)
+        self._docker(
+            "network",
+            "disconnect",
+            self.network,
+            self.victim_container,
+            check=False,
+            timeout=timeout_seconds,
+        )
+        self._docker("network", "rm", self.network, check=False, timeout=timeout_seconds)
         if remove_volume:
-            self._docker("volume", "rm", self.volume, check=False)
+            self._docker("volume", "rm", self.volume, check=False, timeout=timeout_seconds)
         self.started = False
         self.embedding_started = False
 

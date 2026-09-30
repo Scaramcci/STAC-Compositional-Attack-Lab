@@ -27,6 +27,11 @@ class RuntimeEvent(StrictModel):
     event_type: Literal[
         "session_started",
         "source_delivered",
+        "source_prepared",
+        "source_read_requested",
+        "source_summary_visible",
+        "source_result_delivered",
+        "provider_context_reachable",
         "semantic_use",
         "tool_selected",
         "tool_request",
@@ -114,6 +119,69 @@ class AttackCandidate(StrictModel):
     source_split: Literal["development", "validation", "test"]
     patches: list[Patch]
     planned_primitives: list[Primitive] = Field(default_factory=list)
+
+
+class R4GenerationPlan(StrictModel):
+    """Versioned, bounded Attacker generation configuration."""
+
+    schema_version: Literal["attack-r4-generation-plan/1"] = "attack-r4-generation-plan/1"
+    plan_id: str
+    task_id: str
+    task_group_id: str
+    source_split: Literal["development"] = "development"
+    slot_count: Literal[3] = 3
+    max_attacker_http_attempts: Literal[3] = 3
+    max_output_tokens: int = Field(default=2048, ge=1, le=2048)
+    request_timeout_seconds: int = Field(default=90, ge=1, le=90)
+    wall_clock_seconds: int = Field(default=600, ge=1, le=600)
+    concurrency: Literal[1] = 1
+    http_502_retries: Literal[0] = 0
+    generation_seed: int = 17
+    execution_enabled: Literal[False] = False
+    attacker_model_id: str | None = None
+    attacker_endpoint_identity: str | None = None
+    attacker_endpoint_env: str = "STAC_R4_ATTACKER_URL"
+    attacker_api_key_env: str = "STAC_R4_ATTACKER_KEY"
+    prompt_file: str
+    candidate_schema: Literal["attack-candidate/1"] = "attack-candidate/1"
+    public_goal: str = Field(min_length=1, max_length=1000)
+
+
+class R4GenerationSlot(StrictModel):
+    """Durable per-slot outcome; every assigned slot remains in the denominator."""
+
+    schema_version: Literal["attack-r4-generation-slot/1"] = "attack-r4-generation-slot/1"
+    slot_id: str
+    status: Literal["assigned", "valid", "invalid", "duplicate", "error", "not_started"]
+    request_attempted: bool
+    request_sequence: int | None = None
+    model_candidate_id: str | None = None
+    candidate_hash: str | None = None
+    materialized_task_hash: str | None = None
+    reason_code: str | None = None
+    response_hash: str | None = None
+    response_bytes: int | None = None
+    usage: dict[str, Any] | None = None
+    usage_observation: Literal["returned", "unknown"] = "unknown"
+
+
+class R4GenerationSummary(StrictModel):
+    schema_version: Literal["attack-r4-generation-summary/1"] = "attack-r4-generation-summary/1"
+    plan_id: str
+    task_id: str
+    source_split: Literal["development"]
+    assigned_slots: int
+    attacker_http_attempts: int
+    valid_candidates: int
+    invalid_candidates: int
+    duplicate_candidates: int
+    not_started: int
+    slots: list[R4GenerationSlot]
+    candidate_files: list[str]
+    status: Literal["prepared_disabled", "completed", "interrupted", "rejected"]
+    plan_hash: str
+    prompt_hash: str
+    public_request_hash: str
 
 
 class PrimitiveOccurrence(StrictModel):

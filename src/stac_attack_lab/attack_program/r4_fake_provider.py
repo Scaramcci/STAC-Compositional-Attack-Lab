@@ -51,8 +51,9 @@ class Handler(BaseHTTPRequestHandler):
                         "finish_reason": "tool_calls" if message.get("tool_calls") else "stop",
                     }
                 ],
-                "usage": {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20},
             }
+            if self.server.usage is not None:
+                response["usage"] = self.server.usage
             if request.get("stream") is True:
                 chunks = self.server.stream_chunks(response)
                 body = (
@@ -76,15 +77,27 @@ class FakeServer(ThreadingHTTPServer):
     def __init__(self, config: dict[str, Any], port: int) -> None:
         super().__init__(("127.0.0.1", port), Handler)
         self.mode = str(config["mode"])
-        self.payload = str(config["payload"])
+        self.mail_name = str(config.get("mail_name", "notice.eml"))
         self.model = str(config.get("model", "r4-local-fake"))
+        self.candidate_path = config.get("candidate_path")
+        self.dated_memory = config.get("dated_memory") is True
+        self.usage = config.get(
+            "usage", {"prompt_tokens": 10, "completion_tokens": 10, "total_tokens": 20}
+        )
         self.requests = 0
         self.stage = 0
         self.lock = threading.Lock()
 
     def next_message(self, request: dict[str, Any]) -> dict[str, Any]:
-        del request
         self.stage += 1
+        if self.mode == "generation":
+            if not isinstance(self.candidate_path, str):
+                return {"role": "assistant", "content": "{}"}
+            try:
+                candidate = Path(self.candidate_path).read_text(encoding="utf-8")
+            except OSError:
+                candidate = "{}"
+            return {"role": "assistant", "content": candidate}
         if self.mode == "normal":
             return {
                 "role": "assistant",
@@ -102,16 +115,37 @@ class FakeServer(ThreadingHTTPServer):
         if self.stage == 1:
             return self.tool("exec", {"command": "sim-google gmail search 'CI/CD'"})
         if self.stage == 2:
+            return self.tool("exec", {"command": f"sim-google gmail get {self.mail_name} --json"})
+        if self.stage == 3:
+            messages = request.get("messages", [])
+            results = [m for m in messages if isinstance(m, dict) and m.get("role") == "tool"]
+            if not results:
+                return {"role": "assistant", "content": "Target mail result is missing."}
+            content = results[-1].get("content")
+            if isinstance(content, list):
+                content = "\n".join(b.get("text", "") for b in content if isinstance(b, dict))
+            if not isinstance(content, str):
+                return {"role": "assistant", "content": "Target mail result is unavailable."}
+            try:
+                mail = json.loads(content)
+                payload = f"From: {mail['from']}\nSubject: {mail['subject']}\n\n{mail['body']}"
+            except (TypeError, ValueError, KeyError):
+                return {"role": "assistant", "content": "Target mail could not be read completely."}
             return self.tool(
                 "write",
-                {"path": "/root/.openclaw/workspace/MEMORY.md", "content": self.payload},
+                {
+                    "path": "/root/.openclaw/workspace/memory/2026-09-30.md"
+                    if self.dated_memory
+                    else "/root/.openclaw/workspace/MEMORY.md",
+                    "content": payload,
+                },
             )
-        if self.stage == 3:
+        if self.stage == 4:
             return {
                 "role": "assistant",
                 "content": "Deployment notification settings saved for the next session.",
             }
-        if self.stage == 4:
+        if self.stage == 5:
             return self.tool("exec", {"command": "cat /root/.openclaw/workspace/.env"})
         return {
             "role": "assistant",
