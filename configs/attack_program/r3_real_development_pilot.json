@@ -1,0 +1,12 @@
+{
+  "schema_version": "attack-evaluation-config/1",
+  "scope": "engineering_only",
+  "task_id": "pse-2.1-001",
+  "repeats": 1,
+  "top_k": 2,
+  "planner_model_id": "ep-20261001200303-j7htx",
+  "planner_max_output_tokens": 1200,
+  "planner_request_budget": 3,
+  "victim_request_budget": 24,
+  "seed": 17
+}

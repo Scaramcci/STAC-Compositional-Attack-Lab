@@ -102,12 +102,34 @@
       "title": "Victim Api Key Env",
       "type": "string"
     },
+    "embedding_api_key_env": {
+      "default": "SAFECLAW_EMBEDDING_API_KEY",
+      "title": "Embedding Api Key Env",
+      "type": "string"
+    },
+    "embedding_endpoint_env": {
+      "default": "SAFECLAW_EMBEDDING_BASE_URL",
+      "title": "Embedding Endpoint Env",
+      "type": "string"
+    },
+    "embedding_model_env": {
+      "default": "SAFECLAW_EMBEDDING_MODEL",
+      "title": "Embedding Model Env",
+      "type": "string"
+    },
+    "embedding_enabled": {
+      "default": false,
+      "title": "Embedding Enabled",
+      "type": "boolean"
+    },
     "attacker_model_id": {
       "title": "Attacker Model Id",
       "type": "null"
     },
     "max_http_attempts": {
       "additionalProperties": {
+        "maximum": 24,
+        "minimum": 0,
         "type": "integer"
       },
       "title": "Max Http Attempts",
@@ -124,13 +146,13 @@
       "type": "integer"
     },
     "per_session_timeout_seconds": {
-      "maximum": 360,
+      "maximum": 720,
       "minimum": 1,
       "title": "Per Session Timeout Seconds",
       "type": "integer"
     },
     "episode_deadline_seconds_after_activation": {
-      "maximum": 900,
+      "maximum": 1800,
       "minimum": 1,
       "title": "Episode Deadline Seconds After Activation",
       "type": "integer"
@@ -182,6 +204,19 @@
         }
       ],
       "title": "Fake Mode"
+    },
+    "measurement_relation": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Measurement Relation"
     },
     "manifest_hash": {
       "title": "Manifest Hash",
